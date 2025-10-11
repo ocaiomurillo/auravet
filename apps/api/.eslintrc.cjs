@@ -9,6 +9,7 @@ module.exports = {
     project: ['./tsconfig.json'],
     tsconfigRootDir: __dirname,
     sourceType: 'module',
+    loggerFn: false,
   },
   plugins: ['@typescript-eslint', 'import'],
   extends: [
