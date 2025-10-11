@@ -1,0 +1,123 @@
+import type { PropsWithChildren } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { apiClient } from '../lib/apiClient';
+import { UNAUTHORIZED_EVENT, authStorage } from '../lib/authStorage';
+import type { AuthLoginResponse, Permission, Role, User } from '../types/api';
+
+interface AuthContextValue {
+  user: User | null;
+  token: string | null;
+  isLoading: boolean;
+  login: (payload: { email: string; password: string }) => Promise<void>;
+  logout: () => void;
+  registerUser: (payload: { nome: string; email: string; password: string; role: Role }) => Promise<User>;
+  hasPermission: (permission: Permission) => boolean;
+  refreshUser: () => Promise<User | null>;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+const currentUserQueryKey = ['auth', 'me'];
+
+const fetchCurrentUser = async (): Promise<User> => {
+  const response = await apiClient.get<{ user: User }>('/auth/me');
+  return response.user;
+};
+
+export const AuthProvider = ({ children }: PropsWithChildren): JSX.Element => {
+  const [token, setToken] = useState<string | null>(() => authStorage.getToken());
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const { data: user, isLoading, refetch } = useQuery<User, Error>({
+    queryKey: currentUserQueryKey,
+    queryFn: fetchCurrentUser,
+    enabled: Boolean(token),
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!token) {
+      queryClient.removeQueries({ queryKey: currentUserQueryKey });
+    }
+  }, [queryClient, token]);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      authStorage.clearToken();
+      setToken(null);
+      queryClient.removeQueries({ queryKey: currentUserQueryKey });
+      navigate('/login');
+    };
+
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+  }, [navigate, queryClient]);
+
+  const login = useCallback(
+    async ({ email, password }: { email: string; password: string }) => {
+      const result = await apiClient.post<AuthLoginResponse>('/auth/login', {
+        email,
+        password,
+      });
+
+      authStorage.setToken(result.token);
+      setToken(result.token);
+      await refetch();
+      navigate('/');
+    },
+    [navigate, refetch],
+  );
+
+  const logout = useCallback(() => {
+    authStorage.clearToken();
+    setToken(null);
+    queryClient.removeQueries({ queryKey: currentUserQueryKey });
+    navigate('/login');
+  }, [navigate, queryClient]);
+
+  const registerUser = useCallback(
+    async (payload: { nome: string; email: string; password: string; role: Role }) => {
+      const response = await apiClient.post<{ user: User }>('/auth/register', payload);
+      return response.user;
+    },
+    [],
+  );
+
+  const hasPermission = useCallback(
+    (permission: Permission) => user?.permissions.includes(permission) ?? false,
+    [user],
+  );
+
+  const refreshUser = useCallback(async () => {
+    const result = await refetch();
+    return result.data ?? null;
+  }, [refetch]);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user: user ?? null,
+      token,
+      isLoading: Boolean(token) && isLoading,
+      login,
+      logout,
+      registerUser,
+      hasPermission,
+      refreshUser,
+    }),
+    [hasPermission, isLoading, login, logout, registerUser, refreshUser, token, user],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de AuthProvider');
+  }
+  return context;
+};

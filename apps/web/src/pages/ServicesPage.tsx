@@ -6,6 +6,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
+import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Animal, Owner, Service } from '../types/api';
 
@@ -18,6 +19,8 @@ interface ServiceFilters {
 
 const ServicesPage = () => {
   const [filters, setFilters] = useState<ServiceFilters>({ ownerId: '', animalId: '', from: '', to: '' });
+  const { hasPermission } = useAuth();
+  const canRegisterService = hasPermission('services:write');
 
   const { data: owners } = useQuery({
     queryKey: ['owners'],
@@ -63,9 +66,11 @@ const ServicesPage = () => {
             Visualize consultas, exames, vacinações e cirurgias com filtros por tutor, pet e período.
           </p>
         </div>
-        <Button variant="secondary" asChild>
-          <Link to="/new-service">Registrar novo serviço</Link>
-        </Button>
+        {canRegisterService ? (
+          <Button variant="secondary" asChild>
+            <Link to="/new-service">Registrar novo serviço</Link>
+          </Button>
+        ) : null}
       </div>
 
       <Card title="Filtros inteligentes" description="Aperte play para enxergar o cuidado por período.">

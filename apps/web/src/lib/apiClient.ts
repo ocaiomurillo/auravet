@@ -1,19 +1,35 @@
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = authStorage.getToken();
+
+  const headers = new Headers(options.headers ?? {});
+
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   });
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
-    throw new Error(errorBody?.error ?? 'Não foi possível concluir a solicitação.');
+
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+    }
+
+    const error = new Error(errorBody?.error ?? 'Não foi possível concluir a solicitação.');
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
   }
 
   if (response.status === 204) {
@@ -28,6 +44,11 @@ export const apiClient = {
   post: <T>(path: string, body: unknown) =>
     request<T>(path, {
       method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patch: <T>(path: string, body: unknown) =>
+    request<T>(path, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     }),
   put: <T>(path: string, body: unknown) =>

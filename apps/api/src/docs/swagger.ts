@@ -18,6 +18,13 @@ export const swaggerDocument = {
     },
   ],
   components: {
+    securitySchemes: {
+      BearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
     schemas: {
       Owner: {
         type: 'object',
@@ -61,6 +68,71 @@ export const swaggerDocument = {
         },
         required: ['id', 'animalId', 'tipo', 'data', 'preco', 'createdAt'],
       },
+      User: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          nome: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          role: {
+            type: 'string',
+            enum: [
+              'ADMINISTRADOR',
+              'AUXILIAR_ADMINISTRATIVO',
+              'ASSISTENTE_ADMINISTRATIVO',
+              'ENFERMEIRO',
+              'MEDICO',
+              'CONTADOR',
+            ],
+          },
+          isActive: { type: 'boolean' },
+          lastLoginAt: { type: 'string', format: 'date-time', nullable: true },
+          permissions: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: [
+                'owners:read',
+                'owners:write',
+                'animals:read',
+                'animals:write',
+                'services:read',
+                'services:write',
+                'users:manage',
+              ],
+            },
+          },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+        required: ['id', 'nome', 'email', 'role', 'isActive', 'permissions', 'createdAt', 'updatedAt'],
+      },
+      AuthLoginRequest: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', minLength: 8 },
+        },
+      },
+      AuthLoginResponse: {
+        type: 'object',
+        properties: {
+          token: { type: 'string' },
+          user: { $ref: '#/components/schemas/User' },
+        },
+        required: ['token', 'user'],
+      },
+      RegisterUserRequest: {
+        type: 'object',
+        required: ['nome', 'email', 'password', 'role'],
+        properties: {
+          nome: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', minLength: 8 },
+          role: { $ref: '#/components/schemas/User/properties/role' },
+        },
+      },
       ErrorResponse: {
         type: 'object',
         properties: {
@@ -92,9 +164,221 @@ export const swaggerDocument = {
         },
       },
     },
+    '/auth/login': {
+      post: {
+        summary: 'Autentica um colaborador interno',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AuthLoginRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Autenticação bem-sucedida',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AuthLoginResponse' },
+              },
+            },
+          },
+          '401': {
+            description: 'Credenciais inválidas',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '429': { description: 'Limite de tentativas excedido' },
+        },
+      },
+    },
+    '/auth/register': {
+      post: {
+        summary: 'Cadastra um novo colaborador interno',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/RegisterUserRequest' },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Colaborador criado',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                  required: ['user'],
+                },
+              },
+            },
+          },
+          '403': { description: 'Permissão insuficiente' },
+          '409': {
+            description: 'E-mail já cadastrado',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/auth/me': {
+      get: {
+        summary: 'Retorna informações do usuário autenticado',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Dados do usuário autenticado',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                  required: ['user'],
+                },
+              },
+            },
+          },
+          '401': { description: 'Sessão inválida' },
+        },
+      },
+    },
+    '/users': {
+      get: {
+        summary: 'Lista colaboradores internos',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Colaboradores encontrados',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    users: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/User' },
+                    },
+                  },
+                  required: ['users'],
+                },
+              },
+            },
+          },
+          '403': { description: 'Permissão insuficiente' },
+        },
+      },
+    },
+    '/users/{id}': {
+      patch: {
+        summary: 'Atualiza dados básicos de um colaborador',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'cuid' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  nome: { type: 'string' },
+                  role: { $ref: '#/components/schemas/User/properties/role' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Colaborador atualizado',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                  required: ['user'],
+                },
+              },
+            },
+          },
+          '404': { description: 'Colaborador não encontrado' },
+        },
+      },
+    },
+    '/users/{id}/status': {
+      patch: {
+        summary: 'Ativa ou desativa um colaborador',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'cuid' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['isActive'],
+                properties: {
+                  isActive: { type: 'boolean' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Status atualizado',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                  required: ['user'],
+                },
+              },
+            },
+          },
+          '400': { description: 'Operação não permitida' },
+          '404': { description: 'Colaborador não encontrado' },
+        },
+      },
+    },
     '/owners': {
       get: {
         summary: 'Lista todos os tutores cadastrados',
+        security: [{ BearerAuth: [] }],
         responses: {
           '200': {
             description: 'Lista de tutores',
@@ -111,6 +395,7 @@ export const swaggerDocument = {
       },
       post: {
         summary: 'Cria um novo tutor',
+        security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -150,6 +435,7 @@ export const swaggerDocument = {
     '/owners/{id}': {
       get: {
         summary: 'Obtém um tutor específico',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -179,6 +465,7 @@ export const swaggerDocument = {
       },
       put: {
         summary: 'Atualiza um tutor',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -218,6 +505,7 @@ export const swaggerDocument = {
       },
       delete: {
         summary: 'Remove um tutor',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -235,6 +523,7 @@ export const swaggerDocument = {
     '/animals': {
       get: {
         summary: 'Lista todos os animais',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'ownerId',
@@ -258,6 +547,7 @@ export const swaggerDocument = {
       },
       post: {
         summary: 'Cadastra um novo animal',
+        security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -297,6 +587,7 @@ export const swaggerDocument = {
     '/animals/{id}': {
       get: {
         summary: 'Obtém um animal específico',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -321,6 +612,7 @@ export const swaggerDocument = {
       },
       put: {
         summary: 'Atualiza um animal',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -362,6 +654,7 @@ export const swaggerDocument = {
       },
       delete: {
         summary: 'Remove um animal',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -379,6 +672,7 @@ export const swaggerDocument = {
     '/animals/{id}/services': {
       get: {
         summary: 'Lista serviços relacionados a um animal',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -406,6 +700,7 @@ export const swaggerDocument = {
     '/services': {
       get: {
         summary: 'Lista serviços com filtros por animal, tutor e período',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'animalId',
@@ -444,6 +739,7 @@ export const swaggerDocument = {
       },
       post: {
         summary: 'Registra um novo serviço',
+        security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -483,6 +779,7 @@ export const swaggerDocument = {
     '/services/{id}': {
       put: {
         summary: 'Atualiza um serviço',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -524,6 +821,7 @@ export const swaggerDocument = {
       },
       delete: {
         summary: 'Remove um serviço',
+        security: [{ BearerAuth: [] }],
         parameters: [
           {
             name: 'id',

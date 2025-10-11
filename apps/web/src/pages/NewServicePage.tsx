@@ -74,7 +74,12 @@ const NewServicePage = () => {
     },
   });
 
-  const onSubmit = handleSubmit(({ ownerId: _owner, ...values }) => {
+  const onSubmit = handleSubmit(({ ownerId, ...values }) => {
+    if (!ownerId) {
+      toast.error('Selecione um tutor para registrar o serviço.');
+      return;
+    }
+
     if (!values.animalId) {
       toast.error('Selecione um pet para registrar o serviço.');
       return;

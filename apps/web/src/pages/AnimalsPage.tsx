@@ -9,6 +9,7 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
+import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Animal, Owner } from '../types/api';
 
@@ -34,6 +35,10 @@ const AnimalsPage = () => {
   const [selectedAnimalId, setSelectedAnimalId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canManageAnimals = hasPermission('animals:write');
+  const canRegisterServices = hasPermission('services:write');
+  const canViewServices = hasPermission('services:read');
 
   const { data: animals, isLoading, error } = useQuery({
     queryKey: ['animals'],
@@ -117,11 +122,11 @@ const AnimalsPage = () => {
   });
 
   const deleteAnimal = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/animals/${id}`),
-    onSuccess: () => {
+    mutationFn: (animalId: string) => apiClient.delete(`/animals/${animalId}`),
+    onSuccess: (_, deletedAnimalId) => {
       toast.success('Animal removido com sucesso.');
       queryClient.invalidateQueries({ queryKey: ['animals'] });
-      if (selectedAnimalId === id) {
+      if (selectedAnimalId === deletedAnimalId) {
         setSelectedAnimalId(null);
       }
     },
@@ -148,10 +153,12 @@ const AnimalsPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" asChild>
-            <Link to="/new-service">Registrar serviço</Link>
-          </Button>
-          <Button onClick={openCreateModal}>Novo animal</Button>
+          {canRegisterServices ? (
+            <Button variant="secondary" asChild>
+              <Link to="/new-service">Registrar serviço</Link>
+            </Button>
+          ) : null}
+          {canManageAnimals ? <Button onClick={openCreateModal}>Novo animal</Button> : null}
         </div>
       </div>
 
@@ -184,18 +191,20 @@ const AnimalsPage = () => {
                         <p className="text-xs uppercase tracking-wide text-brand-grafite/60">{animal.raca}</p>
                       ) : null}
                     </button>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" onClick={() => openEditModal(animal)}>
-                        Editar
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="text-red-600 hover:bg-red-100"
-                        onClick={() => deleteAnimal.mutate(animal.id)}
-                      >
-                        Remover
-                      </Button>
-                    </div>
+                    {canManageAnimals ? (
+                      <div className="flex gap-2">
+                        <Button variant="ghost" onClick={() => openEditModal(animal)}>
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="text-red-600 hover:bg-red-100"
+                          onClick={() => deleteAnimal.mutate(animal.id)}
+                        >
+                          Remover
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -224,23 +233,29 @@ const AnimalsPage = () => {
                   </p>
                 ) : null}
               </div>
-              {selectedAnimal.services?.length ? (
-                <ul className="space-y-3">
-                  {selectedAnimal.services.map((service) => (
-                    <li key={service.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
-                      <p className="font-semibold text-brand-escuro">{service.tipo}</p>
-                      <p className="text-sm text-brand-grafite/70">
-                        {new Date(service.data).toLocaleDateString('pt-BR')} • R$ {service.preco.toFixed(2)}
-                      </p>
-                      {service.observacoes ? (
-                        <p className="text-sm text-brand-grafite/80">{service.observacoes}</p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+              {canViewServices ? (
+                selectedAnimal.services?.length ? (
+                  <ul className="space-y-3">
+                    {selectedAnimal.services.map((service) => (
+                      <li key={service.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
+                        <p className="font-semibold text-brand-escuro">{service.tipo}</p>
+                        <p className="text-sm text-brand-grafite/70">
+                          {new Date(service.data).toLocaleDateString('pt-BR')} • R$ {service.preco.toFixed(2)}
+                        </p>
+                        {service.observacoes ? (
+                          <p className="text-sm text-brand-grafite/80">{service.observacoes}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-brand-grafite/70">
+                    Nenhum serviço registrado ainda. Que tal registrar o primeiro cuidado?
+                  </p>
+                )
               ) : (
                 <p className="text-sm text-brand-grafite/70">
-                  Nenhum serviço registrado ainda. Que tal registrar o primeiro cuidado?
+                  Você não possui permissão para visualizar o histórico clínico deste pet.
                 </p>
               )}
             </div>
@@ -252,43 +267,45 @@ const AnimalsPage = () => {
         </Card>
       </div>
 
-      <Modal
-        open={modalOpen}
-        onClose={closeModal}
-        title={editingAnimal ? 'Editar pet' : 'Novo pet Auravet'}
-        description="Quanto mais detalhes, mais personalizada fica a jornada de bem-estar do animal."
-        actions={
-          <>
-            <Button variant="ghost" onClick={closeModal}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="animal-form">
-              {editingAnimal ? 'Salvar' : 'Cadastrar pet'}
-            </Button>
-          </>
-        }
-      >
-        <form id="animal-form" className="space-y-4" onSubmit={onSubmit}>
-          <Field label="Nome" placeholder="Nome do pet" required {...register('nome')} />
-          <SelectField label="Espécie" required {...register('especie')}>
-            {Object.entries(specieLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </SelectField>
-          <Field label="Raça" placeholder="Opcional" {...register('raca')} />
-          <Field label="Data de nascimento" type="date" {...register('nascimento')} />
-          <SelectField label="Tutor" required {...register('ownerId')}>
-            <option value="">Selecione um tutor</option>
-            {owners?.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.nome}
-              </option>
-            ))}
-          </SelectField>
-        </form>
-      </Modal>
+      {canManageAnimals ? (
+        <Modal
+          open={modalOpen}
+          onClose={closeModal}
+          title={editingAnimal ? 'Editar pet' : 'Novo pet Auravet'}
+          description="Quanto mais detalhes, mais personalizada fica a jornada de bem-estar do animal."
+          actions={
+            <>
+              <Button variant="ghost" onClick={closeModal}>
+                Cancelar
+              </Button>
+              <Button type="submit" form="animal-form">
+                {editingAnimal ? 'Salvar' : 'Cadastrar pet'}
+              </Button>
+            </>
+          }
+        >
+          <form id="animal-form" className="space-y-4" onSubmit={onSubmit}>
+            <Field label="Nome" placeholder="Nome do pet" required {...register('nome')} />
+            <SelectField label="Espécie" required {...register('especie')}>
+              {Object.entries(specieLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </SelectField>
+            <Field label="Raça" placeholder="Opcional" {...register('raca')} />
+            <Field label="Data de nascimento" type="date" {...register('nascimento')} />
+            <SelectField label="Tutor" required {...register('ownerId')}>
+              <option value="">Selecione um tutor</option>
+              {owners?.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.nome}
+                </option>
+              ))}
+            </SelectField>
+          </form>
+        </Modal>
+      ) : null}
     </div>
   );
 };

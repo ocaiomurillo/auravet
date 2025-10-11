@@ -1,3 +1,20 @@
+export type Role =
+  | 'ADMINISTRADOR'
+  | 'AUXILIAR_ADMINISTRATIVO'
+  | 'ASSISTENTE_ADMINISTRATIVO'
+  | 'ENFERMEIRO'
+  | 'MEDICO'
+  | 'CONTADOR';
+
+export type Permission =
+  | 'owners:read'
+  | 'owners:write'
+  | 'animals:read'
+  | 'animals:write'
+  | 'services:read'
+  | 'services:write'
+  | 'users:manage';
+
 export interface Owner {
   id: string;
   nome: string;
@@ -28,4 +45,21 @@ export interface Service {
   observacoes?: string | null;
   createdAt: string;
   animal?: Animal;
+}
+
+export interface User {
+  id: string;
+  nome: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  permissions: Permission[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuthLoginResponse {
+  token: string;
+  user: User;
 }

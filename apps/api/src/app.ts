@@ -8,8 +8,10 @@ import { env } from './config/env';
 import { swaggerDocument } from './docs/swagger';
 import { errorHandler } from './middlewares/error-handler';
 import { animalsRouter } from './routes/animals';
+import { authRouter } from './routes/auth';
 import { ownersRouter } from './routes/owners';
 import { servicesRouter } from './routes/services';
+import { usersRouter } from './routes/users';
 
 const app = express();
 
@@ -28,9 +30,11 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'Auravet API saudável' });
 });
 
+app.use('/auth', authRouter);
 app.use('/owners', ownersRouter);
 app.use('/animals', animalsRouter);
 app.use('/services', servicesRouter);
+app.use('/users', usersRouter);
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use(errorHandler);
