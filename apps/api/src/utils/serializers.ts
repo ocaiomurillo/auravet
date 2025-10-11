@@ -1,66 +1,132 @@
-import { Animal, Owner, Servico } from '@prisma/client';
+import type { Animal, Owner, Servico, User } from '@prisma/client';
 
-type ServicoWithRelations = Servico & {
-  createdAt: Date;
-  data: Date;
-  animal?: AnimalWithRelations;
+import { buildAuthenticatedUser } from './auth';
+
+type ServiceWithOptionalRelations = Servico & {
+  animal?: AnimalWithOptionalRelations | null;
 };
 
-type AnimalWithRelations = Animal & {
-  createdAt: Date;
-  nascimento: Date | null;
+type AnimalWithOptionalRelations = Animal & {
   owner?: Owner | null;
-  services?: ServicoWithRelations[];
+  services?: ServiceWithOptionalRelations[];
 };
 
-type OwnerWithRelations = Owner & {
-  createdAt: Date;
-  animals?: AnimalWithRelations[];
+type OwnerWithOptionalRelations = Owner & {
+  animals?: AnimalWithOptionalRelations[];
+};
+
+export type SerializedService = {
+  id: string;
+  animalId: string;
+  tipo: Servico['tipo'];
+  data: string;
+  preco: number;
+  observacoes: string | null;
+  createdAt: string;
+  animal?: SerializedAnimal;
+};
+
+export type SerializedAnimal = {
+  id: string;
+  nome: string;
+  especie: Animal['especie'];
+  raca: string | null;
+  nascimento: string | null;
+  ownerId: string;
+  createdAt: string;
+  owner?: SerializedOwner;
+  services?: SerializedService[];
+};
+
+export type SerializedOwner = {
+  id: string;
+  nome: string;
+  email: string;
+  telefone: string | null;
+  createdAt: string;
+  animals?: SerializedAnimal[];
+};
+
+export type SerializedUser = {
+  id: string;
+  nome: string;
+  email: string;
+  role: User['role'];
+  isActive: boolean;
+  lastLoginAt: string | null;
+  permissions: string[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export const serializeService = (
-  service: ServicoWithRelations,
+  service: ServiceWithOptionalRelations,
   options?: { includeAnimal?: boolean },
-) => {
-  const serialized = {
-    ...service,
+): SerializedService => {
+  const serialized: SerializedService = {
+    id: service.id,
+    animalId: service.animalId,
+    tipo: service.tipo,
     data: service.data.toISOString(),
-    createdAt: service.createdAt.toISOString(),
     preco: Number(service.preco),
+    observacoes: service.observacoes ?? null,
+    createdAt: service.createdAt.toISOString(),
   };
 
   if (options?.includeAnimal && service.animal) {
-    serialized.animal = serializeAnimal({
-      ...service.animal,
-      services: undefined,
-    });
-  } else {
-    delete (serialized as Partial<typeof serialized>).animal;
+    serialized.animal = serializeAnimal(service.animal);
   }
 
   return serialized;
 };
 
-export const serializeAnimal = (animal: AnimalWithRelations) => ({
-  ...animal,
-  createdAt: animal.createdAt.toISOString(),
+export const serializeAnimal = (animal: AnimalWithOptionalRelations): SerializedAnimal => ({
+  id: animal.id,
+  nome: animal.nome,
+  especie: animal.especie,
+  raca: animal.raca ?? null,
   nascimento: animal.nascimento ? animal.nascimento.toISOString() : null,
+  ownerId: animal.ownerId,
+  createdAt: animal.createdAt.toISOString(),
   owner: animal.owner
     ? {
-        ...animal.owner,
+        id: animal.owner.id,
+        nome: animal.owner.nome,
+        email: animal.owner.email,
+        telefone: animal.owner.telefone ?? null,
         createdAt: animal.owner.createdAt.toISOString(),
       }
     : undefined,
   services: animal.services?.map((service) => serializeService(service)),
 });
 
-export const serializeOwner = (owner: OwnerWithRelations) => ({
-  ...owner,
+export const serializeOwner = (owner: OwnerWithOptionalRelations): SerializedOwner => ({
+  id: owner.id,
+  nome: owner.nome,
+  email: owner.email,
+  telefone: owner.telefone ?? null,
   createdAt: owner.createdAt.toISOString(),
   animals: owner.animals?.map((animal) =>
     serializeAnimal({
       ...animal,
+      owner: undefined,
       services: animal.services?.map((service) => ({ ...service, animal: undefined })),
     }),
   ),
 });
+
+export const serializeUser = (user: User): SerializedUser => {
+  const authenticated = buildAuthenticatedUser(user);
+
+  return {
+    id: authenticated.id,
+    nome: authenticated.nome,
+    email: authenticated.email,
+    role: authenticated.role,
+    isActive: authenticated.isActive,
+    lastLoginAt: authenticated.lastLoginAt ? authenticated.lastLoginAt.toISOString() : null,
+    permissions: authenticated.permissions,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+  };
+};

@@ -9,6 +9,7 @@ import Field from '../components/Field';
 import Modal from '../components/Modal';
 import { apiClient } from '../lib/apiClient';
 import type { Owner } from '../types/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface OwnerFormValues {
   nome: string;
@@ -20,6 +21,8 @@ const OwnersPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOwner, setEditingOwner] = useState<Owner | null>(null);
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('owners:write');
 
   const { data: owners, isLoading, error } = useQuery({
     queryKey: ['owners'],
@@ -105,7 +108,7 @@ const OwnersPage = () => {
             Aqui cuidamos dos contatos que confiam seus animais à Auravet. Um cadastro completo facilita orientações futuras.
           </p>
         </div>
-        <Button onClick={openCreateModal}>Novo tutor</Button>
+        {canEdit ? <Button onClick={openCreateModal}>Novo tutor</Button> : null}
       </div>
 
       <Card>
@@ -128,18 +131,20 @@ const OwnersPage = () => {
                     {owner.animals?.length ?? 0} animais sob cuidado
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="ghost" onClick={() => openEditModal(owner)}>
-                    Editar
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="text-red-600 hover:bg-red-100"
-                    onClick={() => deleteOwner.mutate(owner.id)}
-                  >
-                    Remover
-                  </Button>
-                </div>
+                {canEdit ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="ghost" onClick={() => openEditModal(owner)}>
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="text-red-600 hover:bg-red-100"
+                      onClick={() => deleteOwner.mutate(owner.id)}
+                    >
+                      Remover
+                    </Button>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -151,28 +156,30 @@ const OwnersPage = () => {
         ) : null}
       </Card>
 
-      <Modal
-        open={modalOpen}
-        onClose={closeModal}
-        title={editingOwner ? 'Editar tutor' : 'Novo tutor Auravet'}
-        description="Preencha os dados de contato para fortalecer a comunicação empática com cada família."
-        actions={
-          <>
-            <Button variant="ghost" onClick={closeModal}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="owner-form">
-              {editingOwner ? 'Salvar alterações' : 'Cadastrar'}
-            </Button>
-          </>
-        }
-      >
-        <form id="owner-form" className="space-y-4" onSubmit={onSubmit}>
-          <Field label="Nome" placeholder="Nome completo" required {...register('nome')} />
-          <Field label="E-mail" type="email" placeholder="email@auravet.com" required {...register('email')} />
-          <Field label="Telefone" placeholder="(00) 00000-0000" {...register('telefone')} />
-        </form>
-      </Modal>
+      {canEdit ? (
+        <Modal
+          open={modalOpen}
+          onClose={closeModal}
+          title={editingOwner ? 'Editar tutor' : 'Novo tutor Auravet'}
+          description="Preencha os dados de contato para fortalecer a comunicação empática com cada família."
+          actions={
+            <>
+              <Button variant="ghost" onClick={closeModal}>
+                Cancelar
+              </Button>
+              <Button type="submit" form="owner-form">
+                {editingOwner ? 'Salvar alterações' : 'Cadastrar'}
+              </Button>
+            </>
+          }
+        >
+          <form id="owner-form" className="space-y-4" onSubmit={onSubmit}>
+            <Field label="Nome" placeholder="Nome completo" required {...register('nome')} />
+            <Field label="E-mail" type="email" placeholder="email@auravet.com" required {...register('email')} />
+            <Field label="Telefone" placeholder="(00) 00000-0000" {...register('telefone')} />
+          </form>
+        </Modal>
+      ) : null}
     </div>
   );
 };

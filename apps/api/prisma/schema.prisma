@@ -21,6 +21,15 @@ enum TipoServico {
   OUTROS
 }
 
+enum Role {
+  ADMINISTRADOR
+  AUXILIAR_ADMINISTRATIVO
+  ASSISTENTE_ADMINISTRATIVO
+  ENFERMEIRO
+  MEDICO
+  CONTADOR
+}
+
 model Owner {
   id        String   @id @default(cuid())
   nome      String
@@ -51,4 +60,16 @@ model Servico {
   preco        Decimal     @db.Decimal(10, 2)
   observacoes  String?
   createdAt    DateTime    @default(now())
+}
+
+model User {
+  id           String   @id @default(cuid())
+  nome         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

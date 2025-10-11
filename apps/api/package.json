@@ -11,8 +11,11 @@
     "format": "prettier --check \"src/**/*.{ts,json}\" \"prisma/**/*.prisma\"",
     "format:fix": "prettier --write \"src/**/*.{ts,json}\" \"prisma/**/*.prisma\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test tests/**/*.test.ts",
+    "test:watch": "tsx --test --watch tests/**/*.test.ts",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed"
   },
   "dependencies": {
     "@prisma/client": "^5.11.0",
@@ -38,5 +41,8 @@
     "tslib": "^2.6.2",
     "tsx": "^4.7.1",
     "typescript": "^5.4.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

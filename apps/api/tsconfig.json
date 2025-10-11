@@ -3,10 +3,11 @@
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "rootDir": "src",
+    "rootDir": "./",
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "typeRoots": ["./src/types", "../../node_modules/@types"]
   },
-  "include": ["src"],
+  "include": ["src", "tests", "prisma"],
   "exclude": ["node_modules", "dist"]
 }

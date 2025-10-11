@@ -1,19 +1,29 @@
 import { NavLink } from 'react-router-dom';
 
+import { roleLabels } from '../constants/roles';
+import { useAuth } from '../contexts/AuthContext';
+import type { Permission } from '../types/api';
+
+import Button from './Button';
 import LogoAuravet from './LogoAuravet';
 
-const navItems = [
+const navItems: Array<{ to: string; label: string; permission?: Permission }> = [
   { to: '/', label: 'Início' },
-  { to: '/owners', label: 'Tutores' },
-  { to: '/animals', label: 'Animais' },
-  { to: '/services', label: 'Serviços' },
-  { to: '/new-service', label: 'Registrar serviço' },
+  { to: '/owners', label: 'Tutores', permission: 'owners:read' },
+  { to: '/animals', label: 'Animais', permission: 'animals:read' },
+  { to: '/services', label: 'Serviços', permission: 'services:read' },
+  { to: '/new-service', label: 'Registrar serviço', permission: 'services:write' },
+  { to: '/users', label: 'Usuários', permission: 'users:manage' },
 ];
 
 const Header = () => {
+  const { user, logout, hasPermission } = useAuth();
+
+  const availableNavItems = navItems.filter((item) => !item.permission || hasPermission(item.permission));
+
   return (
     <header className="bg-white/70 backdrop-blur border-b border-brand-azul/30">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5">
+      <div className="mx-auto grid max-w-6xl gap-4 px-6 py-5 md:grid-cols-[auto,1fr,auto] md:items-center">
         <div className="flex items-center gap-4">
           <LogoAuravet className="h-14 w-14" />
           <div>
@@ -21,8 +31,8 @@ const Header = () => {
             <p className="text-sm text-brand-grafite/70">Cuidar é natural.</p>
           </div>
         </div>
-        <nav className="flex flex-wrap gap-3 text-sm font-semibold uppercase tracking-wide text-brand-escuro">
-          {navItems.map((item) => (
+        <nav className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-wide text-brand-escuro">
+          {availableNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -36,6 +46,21 @@ const Header = () => {
             </NavLink>
           ))}
         </nav>
+        <div className="flex flex-col items-start justify-center gap-2 text-sm text-brand-grafite/80 md:items-end">
+          {user ? (
+            <>
+              <div className="text-right">
+                <p className="font-semibold text-brand-escuro">{user.nome}</p>
+                <p className="text-xs uppercase tracking-wide text-brand-grafite/70">
+                  {roleLabels[user.role]}
+                </p>
+              </div>
+              <Button variant="ghost" className="px-3 py-1 text-xs" onClick={logout}>
+                Sair
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
     </header>
   );

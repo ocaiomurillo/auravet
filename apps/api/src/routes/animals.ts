@@ -1,6 +1,8 @@
-import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 
+import { prisma } from '../lib/prisma';
+import { authenticate } from '../middlewares/authenticate';
+import { requirePermission } from '../middlewares/require-permission';
 import {
   animalCreateSchema,
   animalIdSchema,
@@ -9,10 +11,12 @@ import {
 } from '../schema/animal';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
+import { isPrismaKnownError } from '../utils/prisma-error';
 import { serializeAnimal, serializeService } from '../utils/serializers';
-import { prisma } from '../lib/prisma';
 
 export const animalsRouter = Router();
+
+animalsRouter.use(authenticate);
 
 const parseDate = (value: string | undefined) => {
   if (!value) return undefined;
@@ -25,6 +29,7 @@ const parseDate = (value: string | undefined) => {
 
 animalsRouter.get(
   '/',
+  requirePermission('animals:read'),
   asyncHandler(async (req, res) => {
     const query = animalListQuerySchema.parse(req.query);
 
@@ -47,6 +52,7 @@ animalsRouter.get(
 
 animalsRouter.post(
   '/',
+  requirePermission('animals:write'),
   asyncHandler(async (req, res) => {
     const payload = animalCreateSchema.parse(req.body);
 
@@ -78,6 +84,7 @@ animalsRouter.post(
 
 animalsRouter.get(
   '/:id',
+  requirePermission('animals:read'),
   asyncHandler(async (req, res) => {
     const { id } = animalIdSchema.parse(req.params);
 
@@ -101,6 +108,7 @@ animalsRouter.get(
 
 animalsRouter.get(
   '/:id/services',
+  requirePermission('services:read'),
   asyncHandler(async (req, res) => {
     const { id } = animalIdSchema.parse(req.params);
 
@@ -114,12 +122,13 @@ animalsRouter.get(
       orderBy: { data: 'desc' },
     });
 
-    res.json(services.map(serializeService));
+    res.json(services.map((service) => serializeService(service)));
   }),
 );
 
 animalsRouter.put(
   '/:id',
+  requirePermission('animals:write'),
   asyncHandler(async (req, res) => {
     const { id } = animalIdSchema.parse(req.params);
     const payload = animalUpdateSchema.parse(req.body);
@@ -150,7 +159,7 @@ animalsRouter.put(
 
       res.json(serializeAnimal(animal));
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (isPrismaKnownError(error, 'P2025')) {
         throw new HttpError(404, 'Animal não encontrado.');
       }
       throw error;
@@ -160,13 +169,14 @@ animalsRouter.put(
 
 animalsRouter.delete(
   '/:id',
+  requirePermission('animals:write'),
   asyncHandler(async (req, res) => {
     const { id } = animalIdSchema.parse(req.params);
 
     try {
       await prisma.animal.delete({ where: { id } });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (isPrismaKnownError(error, 'P2025')) {
         throw new HttpError(404, 'Animal não encontrado.');
       }
       throw error;

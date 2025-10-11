@@ -1,13 +1,17 @@
-import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 
 import { prisma } from '../lib/prisma';
+import { authenticate } from '../middlewares/authenticate';
+import { requirePermission } from '../middlewares/require-permission';
 import { serviceCreateSchema, serviceFilterSchema, serviceIdSchema, serviceUpdateSchema } from '../schema/service';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
+import { isPrismaKnownError } from '../utils/prisma-error';
 import { serializeService } from '../utils/serializers';
 
 export const servicesRouter = Router();
+
+servicesRouter.use(authenticate);
 
 const parseDate = (value: string) => {
   const date = new Date(value);
@@ -26,6 +30,7 @@ const ensureAnimalExists = async (animalId: string) => {
 
 servicesRouter.get(
   '/',
+  requirePermission('services:read'),
   asyncHandler(async (req, res) => {
     const filters = serviceFilterSchema.parse(req.query);
 
@@ -58,6 +63,7 @@ servicesRouter.get(
 
 servicesRouter.post(
   '/',
+  requirePermission('services:write'),
   asyncHandler(async (req, res) => {
     const payload = serviceCreateSchema.parse(req.body);
 
@@ -86,6 +92,7 @@ servicesRouter.post(
 
 servicesRouter.put(
   '/:id',
+  requirePermission('services:write'),
   asyncHandler(async (req, res) => {
     const { id } = serviceIdSchema.parse(req.params);
     const payload = serviceUpdateSchema.parse(req.body);
@@ -115,7 +122,7 @@ servicesRouter.put(
 
       res.json(serializeService(service, { includeAnimal: true }));
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (isPrismaKnownError(error, 'P2025')) {
         throw new HttpError(404, 'Serviço não encontrado.');
       }
       throw error;
@@ -125,13 +132,14 @@ servicesRouter.put(
 
 servicesRouter.delete(
   '/:id',
+  requirePermission('services:write'),
   asyncHandler(async (req, res) => {
     const { id } = serviceIdSchema.parse(req.params);
 
     try {
       await prisma.servico.delete({ where: { id } });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (isPrismaKnownError(error, 'P2025')) {
         throw new HttpError(404, 'Serviço não encontrado.');
       }
       throw error;
