@@ -1,0 +1,18 @@
+<svg width="800" height="450" viewBox="0 0 800 450" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="450" rx="28" fill="#F8FAF9"/>
+  <text x="60" y="80" font-family="Montserrat, sans-serif" font-weight="700" font-size="32" fill="#0F172A">
+    Serviços recentes
+  </text>
+  <rect x="60" y="120" width="680" height="70" rx="18" fill="#B3D4E0"/>
+  <text x="90" y="160" font-family="Nunito Sans, sans-serif" font-size="20" fill="#0F172A">
+    12/03 — Consulta — Nina (Tutor: Ana)
+  </text>
+  <rect x="60" y="210" width="680" height="70" rx="18" fill="#A7C7A0"/>
+  <text x="90" y="250" font-family="Nunito Sans, sans-serif" font-size="20" fill="#0F172A">
+    18/03 — Vacinação — Thor (Tutor: Bruno)
+  </text>
+  <rect x="60" y="310" width="320" height="60" rx="12" fill="#3D6655"/>
+  <text x="90" y="348" font-family="Montserrat, sans-serif" font-weight="600" font-size="20" fill="#F8FAF9">
+    Filtrar por período
+  </text>
+</svg>
