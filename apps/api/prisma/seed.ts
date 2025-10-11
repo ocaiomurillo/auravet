@@ -1,6 +1,41 @@
+import { randomBytes, scrypt as scryptCallback } from 'crypto';
+
 import { PrismaClient, Role } from '@prisma/client';
 
-import { hashPassword } from '../src/utils/auth.js';
+const SALT_LENGTH = 16;
+const KEY_LENGTH = 64;
+
+const parseSaltRounds = () => {
+  const rawValue = process.env.PASSWORD_SALT_ROUNDS;
+  const parsedValue = rawValue ? Number(rawValue) : 10;
+
+  if (!Number.isFinite(parsedValue)) {
+    return 10;
+  }
+
+  return parsedValue;
+};
+
+const SCRYPT_COST = Math.min(Math.max(parseSaltRounds(), 10), 18);
+const SCRYPT_OPTIONS = { N: 2 ** SCRYPT_COST, r: 8, p: 1 } as const;
+
+const runScrypt = (password: string, salt: string) =>
+  new Promise<Buffer>((resolve, reject) => {
+    scryptCallback(password, salt, KEY_LENGTH, SCRYPT_OPTIONS, (error, derivedKey) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(derivedKey as Buffer);
+    });
+  });
+
+const hashPassword = async (password: string) => {
+  const salt = randomBytes(SALT_LENGTH).toString('hex');
+  const derivedKey = await runScrypt(password, salt);
+  return `${salt}:${derivedKey.toString('hex')}`;
+};
 
 const prisma = new PrismaClient();
 
