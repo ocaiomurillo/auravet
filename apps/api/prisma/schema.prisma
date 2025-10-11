@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Especie {
+  CACHORRO
+  GATO
+  OUTROS
+}
+
+enum TipoServico {
+  CONSULTA
+  EXAME
+  VACINACAO
+  CIRURGIA
+  OUTROS
+}
+
+model Owner {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  telefone  String?
+  createdAt DateTime @default(now())
+  animals   Animal[]
+}
+
+model Animal {
+  id         String    @id @default(cuid())
+  nome       String
+  especie    Especie
+  raca       String?
+  nascimento DateTime?
+  ownerId    String
+  owner      Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  services   Servico[]
+}
+
+model Servico {
+  id           String      @id @default(cuid())
+  animalId     String
+  animal       Animal      @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  tipo         TipoServico
+  data         DateTime
+  preco        Decimal     @db.Decimal(10, 2)
+  observacoes  String?
+  createdAt    DateTime    @default(now())
+}

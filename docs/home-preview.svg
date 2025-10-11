@@ -1,0 +1,16 @@
+<svg width="800" height="450" viewBox="0 0 800 450" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="450" rx="28" fill="#F8FAF9"/>
+  <rect x="40" y="40" width="720" height="120" rx="16" fill="#B3D4E0"/>
+  <text x="60" y="100" font-family="Montserrat, sans-serif" font-weight="700" font-size="36" fill="#0F172A">
+    Auravet — Home
+  </text>
+  <text x="60" y="140" font-family="Nunito Sans, sans-serif" font-size="18" fill="#0F172A">
+    “Na Auravet, seu pet é cuidado com ciência e carinho.”
+  </text>
+  <rect x="40" y="200" width="220" height="180" rx="24" fill="#A7C7A0" opacity="0.9"/>
+  <rect x="290" y="200" width="220" height="180" rx="24" fill="#3D6655" opacity="0.85"/>
+  <rect x="540" y="200" width="220" height="180" rx="24" fill="#B3D4E0" opacity="0.8"/>
+  <text x="70" y="320" font-family="Montserrat, sans-serif" font-weight="600" font-size="24" fill="#0F172A">Tutores</text>
+  <text x="320" y="320" font-family="Montserrat, sans-serif" font-weight="600" font-size="24" fill="#F8FAF9">Animais</text>
+  <text x="580" y="320" font-family="Montserrat, sans-serif" font-weight="600" font-size="24" fill="#0F172A">Serviços</text>
+</svg>

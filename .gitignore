@@ -1,0 +1,26 @@
+# Node
+node_modules/
+.pnpm-store/
+
+# Build
+apps/web/dist/
+apps/api/dist/
+
+# Env
+.env
+.env.local
+apps/**/.env
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Prisma
+apps/api/prisma/dev.db
+
+# Editor
+.idea/
+.vscode/
+.DS_Store

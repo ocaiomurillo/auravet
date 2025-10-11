@@ -1,0 +1,18 @@
+<svg width="800" height="450" viewBox="0 0 800 450" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="450" rx="28" fill="#F8FAF9"/>
+  <text x="60" y="80" font-family="Montserrat, sans-serif" font-weight="700" font-size="32" fill="#0F172A">
+    Tutores cadastrados
+  </text>
+  <rect x="60" y="120" width="680" height="60" rx="16" fill="#A7C7A0"/>
+  <text x="90" y="158" font-family="Nunito Sans, sans-serif" font-size="20" fill="#0F172A">
+    Ana Pereira — ana@auravet.com — (11) 99999-9999
+  </text>
+  <rect x="60" y="200" width="680" height="60" rx="16" fill="#B3D4E0"/>
+  <text x="90" y="238" font-family="Nunito Sans, sans-serif" font-size="20" fill="#0F172A">
+    Bruno Costa — bruno@auravet.com — (21) 98888-8888
+  </text>
+  <rect x="60" y="280" width="260" height="60" rx="12" fill="#3D6655"/>
+  <text x="90" y="318" font-family="Montserrat, sans-serif" font-weight="600" font-size="20" fill="#F8FAF9">
+    Novo Tutor
+  </text>
+</svg>
