@@ -15,6 +15,7 @@ import UsersPage from './pages/UsersPage';
 import ProductsPage from './pages/ProductsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import CalendarPage from './pages/CalendarPage';
+import CashierPage from './pages/CashierPage';
 
 const App = () => {
   return (
@@ -40,6 +41,9 @@ const App = () => {
           </Route>
           <Route element={<RequireModules modules={['products:read']} />}>
             <Route path="products" element={<ProductsPage />} />
+          </Route>
+          <Route element={<RequireModules modules={['cashier:access']} />}>
+            <Route path="cashier" element={<CashierPage />} />
           </Route>
           <Route element={<RequireModules modules={['services:write']} />}>
             <Route path="new-service" element={<NewServicePage />} />

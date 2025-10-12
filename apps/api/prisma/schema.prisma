@@ -35,6 +35,7 @@ model Owner {
   createdAt DateTime @default(now())
   animals   Animal[]
   appointments Appointment[]
+  invoices  Invoice[]
 }
 
 model Animal {
@@ -61,6 +62,7 @@ model Servico {
   createdAt    DateTime    @default(now())
   items        ServiceProductUsage[]
   appointment  Appointment? @relation("AppointmentService")
+  invoiceItems InvoiceItem[]
 }
 
 model Module {
@@ -112,6 +114,7 @@ model User {
   collaboratorProfile CollaboratorProfile?
   appointmentsAsVeterinarian Appointment[] @relation("VeterinarianAppointments")
   appointmentsAsAssistant    Appointment[] @relation("AssistantAppointments")
+  invoicesResponsible         Invoice[]     @relation("InvoiceResponsible")
 }
 
 model CollaboratorProfile {
@@ -163,6 +166,7 @@ model Product {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   serviceUsages ServiceProductUsage[]
+  invoiceItems  InvoiceItem[]
 }
 
 model ServiceProductUsage {
@@ -179,4 +183,49 @@ model ServiceProductUsage {
   product Product @relation(fields: [productId], references: [id])
 
   @@unique([servicoId, productId])
+}
+
+model Invoice {
+  id             String   @id @default(cuid())
+  ownerId        String
+  statusId       String
+  responsibleId  String?
+  total          Decimal  @db.Decimal(10, 2)
+  dueDate        DateTime
+  paidAt         DateTime?
+  paymentNotes   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner        Owner         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  status       InvoiceStatus @relation(fields: [statusId], references: [id])
+  responsible  User?         @relation("InvoiceResponsible", fields: [responsibleId], references: [id])
+  items        InvoiceItem[]
+}
+
+model InvoiceStatus {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  invoices  Invoice[]
+}
+
+model InvoiceItem {
+  id           String   @id @default(cuid())
+  invoiceId    String
+  servicoId    String?
+  productId    String?
+  description  String
+  quantity     Int
+  unitPrice    Decimal @db.Decimal(10, 2)
+  total        Decimal @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+
+  invoice  Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  service  Servico? @relation(fields: [servicoId], references: [id])
+  product  Product? @relation(fields: [productId], references: [id])
+
+  @@unique([servicoId])
 }

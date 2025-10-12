@@ -9,6 +9,7 @@ import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
 import { isPrismaKnownError } from '../utils/prisma-error';
 import { serializeService } from '../utils/serializers';
+import { syncInvoiceForService } from '../utils/invoice';
 
 export const servicesRouter = Router();
 
@@ -134,6 +135,8 @@ servicesRouter.post(
     const items: ServiceItemInput[] = payload.items ?? [];
     ensureDistinctItems(items);
 
+    const responsibleId = req.user?.id ?? null;
+
     const service = await prisma.$transaction(async (tx) => {
       await validateStockForCreation(tx, items);
 
@@ -163,6 +166,8 @@ servicesRouter.post(
         });
       }
 
+      await syncInvoiceForService(tx, created.id, { responsibleId });
+
       return created;
     });
 
@@ -182,14 +187,45 @@ servicesRouter.put(
     }
 
     try {
+      const responsibleId = req.user?.id ?? null;
+
       const service = await prisma.$transaction(async (tx) => {
         const existing = await tx.servico.findUnique({
           where: { id },
-          include: { items: true },
+          include: {
+            items: true,
+            invoiceItems: {
+              include: {
+                invoice: {
+                  include: {
+                    status: true,
+                  },
+                },
+              },
+            },
+          },
         });
 
         if (!existing) {
           throw new HttpError(404, 'Serviço não encontrado.');
+        }
+
+        const hasPaidInvoice = existing.invoiceItems?.some(
+          (invoiceItem) => invoiceItem.invoice?.status.slug === 'QUITADA',
+        );
+
+        if (
+          hasPaidInvoice &&
+          (payload.animalId !== undefined ||
+            payload.tipo !== undefined ||
+            payload.data !== undefined ||
+            payload.preco !== undefined ||
+            payload.items !== undefined)
+        ) {
+          throw new HttpError(
+            400,
+            'Não é possível alterar informações financeiras de um serviço com conta quitada.',
+          );
         }
 
         const updateData: Prisma.ServicoUpdateInput = {};
@@ -276,6 +312,8 @@ servicesRouter.put(
           data: updateData,
           include: serviceInclude,
         });
+
+        await syncInvoiceForService(tx, id, { responsibleId });
 
         return updated;
       });

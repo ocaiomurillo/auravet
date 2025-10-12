@@ -1,6 +1,6 @@
 import { randomBytes, scrypt as scryptCallback } from 'crypto';
 
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const SALT_LENGTH = 16;
 const KEY_LENGTH = 64;
@@ -117,6 +117,11 @@ const DEFAULT_MODULES = [
     name: 'Administrar usuários',
     description: 'Permite criar e gerenciar usuários e funções.',
   },
+  {
+    slug: 'cashier:access',
+    name: 'Caixa',
+    description: 'Permite gerenciar contas a receber e registrar pagamentos.',
+  },
 ] as const;
 
 const DEFAULT_ROLES: Array<{
@@ -142,12 +147,13 @@ const DEFAULT_ROLES: Array<{
       'services:read',
       'products:read',
       'products:write',
+      'cashier:access',
     ],
   },
   {
     slug: 'ASSISTENTE_ADMINISTRATIVO',
     name: 'Assistente Administrativo',
-    modules: ['owners:read', 'animals:read', 'services:read', 'products:read'],
+    modules: ['owners:read', 'animals:read', 'services:read', 'products:read', 'cashier:access'],
   },
   {
     slug: 'ENFERMEIRO',
@@ -170,9 +176,14 @@ const DEFAULT_ROLES: Array<{
   {
     slug: 'CONTADOR',
     name: 'Contador',
-    modules: ['services:read', 'products:read'],
+    modules: ['services:read', 'products:read', 'cashier:access'],
   },
 ];
+
+const DEFAULT_INVOICE_STATUSES = [
+  { slug: 'ABERTA', name: 'Aberta' },
+  { slug: 'QUITADA', name: 'Quitada' },
+] as const;
 
 async function main() {
   const modules = await Promise.all(
@@ -302,6 +313,67 @@ async function main() {
     });
 
     console.log(`🤝 Perfil clínico pronto: ${collaborator.email}`);
+  }
+
+  const invoiceStatuses = await Promise.all(
+    DEFAULT_INVOICE_STATUSES.map((status) =>
+      prisma.invoiceStatus.upsert({
+        where: { slug: status.slug },
+        update: { name: status.name },
+        create: { slug: status.slug, name: status.name },
+      }),
+    ),
+  );
+
+  const statusMap = new Map(invoiceStatuses.map((status) => [status.slug, status]));
+  const openStatus = statusMap.get('ABERTA');
+
+  if (openStatus) {
+    const servicesWithoutInvoice = await prisma.servico.findMany({
+      where: { invoiceItems: { none: {} } },
+      include: {
+        animal: { include: { owner: true } },
+        items: { include: { product: true } },
+      },
+    });
+
+    for (const service of servicesWithoutInvoice) {
+      const productsTotal = service.items.reduce(
+        (acc, item) => acc.add(item.valorTotal),
+        new Prisma.Decimal(0),
+      );
+      const total = service.preco.add(productsTotal);
+
+      const dueDate = new Date(service.data);
+      dueDate.setDate(dueDate.getDate() + 7);
+
+      await prisma.invoice.create({
+        data: {
+          ownerId: service.animal.ownerId,
+          statusId: openStatus.id,
+          total,
+          dueDate,
+          items: {
+            create: [
+              {
+                servicoId: service.id,
+                description: `Serviço: ${service.tipo}`,
+                quantity: 1,
+                unitPrice: service.preco,
+                total: service.preco,
+              },
+              ...service.items.map((item) => ({
+                productId: item.productId,
+                description: item.product ? `Produto: ${item.product.nome}` : 'Produto utilizado',
+                quantity: item.quantidade,
+                unitPrice: item.valorUnitario,
+                total: item.valorTotal,
+              })),
+            ],
+          },
+        },
+      });
+    }
   }
 }
 

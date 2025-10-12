@@ -15,6 +15,7 @@ import { servicesRouter } from './routes/services';
 import { usersRouter } from './routes/users';
 import { rolesRouter } from './routes/roles';
 import { productsRouter } from './routes/products';
+import { invoicesRouter } from './routes/invoices';
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/owners', ownersRouter);
 app.use('/animals', animalsRouter);
 app.use('/appointments', appointmentsRouter);
 app.use('/services', servicesRouter);
+app.use('/invoices', invoicesRouter);
 app.use('/users', usersRouter);
 app.use('/roles', rolesRouter);
 app.use('/products', productsRouter);

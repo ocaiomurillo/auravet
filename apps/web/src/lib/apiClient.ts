@@ -1,9 +1,13 @@
-import type { Product } from '../types/api';
+import type { Invoice, InvoiceListResponse, InvoiceStatus, Product, Service } from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  responseType: 'json' | 'text' = 'json',
+): Promise<T> {
   const token = authStorage.getToken();
 
   const headers = new Headers(options.headers ?? {});
@@ -37,11 +41,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return null as T;
   }
 
+  if (responseType === 'text') {
+    return (await response.text()) as T;
+  }
+
   return (await response.json()) as T;
 }
 
 export const apiClient = {
   get: <T>(path: string) => request<T>(path),
+  getText: (path: string) => request<string>(path, {}, 'text'),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, {
       method: 'POST',
@@ -87,4 +96,40 @@ export const productsApi = {
   remove: (id: string) => apiClient.delete(`/products/${id}`),
   adjustStock: (id: string, payload: AdjustProductStockPayload) =>
     apiClient.patch<Product>(`/products/${id}/stock`, payload),
+};
+
+export interface InvoiceFilters {
+  ownerId?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+}
+
+const buildInvoiceQuery = (filters: InvoiceFilters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.ownerId) params.set('ownerId', filters.ownerId);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : '';
+};
+
+export const invoicesApi = {
+  list: (filters: InvoiceFilters = {}) => apiClient.get<InvoiceListResponse>(`/invoices${buildInvoiceQuery(filters)}`),
+  statuses: () => apiClient.get<InvoiceStatus[]>('/invoices/statuses'),
+  candidates: (ownerId?: string) => {
+    const query = ownerId ? `?ownerId=${ownerId}` : '';
+    return apiClient.get<Service[]>(`/invoices/candidates${query}`);
+  },
+  generateFromService: (payload: { serviceId: string; dueDate?: string }) =>
+    apiClient.post<Invoice>('/invoices', payload),
+  markAsPaid: (id: string, payload: { paidAt?: string; paymentNotes?: string }) =>
+    apiClient.post<Invoice>(`/invoices/${id}/pay`, payload),
+  exportCsv: (filters: InvoiceFilters = {}) =>
+    (() => {
+      const query = buildInvoiceQuery(filters);
+      const separator = query ? '&' : '?';
+      return apiClient.getText(`/invoices/export${query}${separator}format=csv`);
+    })(),
 };

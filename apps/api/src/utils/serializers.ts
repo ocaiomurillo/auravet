@@ -17,6 +17,43 @@ import { buildAuthenticatedUser } from './auth';
 
 type ServiceItemWithProduct = ServiceProductUsage & { product: Product };
 
+type InvoiceItemWithRelations = Prisma.InvoiceItemGetPayload<{
+  include: {
+    product: { select: { id: true; nome: true } };
+    service: {
+      include: {
+        animal: {
+          include: {
+            owner: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
+type InvoiceWithRelations = Prisma.InvoiceGetPayload<{
+  include: {
+    owner: true;
+    status: true;
+    responsible: { select: { id: true; nome: true; email: true } };
+    items: {
+      include: {
+        product: { select: { id: true; nome: true } };
+        service: {
+          include: {
+            animal: {
+              include: {
+                owner: true;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+}>;
+
 type ServiceWithOptionalRelations = Servico & {
   animal?: AnimalWithOptionalRelations | null;
   items?: ServiceItemWithProduct[];
@@ -47,6 +84,49 @@ export type SerializedServiceItem = {
     estoqueAtual: number;
     estoqueMinimo: number;
   };
+};
+
+export type SerializedInvoiceItem = {
+  id: string;
+  invoiceId: string;
+  servicoId: string | null;
+  productId: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  createdAt: string;
+  product: { id: string; nome: string } | null;
+  service: {
+    id: string;
+    tipo: Servico['tipo'];
+    data: string;
+    animal?: {
+      id: string;
+      nome: string;
+      owner?: { id: string; nome: string };
+    };
+  } | null;
+};
+
+export type SerializedInvoice = {
+  id: string;
+  ownerId: string;
+  status: { id: string; slug: string; name: string };
+  total: number;
+  dueDate: string;
+  paidAt: string | null;
+  paymentNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  owner: {
+    id: string;
+    nome: string;
+    email: string;
+    telefone: string | null;
+  };
+  responsible: { id: string; nome: string; email: string } | null;
+  items: SerializedInvoiceItem[];
 };
 
 export type SerializedService = {
@@ -395,4 +475,68 @@ export const serializeProduct = (product: Product): SerializedProduct => ({
   isSellable: product.isSellable,
   createdAt: product.createdAt.toISOString(),
   updatedAt: product.updatedAt.toISOString(),
+});
+
+const serializeInvoiceItemService = (service: InvoiceItemWithRelations['service']): SerializedInvoiceItem['service'] => {
+  if (!service) {
+    return null;
+  }
+
+  return {
+    id: service.id,
+    tipo: service.tipo,
+    data: service.data.toISOString(),
+    animal: service.animal
+      ? {
+          id: service.animal.id,
+          nome: service.animal.nome,
+          owner: service.animal.owner
+            ? {
+                id: service.animal.owner.id,
+                nome: service.animal.owner.nome,
+              }
+            : undefined,
+        }
+      : undefined,
+  };
+};
+
+export const serializeInvoiceItem = (item: InvoiceItemWithRelations): SerializedInvoiceItem => ({
+  id: item.id,
+  invoiceId: item.invoiceId,
+  servicoId: item.servicoId ?? null,
+  productId: item.productId ?? null,
+  description: item.description,
+  quantity: item.quantity,
+  unitPrice: Number(item.unitPrice),
+  total: Number(item.total),
+  createdAt: item.createdAt.toISOString(),
+  product: item.product ? { id: item.product.id, nome: item.product.nome } : null,
+  service: serializeInvoiceItemService(item.service),
+});
+
+export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoice => ({
+  id: invoice.id,
+  ownerId: invoice.ownerId,
+  status: {
+    id: invoice.status.id,
+    slug: invoice.status.slug,
+    name: invoice.status.name,
+  },
+  total: Number(invoice.total),
+  dueDate: invoice.dueDate.toISOString(),
+  paidAt: invoice.paidAt ? invoice.paidAt.toISOString() : null,
+  paymentNotes: invoice.paymentNotes ?? null,
+  createdAt: invoice.createdAt.toISOString(),
+  updatedAt: invoice.updatedAt.toISOString(),
+  owner: {
+    id: invoice.owner.id,
+    nome: invoice.owner.nome,
+    email: invoice.owner.email,
+    telefone: invoice.owner.telefone ?? null,
+  },
+  responsible: invoice.responsible
+    ? { id: invoice.responsible.id, nome: invoice.responsible.nome, email: invoice.responsible.email }
+    : null,
+  items: invoice.items.map((item) => serializeInvoiceItem(item)),
 });
