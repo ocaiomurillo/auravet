@@ -78,6 +78,78 @@ export interface ServiceItem {
   };
 }
 
+export interface InvoiceStatus {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface InvoiceItemProductSummary {
+  id: string;
+  nome: string;
+}
+
+export interface InvoiceItemServiceSummary {
+  id: string;
+  tipo: Service['tipo'];
+  data: string;
+  animal?: {
+    id: string;
+    nome: string;
+    owner?: { id: string; nome: string };
+  };
+}
+
+export interface InvoiceItem {
+  id: string;
+  invoiceId: string;
+  servicoId: string | null;
+  productId: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  createdAt: string;
+  product: InvoiceItemProductSummary | null;
+  service: InvoiceItemServiceSummary | null;
+}
+
+export interface Invoice {
+  id: string;
+  ownerId: string;
+  status: InvoiceStatus;
+  total: number;
+  dueDate: string;
+  paidAt: string | null;
+  paymentNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  owner: {
+    id: string;
+    nome: string;
+    email: string;
+    telefone: string | null;
+  };
+  responsible: {
+    id: string;
+    nome: string;
+    email: string;
+  } | null;
+  items: InvoiceItem[];
+}
+
+export interface InvoiceSummary {
+  openTotal: number;
+  paidTotal: number;
+  openCount: number;
+  paidCount: number;
+}
+
+export interface InvoiceListResponse {
+  invoices: Invoice[];
+  summary: InvoiceSummary;
+}
+
 export interface Product {
   id: string;
   nome: string;
