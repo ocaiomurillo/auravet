@@ -68,44 +68,74 @@ export const swaggerDocument = {
         },
         required: ['id', 'animalId', 'tipo', 'data', 'preco', 'createdAt'],
       },
+      Module: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          slug: { type: 'string' },
+          name: { type: 'string' },
+          description: { type: 'string', nullable: true },
+          isActive: { type: 'boolean' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+        required: ['id', 'slug', 'name', 'isActive', 'createdAt', 'updatedAt'],
+      },
+      RoleModule: {
+        allOf: [
+          { $ref: '#/components/schemas/Module' },
+          {
+            type: 'object',
+            properties: {
+              isEnabled: { type: 'boolean' },
+            },
+            required: ['isEnabled'],
+          },
+        ],
+      },
+      Role: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          name: { type: 'string' },
+          slug: { type: 'string' },
+          description: { type: 'string', nullable: true },
+          isActive: { type: 'boolean' },
+          modules: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/RoleModule' },
+          },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+        required: ['id', 'name', 'slug', 'isActive', 'modules', 'createdAt', 'updatedAt'],
+      },
+      UserRole: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          slug: { type: 'string' },
+          name: { type: 'string' },
+        },
+        required: ['id', 'slug', 'name'],
+      },
       User: {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'cuid' },
           nome: { type: 'string' },
           email: { type: 'string', format: 'email' },
-          role: {
-            type: 'string',
-            enum: [
-              'ADMINISTRADOR',
-              'AUXILIAR_ADMINISTRATIVO',
-              'ASSISTENTE_ADMINISTRATIVO',
-              'ENFERMEIRO',
-              'MEDICO',
-              'CONTADOR',
-            ],
-          },
+          role: { $ref: '#/components/schemas/UserRole' },
           isActive: { type: 'boolean' },
           lastLoginAt: { type: 'string', format: 'date-time', nullable: true },
-          permissions: {
+          modules: {
             type: 'array',
-            items: {
-              type: 'string',
-              enum: [
-                'owners:read',
-                'owners:write',
-                'animals:read',
-                'animals:write',
-                'services:read',
-                'services:write',
-                'users:manage',
-              ],
-            },
+            items: { type: 'string' },
           },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
         },
-        required: ['id', 'nome', 'email', 'role', 'isActive', 'permissions', 'createdAt', 'updatedAt'],
+        required: ['id', 'nome', 'email', 'role', 'isActive', 'modules', 'createdAt', 'updatedAt'],
       },
       AuthLoginRequest: {
         type: 'object',
@@ -125,12 +155,50 @@ export const swaggerDocument = {
       },
       RegisterUserRequest: {
         type: 'object',
-        required: ['nome', 'email', 'password', 'role'],
+        required: ['nome', 'email', 'password', 'roleId'],
         properties: {
           nome: { type: 'string' },
           email: { type: 'string', format: 'email' },
           password: { type: 'string', minLength: 8 },
-          role: { $ref: '#/components/schemas/User/properties/role' },
+          roleId: { type: 'string', format: 'cuid' },
+        },
+      },
+      CreateRoleRequest: {
+        type: 'object',
+        required: ['name', 'slug'],
+        properties: {
+          name: { type: 'string' },
+          slug: { type: 'string', description: 'Identificador único em letras maiúsculas.' },
+          description: { type: 'string' },
+          moduleIds: {
+            type: 'array',
+            items: { type: 'string', format: 'cuid' },
+          },
+        },
+      },
+      UpdateRoleRequest: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string', nullable: true },
+          isActive: { type: 'boolean' },
+        },
+      },
+      UpdateRoleModulesRequest: {
+        type: 'object',
+        required: ['modules'],
+        properties: {
+          modules: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['moduleId', 'isEnabled'],
+              properties: {
+                moduleId: { type: 'string', format: 'cuid' },
+                isEnabled: { type: 'boolean' },
+              },
+            },
+          },
         },
       },
       ErrorResponse: {
@@ -304,7 +372,7 @@ export const swaggerDocument = {
                 type: 'object',
                 properties: {
                   nome: { type: 'string' },
-                  role: { $ref: '#/components/schemas/User/properties/role' },
+                  roleId: { type: 'string', format: 'cuid' },
                 },
               },
             },
@@ -372,6 +440,175 @@ export const swaggerDocument = {
           },
           '400': { description: 'Operação não permitida' },
           '404': { description: 'Colaborador não encontrado' },
+        },
+      },
+    },
+    '/roles': {
+      get: {
+        summary: 'Lista funções cadastradas',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Funções encontradas',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    roles: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Role' },
+                    },
+                  },
+                  required: ['roles'],
+                },
+              },
+            },
+          },
+          '403': { description: 'Permissão insuficiente' },
+        },
+      },
+      post: {
+        summary: 'Cria uma nova função',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreateRoleRequest' },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Função criada',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { role: { $ref: '#/components/schemas/Role' } },
+                  required: ['role'],
+                },
+              },
+            },
+          },
+          '403': { description: 'Permissão insuficiente' },
+        },
+      },
+    },
+    '/roles/modules': {
+      get: {
+        summary: 'Lista módulos disponíveis',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Módulos disponíveis',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    modules: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Module' },
+                    },
+                  },
+                  required: ['modules'],
+                },
+              },
+            },
+          },
+          '403': { description: 'Permissão insuficiente' },
+        },
+      },
+    },
+    '/roles/{id}': {
+      get: {
+        summary: 'Obtém uma função específica',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'cuid' } }],
+        responses: {
+          '200': {
+            description: 'Função encontrada',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { role: { $ref: '#/components/schemas/Role' } },
+                  required: ['role'],
+                },
+              },
+            },
+          },
+          '404': { description: 'Função não encontrada' },
+        },
+      },
+      patch: {
+        summary: 'Atualiza informações básicas de uma função',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'cuid' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/UpdateRoleRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Função atualizada',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { role: { $ref: '#/components/schemas/Role' } },
+                  required: ['role'],
+                },
+              },
+            },
+          },
+          '404': { description: 'Função não encontrada' },
+        },
+      },
+      delete: {
+        summary: 'Remove uma função',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'cuid' } }],
+        responses: {
+          '204': { description: 'Função removida' },
+          '400': { description: 'Função em uso' },
+          '404': { description: 'Função não encontrada' },
+        },
+      },
+    },
+    '/roles/{id}/modules': {
+      patch: {
+        summary: 'Atualiza os módulos disponíveis para uma função',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'cuid' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/UpdateRoleModulesRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Módulos da função atualizados',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { role: { $ref: '#/components/schemas/Role' } },
+                  required: ['role'],
+                },
+              },
+            },
+          },
+          '404': { description: 'Função não encontrada' },
         },
       },
     },

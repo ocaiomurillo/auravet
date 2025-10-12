@@ -21,15 +21,6 @@ enum TipoServico {
   OUTROS
 }
 
-enum Role {
-  ADMINISTRADOR
-  AUXILIAR_ADMINISTRATIVO
-  ASSISTENTE_ADMINISTRATIVO
-  ENFERMEIRO
-  MEDICO
-  CONTADOR
-}
-
 model Owner {
   id        String   @id @default(cuid())
   nome      String
@@ -62,14 +53,50 @@ model Servico {
   createdAt    DateTime    @default(now())
 }
 
+model Module {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  roles       RoleModuleAccess[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+  modules     RoleModuleAccess[]
+}
+
+model RoleModuleAccess {
+  roleId    String
+  moduleId  String
+  isEnabled Boolean  @default(true)
+
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, moduleId])
+}
+
 model User {
   id           String   @id @default(cuid())
   nome         String
   email        String   @unique
   passwordHash String
-  role         Role
+  roleId       String
   isActive     Boolean  @default(true)
   lastLoginAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  role Role @relation(fields: [roleId], references: [id])
 }

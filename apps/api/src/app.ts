@@ -12,6 +12,7 @@ import { authRouter } from './routes/auth';
 import { ownersRouter } from './routes/owners';
 import { servicesRouter } from './routes/services';
 import { usersRouter } from './routes/users';
+import { rolesRouter } from './routes/roles';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/owners', ownersRouter);
 app.use('/animals', animalsRouter);
 app.use('/services', servicesRouter);
 app.use('/users', usersRouter);
+app.use('/roles', rolesRouter);
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use(errorHandler);

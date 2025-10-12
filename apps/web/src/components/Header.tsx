@@ -1,25 +1,24 @@
 import { NavLink } from 'react-router-dom';
 
-import { roleLabels } from '../constants/roles';
 import { useAuth } from '../contexts/AuthContext';
-import type { Permission } from '../types/api';
 
 import Button from './Button';
 import LogoAuravet from './LogoAuravet';
 
-const navItems: Array<{ to: string; label: string; permission?: Permission }> = [
+const navItems: Array<{ to: string; label: string; module?: string }> = [
   { to: '/', label: 'Início' },
-  { to: '/owners', label: 'Tutores', permission: 'owners:read' },
-  { to: '/animals', label: 'Animais', permission: 'animals:read' },
-  { to: '/services', label: 'Serviços', permission: 'services:read' },
-  { to: '/new-service', label: 'Registrar serviço', permission: 'services:write' },
-  { to: '/users', label: 'Usuários', permission: 'users:manage' },
+  { to: '/owners', label: 'Tutores', module: 'owners:read' },
+  { to: '/animals', label: 'Animais', module: 'animals:read' },
+  { to: '/services', label: 'Serviços', module: 'services:read' },
+  { to: '/new-service', label: 'Registrar serviço', module: 'services:write' },
+  { to: '/users', label: 'Usuários', module: 'users:manage' },
+  { to: '/roles', label: 'Funções', module: 'users:manage' },
 ];
 
 const Header = () => {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasModule } = useAuth();
 
-  const availableNavItems = navItems.filter((item) => !item.permission || hasPermission(item.permission));
+  const availableNavItems = navItems.filter((item) => !item.module || hasModule(item.module));
 
   return (
     <header className="bg-white/70 backdrop-blur border-b border-brand-azul/30">
@@ -52,7 +51,7 @@ const Header = () => {
               <div className="text-right">
                 <p className="font-semibold text-brand-escuro">{user.nome}</p>
                 <p className="text-xs uppercase tracking-wide text-brand-grafite/70">
-                  {roleLabels[user.role]}
+                  {user.role.name}
                 </p>
               </div>
               <Button variant="ghost" className="px-3 py-1 text-xs" onClick={logout}>

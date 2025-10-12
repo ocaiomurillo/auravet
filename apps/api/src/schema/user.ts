@@ -1,4 +1,3 @@
-import { Role } from '@prisma/client';
 import { z } from 'zod';
 
 export const userIdSchema = z.object({
@@ -8,7 +7,7 @@ export const userIdSchema = z.object({
 export const userUpdateSchema = z
   .object({
     nome: z.string().min(3, 'Informe ao menos 3 caracteres para o nome.').optional(),
-    role: z.nativeEnum(Role).optional(),
+    roleId: z.string().cuid('Função inválida.').optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'Informe ao menos um campo para atualização.',

@@ -61,7 +61,7 @@ const seedAdminUser = async () => {
       nome: 'Admin Auravet',
       email: 'admin@auravet.com',
       passwordHash,
-      role: 'ADMINISTRADOR',
+      roleId: 'ADMINISTRADOR',
       isActive: true,
     },
   });
@@ -116,8 +116,9 @@ describe('Authentication flows', () => {
     assert.equal(response.status, 200);
     assert.ok(data?.token);
     assert.equal(data?.user.email, 'admin@auravet.com');
-    assert.ok(Array.isArray(data?.user.permissions));
-    assert.ok(data?.user.permissions.includes('users:manage'));
+    assert.ok(Array.isArray(data?.user.modules));
+    assert.ok(data?.user.modules.includes('users:manage'));
+    assert.equal(data?.user.role.slug, 'ADMINISTRADOR');
   });
 
   it('rejects login with invalid credentials', async () => {
@@ -144,15 +145,15 @@ describe('Authentication flows', () => {
         nome: 'Novo Colaborador',
         email: 'colaborador@auravet.com',
         password: 'Assist123!',
-        role: 'ASSISTENTE_ADMINISTRATIVO',
+        roleId: 'ASSISTENTE_ADMINISTRATIVO',
       },
       token,
     );
 
     assert.equal(response.status, 201);
     assert.equal(data?.user.email, 'colaborador@auravet.com');
-    assert.ok(Array.isArray(data?.user.permissions));
-    assert.ok(!data?.user.permissions.includes('users:manage'));
+    assert.ok(Array.isArray(data?.user.modules));
+    assert.ok(!data?.user.modules.includes('users:manage'));
   });
 
   it('blocks non administrators from creating users', async () => {
@@ -164,7 +165,7 @@ describe('Authentication flows', () => {
         nome: 'Assistente',
         email: 'assistente@auravet.com',
         passwordHash: assistantHash,
-        role: 'ASSISTENTE_ADMINISTRATIVO',
+        roleId: 'ASSISTENTE_ADMINISTRATIVO',
         isActive: true,
       },
     });
@@ -183,7 +184,7 @@ describe('Authentication flows', () => {
         nome: 'Outro Usuário',
         email: 'outro@auravet.com',
         password: 'Assist123!',
-        role: 'ASSISTENTE_ADMINISTRATIVO',
+        roleId: 'ASSISTENTE_ADMINISTRATIVO',
       },
       token,
     );

@@ -1,19 +1,33 @@
-export type Role =
-  | 'ADMINISTRADOR'
-  | 'AUXILIAR_ADMINISTRATIVO'
-  | 'ASSISTENTE_ADMINISTRATIVO'
-  | 'ENFERMEIRO'
-  | 'MEDICO'
-  | 'CONTADOR';
+export interface Module {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export type Permission =
-  | 'owners:read'
-  | 'owners:write'
-  | 'animals:read'
-  | 'animals:write'
-  | 'services:read'
-  | 'services:write'
-  | 'users:manage';
+export interface RoleModule extends Module {
+  isEnabled: boolean;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  isActive: boolean;
+  modules: RoleModule[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserRoleSummary {
+  id: string;
+  slug: string;
+  name: string;
+}
 
 export interface Owner {
   id: string;
@@ -51,10 +65,10 @@ export interface User {
   id: string;
   nome: string;
   email: string;
-  role: Role;
+  role: UserRoleSummary;
   isActive: boolean;
   lastLoginAt: string | null;
-  permissions: Permission[];
+  modules: string[];
   createdAt: string;
   updatedAt: string;
 }

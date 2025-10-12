@@ -19,6 +19,16 @@ usersRouter.get(
   asyncHandler(async (_req, res) => {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
+      include: {
+        role: {
+          include: {
+            modules: {
+              where: { isEnabled: true, module: { isActive: true } },
+              include: { module: true },
+            },
+          },
+        },
+      },
     });
 
     res.json({ users: users.map(serializeUser) });
@@ -35,6 +45,16 @@ usersRouter.patch(
       const user = await prisma.user.update({
         where: { id },
         data: payload,
+        include: {
+          role: {
+            include: {
+              modules: {
+                where: { isEnabled: true, module: { isActive: true } },
+                include: { module: true },
+              },
+            },
+          },
+        },
       });
 
       res.json({ user: serializeUser(user) });
@@ -61,6 +81,16 @@ usersRouter.patch(
       const user = await prisma.user.update({
         where: { id },
         data: { isActive: payload.isActive },
+        include: {
+          role: {
+            include: {
+              modules: {
+                where: { isEnabled: true, module: { isActive: true } },
+                include: { module: true },
+              },
+            },
+          },
+        },
       });
 
       res.json({ user: serializeUser(user) });

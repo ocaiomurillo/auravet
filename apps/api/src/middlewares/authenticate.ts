@@ -23,7 +23,19 @@ export const authenticate: RequestHandler = asyncHandler(async (req, _res, next)
 
   try {
     const payload = verifyToken(token);
-    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: {
+        role: {
+          include: {
+            modules: {
+              where: { isEnabled: true, module: { isActive: true } },
+              include: { module: true },
+            },
+          },
+        },
+      },
+    });
 
     if (!user) {
       throw new HttpError(401, 'Sessão expirada ou inválida.');

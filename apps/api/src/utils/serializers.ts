@@ -1,5 +1,6 @@
-import type { Animal, Owner, Servico, User } from '@prisma/client';
+import type { Animal, Module, Owner, Prisma, Servico } from '@prisma/client';
 
+import type { UserWithRole } from './auth';
 import { buildAuthenticatedUser } from './auth';
 
 type ServiceWithOptionalRelations = Servico & {
@@ -47,14 +48,53 @@ export type SerializedOwner = {
   animals?: SerializedAnimal[];
 };
 
+export type SerializedModule = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedRoleModule = SerializedModule & {
+  isEnabled: boolean;
+};
+
+export type RoleWithModules = Prisma.RoleGetPayload<{
+  include: {
+    modules: {
+      include: {
+        module: true;
+      };
+    };
+  };
+}>;
+
+export type SerializedRole = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  isActive: boolean;
+  modules: SerializedRoleModule[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SerializedUser = {
   id: string;
   nome: string;
   email: string;
-  role: User['role'];
+  role: {
+    id: string;
+    slug: string;
+    name: string;
+  };
   isActive: boolean;
   lastLoginAt: string | null;
-  permissions: string[];
+  modules: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -115,7 +155,34 @@ export const serializeOwner = (owner: OwnerWithOptionalRelations): SerializedOwn
   ),
 });
 
-export const serializeUser = (user: User): SerializedUser => {
+export const serializeModule = (module: Module): SerializedModule => ({
+  id: module.id,
+  slug: module.slug,
+  name: module.name,
+  description: module.description ?? null,
+  isActive: module.isActive,
+  createdAt: module.createdAt.toISOString(),
+  updatedAt: module.updatedAt.toISOString(),
+});
+
+export const serializeRole = (role: RoleWithModules): SerializedRole => ({
+  id: role.id,
+  name: role.name,
+  slug: role.slug,
+  description: role.description ?? null,
+  isActive: role.isActive,
+  modules: role.modules
+    .slice()
+    .sort((a, b) => a.module.name.localeCompare(b.module.name))
+    .map((access) => ({
+      ...serializeModule(access.module),
+      isEnabled: access.isEnabled,
+    })),
+  createdAt: role.createdAt.toISOString(),
+  updatedAt: role.updatedAt.toISOString(),
+});
+
+export const serializeUser = (user: UserWithRole): SerializedUser => {
   const authenticated = buildAuthenticatedUser(user);
 
   return {
@@ -125,7 +192,7 @@ export const serializeUser = (user: User): SerializedUser => {
     role: authenticated.role,
     isActive: authenticated.isActive,
     lastLoginAt: authenticated.lastLoginAt ? authenticated.lastLoginAt.toISOString() : null,
-    permissions: authenticated.permissions,
+    modules: authenticated.modules,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };

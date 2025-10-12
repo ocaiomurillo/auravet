@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -8,7 +8,6 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
-import { roleLabels } from '../constants/roles';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Role, User } from '../types/api';
@@ -17,27 +16,33 @@ interface UserFormValues {
   nome: string;
   email: string;
   password: string;
-  role: Role;
+  roleId: string;
 }
 
 const defaultValues: UserFormValues = {
   nome: '',
   email: '',
   password: '',
-  role: 'ASSISTENTE_ADMINISTRATIVO',
+  roleId: '',
 };
 
 const UsersPage = () => {
   const queryClient = useQueryClient();
-  const { registerUser, hasPermission, refreshUser } = useAuth();
+  const { registerUser, hasModule, refreshUser } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const canManage = hasPermission('users:manage');
+  const canManage = hasModule('users:manage');
 
   const usersQuery = useQuery({
     queryKey: ['users'],
     queryFn: () => apiClient.get<{ users: User[] }>('/users'),
+    enabled: canManage,
+  });
+
+  const rolesQuery = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => apiClient.get<{ roles: Role[] }>('/roles'),
     enabled: canManage,
   });
 
@@ -48,21 +53,23 @@ const UsersPage = () => {
     formState: { errors },
   } = useForm<UserFormValues>({ defaultValues });
 
+  const activeRoles = useMemo(() => rolesQuery.data?.roles.filter((role) => role.isActive) ?? [], [rolesQuery.data?.roles]);
+
   const closeModal = () => {
     setModalOpen(false);
     setEditingUser(null);
-    reset(defaultValues);
+    reset({ ...defaultValues, roleId: activeRoles[0]?.id ?? '' });
   };
 
   const openCreateModal = () => {
     setEditingUser(null);
-    reset(defaultValues);
+    reset({ ...defaultValues, roleId: activeRoles[0]?.id ?? '' });
     setModalOpen(true);
   };
 
   const openEditModal = (user: User) => {
     setEditingUser(user);
-    reset({ nome: user.nome, email: user.email, password: '', role: user.role });
+    reset({ nome: user.nome, email: user.email, password: '', roleId: user.role.id });
     setModalOpen(true);
   };
 
@@ -80,10 +87,10 @@ const UsersPage = () => {
   });
 
   const updateUser = useMutation({
-    mutationFn: async ({ id, nome, role }: { id: string; nome: string; role: Role }) => {
+    mutationFn: async ({ id, nome, roleId }: { id: string; nome: string; roleId: string }) => {
       const response = await apiClient.patch<{ user: User }>(`/users/${id}`, {
         nome,
-        role,
+        roleId,
       });
       return response.user;
     },
@@ -117,7 +124,7 @@ const UsersPage = () => {
 
   const onSubmit = handleSubmit((values) => {
     if (editingUser) {
-      updateUser.mutate({ id: editingUser.id, nome: values.nome, role: values.role });
+      updateUser.mutate({ id: editingUser.id, nome: values.nome, roleId: values.roleId });
     } else {
       createUser.mutate(values);
     }
@@ -132,8 +139,13 @@ const UsersPage = () => {
             Administre o acesso da equipe com responsabilidade: defina papéis, acompanhe status e mantenha a segurança da clínica.
           </p>
         </div>
-        <Button onClick={openCreateModal}>Novo colaborador</Button>
+        <Button onClick={openCreateModal} disabled={!activeRoles.length}>
+          Novo colaborador
+        </Button>
       </div>
+      {rolesQuery.error ? (
+        <p className="text-sm text-red-600">Não foi possível carregar as funções disponíveis. Atualize a página para tentar novamente.</p>
+      ) : null}
 
       <Card title="Equipe interna" description="Somente usuários ativos podem acessar o ecossistema Auravet.">
         {usersQuery.isLoading ? <p>Carregando colaboradores...</p> : null}
@@ -150,7 +162,7 @@ const UsersPage = () => {
                 <div>
                   <p className="font-montserrat text-lg font-semibold text-brand-escuro">{user.nome}</p>
                   <p className="text-sm text-brand-grafite/70">{user.email}</p>
-                  <p className="text-xs uppercase tracking-wide text-brand-escuro/70">{roleLabels[user.role]}</p>
+                  <p className="text-xs uppercase tracking-wide text-brand-escuro/70">{user.role.name}</p>
                   <p className="text-xs text-brand-grafite/60">
                     Último acesso:{' '}
                     {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('pt-BR') : 'Ainda não entrou'}
@@ -230,10 +242,13 @@ const UsersPage = () => {
               helperText={errors.password?.message}
             />
           ) : null}
-          <SelectField label="Papel" required {...register('role')}>
-            {Object.entries(roleLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+          <SelectField label="Função" required {...register('roleId', { required: 'Selecione uma função.' })}>
+            <option value="" disabled>
+              {rolesQuery.isLoading ? 'Carregando funções...' : 'Selecione uma função'}
+            </option>
+            {activeRoles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
               </option>
             ))}
           </SelectField>

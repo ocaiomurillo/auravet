@@ -1,10 +1,9 @@
 import type { RequestHandler } from 'express';
 
-import type { Permission } from '../utils/permissions';
 import { HttpError } from '../utils/http-error';
 
-export const requirePermission = (...permissions: Permission[]): RequestHandler => {
-  if (permissions.length === 0) {
+export const requirePermission = (...modules: string[]): RequestHandler => {
+  if (modules.length === 0) {
     throw new Error('É necessário informar ao menos uma permissão para a verificação.');
   }
 
@@ -13,7 +12,7 @@ export const requirePermission = (...permissions: Permission[]): RequestHandler 
       throw new HttpError(401, 'Autenticação obrigatória.');
     }
 
-    const allowed = permissions.some((permission) => req.user?.permissions.includes(permission));
+    const allowed = modules.some((module) => req.user?.modules.includes(module));
 
     if (!allowed) {
       throw new HttpError(403, 'Você não tem permissão para acessar este recurso.');

@@ -1,4 +1,3 @@
-import { Role } from '@prisma/client';
 import { z } from 'zod';
 
 export const passwordSchema = z
@@ -12,7 +11,7 @@ export const registerSchema = z.object({
   nome: z.string().min(3, 'Informe ao menos 3 caracteres para o nome.'),
   email: z.string().email('Informe um e-mail válido.'),
   password: passwordSchema,
-  role: z.nativeEnum(Role),
+  roleId: z.string().cuid('Função inválida.'),
 });
 
 export const loginSchema = z.object({
