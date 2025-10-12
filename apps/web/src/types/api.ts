@@ -59,6 +59,22 @@ export interface Service {
   observacoes?: string | null;
   createdAt: string;
   animal?: Animal;
+  items: ServiceItem[];
+}
+
+export interface ServiceItem {
+  id: string;
+  productId: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  product: {
+    id: string;
+    nome: string;
+    precoVenda: number;
+    estoqueAtual: number;
+    estoqueMinimo: number;
+  };
 }
 
 export interface Product {

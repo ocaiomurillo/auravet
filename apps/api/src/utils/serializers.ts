@@ -1,10 +1,13 @@
-import type { Animal, Module, Owner, Prisma, Product, Servico } from '@prisma/client';
+import type { Animal, Module, Owner, Prisma, Product, ServiceProductUsage, Servico } from '@prisma/client';
 
 import type { UserWithRole } from './auth';
 import { buildAuthenticatedUser } from './auth';
 
+type ServiceItemWithProduct = ServiceProductUsage & { product: Product };
+
 type ServiceWithOptionalRelations = Servico & {
   animal?: AnimalWithOptionalRelations | null;
+  items?: ServiceItemWithProduct[];
 };
 
 type AnimalWithOptionalRelations = Animal & {
@@ -16,6 +19,21 @@ type OwnerWithOptionalRelations = Owner & {
   animals?: AnimalWithOptionalRelations[];
 };
 
+export type SerializedServiceItem = {
+  id: string;
+  productId: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  product: {
+    id: string;
+    nome: string;
+    precoVenda: number;
+    estoqueAtual: number;
+    estoqueMinimo: number;
+  };
+};
+
 export type SerializedService = {
   id: string;
   animalId: string;
@@ -25,6 +43,7 @@ export type SerializedService = {
   observacoes: string | null;
   createdAt: string;
   animal?: SerializedAnimal;
+  items: SerializedServiceItem[];
 };
 
 export type SerializedAnimal = {
@@ -125,6 +144,21 @@ export const serializeService = (
     preco: Number(service.preco),
     observacoes: service.observacoes ?? null,
     createdAt: service.createdAt.toISOString(),
+    items:
+      service.items?.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        quantidade: item.quantidade,
+        valorUnitario: Number(item.valorUnitario),
+        valorTotal: Number(item.valorTotal),
+        product: {
+          id: item.product.id,
+          nome: item.product.nome,
+          precoVenda: Number(item.product.precoVenda),
+          estoqueAtual: item.product.estoqueAtual,
+          estoqueMinimo: item.product.estoqueMinimo,
+        },
+      })) ?? [],
   };
 
   if (options?.includeAnimal && service.animal) {

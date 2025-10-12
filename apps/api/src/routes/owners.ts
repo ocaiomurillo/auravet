@@ -21,7 +21,16 @@ ownersRouter.get(
       include: {
         animals: {
           include: {
-            services: true,
+            services: {
+              orderBy: { data: 'desc' },
+              include: {
+                items: {
+                  include: {
+                    product: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -61,7 +70,16 @@ ownersRouter.get(
       include: {
         animals: {
           include: {
-            services: true,
+            services: {
+              orderBy: { data: 'desc' },
+              include: {
+                items: {
+                  include: {
+                    product: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

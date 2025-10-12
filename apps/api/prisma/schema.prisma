@@ -51,6 +51,7 @@ model Servico {
   preco        Decimal     @db.Decimal(10, 2)
   observacoes  String?
   createdAt    DateTime    @default(now())
+  items        ServiceProductUsage[]
 }
 
 model Module {
@@ -113,4 +114,21 @@ model Product {
   isSellable    Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  serviceUsages ServiceProductUsage[]
+}
+
+model ServiceProductUsage {
+  id            String   @id @default(cuid())
+  servicoId     String
+  productId     String
+  quantidade    Int
+  valorUnitario Decimal  @db.Decimal(10, 2)
+  valorTotal    Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  servico Servico @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([servicoId, productId])
 }
