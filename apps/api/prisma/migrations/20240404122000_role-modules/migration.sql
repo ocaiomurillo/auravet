@@ -1,3 +1,6 @@
+-- Rename old enum type to avoid name collision with new table
+ALTER TYPE "Role" RENAME TO "RoleEnum";
+
 -- CreateTable
 CREATE TABLE "Module" (
     "id" TEXT NOT NULL,
@@ -95,7 +98,7 @@ ALTER TABLE "User" ALTER COLUMN "roleId" SET NOT NULL;
 
 -- Drop old role column and enum
 ALTER TABLE "User" DROP COLUMN "role";
-DROP TYPE "Role";
+DROP TYPE "RoleEnum";
 
 -- Create indexes
 CREATE UNIQUE INDEX "Module_slug_key" ON "Module"("slug");
