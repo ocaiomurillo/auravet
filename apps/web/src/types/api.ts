@@ -58,6 +58,7 @@ export interface Service {
   preco: number;
   observacoes?: string | null;
   createdAt: string;
+  appointmentId: string | null;
   animal?: Animal;
   items: ServiceItem[];
 }
@@ -101,9 +102,75 @@ export interface User {
   modules: string[];
   createdAt: string;
   updatedAt: string;
+  collaboratorProfile: CollaboratorProfile | null;
 }
 
 export interface AuthLoginResponse {
   token: string;
   user: User;
+}
+
+export interface CollaboratorProfile {
+  especialidade?: string | null;
+  crmv?: string | null;
+  turnos: string[];
+  bio?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CollaboratorSummary {
+  id: string;
+  nome: string;
+  email: string;
+  role: UserRoleSummary;
+  collaboratorProfile: CollaboratorProfile | null;
+}
+
+export interface AppointmentAvailability {
+  veterinarianConflict: boolean;
+  assistantConflict: boolean;
+}
+
+export interface Appointment {
+  id: string;
+  animalId: string;
+  ownerId: string;
+  veterinarianId: string;
+  assistantId: string | null;
+  serviceId: string | null;
+  status: 'AGENDADO' | 'CONFIRMADO' | 'CONCLUIDO';
+  scheduledStart: string;
+  scheduledEnd: string;
+  confirmedAt: string | null;
+  completedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  durationMinutes: number;
+  availability: AppointmentAvailability;
+  animal: Animal;
+  owner: Owner;
+  veterinarian: CollaboratorSummary;
+  assistant: CollaboratorSummary | null;
+  service: Service | null;
+}
+
+export interface AppointmentCalendarSummary {
+  total: number;
+  confirmed: number;
+  concluded: number;
+  pending: number;
+  capacity: {
+    totalSlots: number | null;
+    bookedSlots: number;
+    availableSlots: number | null;
+  };
+}
+
+export interface AppointmentCalendarResponse {
+  view: 'day' | 'week' | 'month';
+  range: { start: string; end: string };
+  appointments: Appointment[];
+  summary: AppointmentCalendarSummary;
 }

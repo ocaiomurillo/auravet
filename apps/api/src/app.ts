@@ -9,6 +9,7 @@ import { swaggerDocument } from './docs/swagger';
 import { errorHandler } from './middlewares/error-handler';
 import { animalsRouter } from './routes/animals';
 import { authRouter } from './routes/auth';
+import { appointmentsRouter } from './routes/appointments';
 import { ownersRouter } from './routes/owners';
 import { servicesRouter } from './routes/services';
 import { usersRouter } from './routes/users';
@@ -35,6 +36,7 @@ app.get('/health', (_req, res) => {
 app.use('/auth', authRouter);
 app.use('/owners', ownersRouter);
 app.use('/animals', animalsRouter);
+app.use('/appointments', appointmentsRouter);
 app.use('/services', servicesRouter);
 app.use('/users', usersRouter);
 app.use('/roles', rolesRouter);

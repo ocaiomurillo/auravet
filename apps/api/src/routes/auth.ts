@@ -36,6 +36,7 @@ authRouter.post(
             },
           },
         },
+        collaboratorProfile: true,
       },
     });
 
@@ -67,6 +68,7 @@ authRouter.post(
             },
           },
         },
+        collaboratorProfile: true,
       },
     });
 
@@ -110,6 +112,7 @@ authRouter.post(
               },
             },
           },
+          collaboratorProfile: true,
         },
       });
 
@@ -147,6 +150,7 @@ authRouter.get(
             },
           },
         },
+        collaboratorProfile: true,
       },
     });
 

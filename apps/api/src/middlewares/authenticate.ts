@@ -34,6 +34,7 @@ export const authenticate: RequestHandler = asyncHandler(async (req, _res, next)
             },
           },
         },
+        collaboratorProfile: true,
       },
     });
 

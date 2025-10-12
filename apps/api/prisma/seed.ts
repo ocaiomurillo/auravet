@@ -44,6 +44,33 @@ const DEFAULT_ADMIN_NAME = process.env.SEED_ADMIN_NAME ?? 'Administrador Auravet
 const DEFAULT_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin123!';
 const ADMIN_ROLE_SLUG = 'ADMINISTRADOR';
 
+const DEFAULT_COLLABORATORS = [
+  {
+    slug: 'MEDICO',
+    nome: 'Dra. Aurora Campos',
+    email: 'dra.aurora@auravet.com',
+    password: process.env.SEED_DOCTOR_PASSWORD ?? 'VetAurora123!',
+    profile: {
+      especialidade: 'Clínica geral e felinos',
+      crmv: 'CRMV-SP 12345',
+      turnos: ['MANHA', 'TARDE'],
+      bio: 'Apaixonada por medicina preventiva e pelo cuidado gentil com gatos e cães.',
+    },
+  },
+  {
+    slug: 'ENFERMEIRO',
+    nome: 'Enf. Theo Ribeiro',
+    email: 'enf.theo@auravet.com',
+    password: process.env.SEED_NURSE_PASSWORD ?? 'NurseTheo123!',
+    profile: {
+      especialidade: 'Enfermagem cirúrgica e internação',
+      crmv: 'CRMV-SP 67890',
+      turnos: ['TARDE', 'NOITE'],
+      bio: 'Responsável pelos cuidados assistenciais e pela preparação de procedimentos.',
+    },
+  },
+] as const;
+
 const DEFAULT_MODULES = [
   {
     slug: 'owners:read',
@@ -229,6 +256,53 @@ async function main() {
   });
 
   console.log(`👩‍⚕️ Usuário administrador pronto: ${admin.email}`);
+
+  for (const collaborator of DEFAULT_COLLABORATORS) {
+    const role = roles.find((item) => item.slug === collaborator.slug);
+
+    if (!role) {
+      console.warn(`⚠️  Função ${collaborator.slug} não encontrada. Perfil ${collaborator.email} não será criado.`);
+      continue;
+    }
+
+    const collaboratorPasswordHash = await hashPassword(collaborator.password);
+
+    const user = await prisma.user.upsert({
+      where: { email: collaborator.email },
+      create: {
+        nome: collaborator.nome,
+        email: collaborator.email,
+        passwordHash: collaboratorPasswordHash,
+        roleId: role.id,
+        isActive: true,
+      },
+      update: {
+        nome: collaborator.nome,
+        roleId: role.id,
+        isActive: true,
+        passwordHash: collaboratorPasswordHash,
+      },
+    });
+
+    await prisma.collaboratorProfile.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        especialidade: collaborator.profile.especialidade,
+        crmv: collaborator.profile.crmv,
+        turnos: [...collaborator.profile.turnos],
+        bio: collaborator.profile.bio,
+      },
+      update: {
+        especialidade: collaborator.profile.especialidade,
+        crmv: collaborator.profile.crmv,
+        turnos: [...collaborator.profile.turnos],
+        bio: collaborator.profile.bio,
+      },
+    });
+
+    console.log(`🤝 Perfil clínico pronto: ${collaborator.email}`);
+  }
 }
 
 main()

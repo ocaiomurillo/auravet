@@ -28,6 +28,7 @@ usersRouter.get(
             },
           },
         },
+        collaboratorProfile: true,
       },
     });
 
@@ -54,6 +55,7 @@ usersRouter.patch(
               },
             },
           },
+          collaboratorProfile: true,
         },
       });
 
@@ -90,6 +92,7 @@ usersRouter.patch(
               },
             },
           },
+          collaboratorProfile: true,
         },
       });
 
