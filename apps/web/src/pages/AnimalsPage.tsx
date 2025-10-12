@@ -35,10 +35,10 @@ const AnimalsPage = () => {
   const [selectedAnimalId, setSelectedAnimalId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
-  const canManageAnimals = hasPermission('animals:write');
-  const canRegisterServices = hasPermission('services:write');
-  const canViewServices = hasPermission('services:read');
+  const { hasModule } = useAuth();
+  const canManageAnimals = hasModule('animals:write');
+  const canRegisterServices = hasModule('services:write');
+  const canViewServices = hasModule('services:read');
 
   const { data: animals, isLoading, error } = useQuery({
     queryKey: ['animals'],

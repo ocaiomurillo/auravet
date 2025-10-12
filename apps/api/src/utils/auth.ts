@@ -1,9 +1,8 @@
 import { createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
-import type { Role, User } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 import { env } from '../config/env';
-import type { Permission } from './permissions';
-import { getRolePermissions } from './permissions';
+import { extractEnabledModuleSlugs } from './permissions';
 
 const SALT_LENGTH = 16;
 const KEY_LENGTH = 64;
@@ -26,15 +25,20 @@ export interface AuthenticatedUser {
   id: string;
   nome: string;
   email: string;
-  role: Role;
+  role: {
+    id: string;
+    slug: string;
+    name: string;
+  };
   isActive: boolean;
   lastLoginAt: Date | null;
-  permissions: Permission[];
+  modules: string[];
 }
 
 export interface TokenPayload {
   sub: string;
-  role: Role;
+  roleId: string;
+  modules: string[];
   exp: number;
 }
 
@@ -61,15 +65,37 @@ export const verifyPassword = async (password: string, storedHash: string) => {
   return timingSafeEqual(storedKey, derivedKey);
 };
 
-export const buildAuthenticatedUser = (user: User): AuthenticatedUser => ({
-  id: user.id,
-  nome: user.nome,
-  email: user.email,
-  role: user.role,
-  isActive: user.isActive,
-  lastLoginAt: user.lastLoginAt ?? null,
-  permissions: getRolePermissions(user.role),
-});
+export type UserWithRole = Prisma.UserGetPayload<{
+  include: {
+    role: {
+      include: {
+        modules: {
+          include: {
+            module: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
+export const buildAuthenticatedUser = (user: UserWithRole): AuthenticatedUser => {
+  const modules = extractEnabledModuleSlugs(user.role.modules);
+
+  return {
+    id: user.id,
+    nome: user.nome,
+    email: user.email,
+    role: {
+      id: user.role.id,
+      slug: user.role.slug,
+      name: user.role.name,
+    },
+    isActive: user.isActive,
+    lastLoginAt: user.lastLoginAt ?? null,
+    modules,
+  };
+};
 
 const base64UrlEncode = (input: string | Buffer) =>
   Buffer.from(input).toString('base64').replace(/=+$/u, '').replace(/\+/gu, '-').replace(/\//gu, '_');
@@ -108,7 +134,8 @@ export const createAccessToken = (user: AuthenticatedUser) => {
   const expiresInSeconds = parseExpiration(env.JWT_EXPIRES_IN);
   const payload: TokenPayload = {
     sub: user.id,
-    role: user.role,
+    roleId: user.role.id,
+    modules: user.modules,
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
   };
 
@@ -141,7 +168,7 @@ export const verifyToken = (token: string): TokenPayload => {
 
   const payload = JSON.parse(base64UrlDecode(encodedPayload)) as TokenPayload;
 
-  if (!payload.sub || !payload.role || !payload.exp) {
+  if (!payload.sub || !payload.roleId || !payload.exp || !Array.isArray(payload.modules)) {
     throw new Error('Token inválido');
   }
 

@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '../lib/apiClient';
 import { UNAUTHORIZED_EVENT, authStorage } from '../lib/authStorage';
-import type { AuthLoginResponse, Permission, Role, User } from '../types/api';
+import type { AuthLoginResponse, User } from '../types/api';
 
 interface AuthContextValue {
   user: User | null;
@@ -13,8 +13,8 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (payload: { email: string; password: string }) => Promise<void>;
   logout: () => void;
-  registerUser: (payload: { nome: string; email: string; password: string; role: Role }) => Promise<User>;
-  hasPermission: (permission: Permission) => boolean;
+  registerUser: (payload: { nome: string; email: string; password: string; roleId: string }) => Promise<User>;
+  hasModule: (module: string) => boolean;
   refreshUser: () => Promise<User | null>;
 }
 
@@ -80,15 +80,15 @@ export const AuthProvider = ({ children }: PropsWithChildren): JSX.Element => {
   }, [navigate, queryClient]);
 
   const registerUser = useCallback(
-    async (payload: { nome: string; email: string; password: string; role: Role }) => {
+    async (payload: { nome: string; email: string; password: string; roleId: string }) => {
       const response = await apiClient.post<{ user: User }>('/auth/register', payload);
       return response.user;
     },
     [],
   );
 
-  const hasPermission = useCallback(
-    (permission: Permission) => user?.permissions.includes(permission) ?? false,
+  const hasModule = useCallback(
+    (module: string) => user?.modules.includes(module) ?? false,
     [user],
   );
 
@@ -105,10 +105,10 @@ export const AuthProvider = ({ children }: PropsWithChildren): JSX.Element => {
       login,
       logout,
       registerUser,
-      hasPermission,
+      hasModule,
       refreshUser,
     }),
-    [hasPermission, isLoading, login, logout, registerUser, refreshUser, token, user],
+    [hasModule, isLoading, login, logout, registerUser, refreshUser, token, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

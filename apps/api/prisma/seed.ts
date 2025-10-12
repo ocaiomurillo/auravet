@@ -1,6 +1,6 @@
 import { randomBytes, scrypt as scryptCallback } from 'crypto';
 
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const SALT_LENGTH = 16;
 const KEY_LENGTH = 64;
@@ -42,7 +42,147 @@ const prisma = new PrismaClient();
 const DEFAULT_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@auravet.com';
 const DEFAULT_ADMIN_NAME = process.env.SEED_ADMIN_NAME ?? 'Administrador Auravet';
 const DEFAULT_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin123!';
+const ADMIN_ROLE_SLUG = 'ADMINISTRADOR';
+
+const DEFAULT_MODULES = [
+  {
+    slug: 'owners:read',
+    name: 'Visualizar tutores',
+    description: 'Permite visualizar a lista de tutores cadastrados.',
+  },
+  {
+    slug: 'owners:write',
+    name: 'Gerenciar tutores',
+    description: 'Permite criar e editar tutores.',
+  },
+  {
+    slug: 'animals:read',
+    name: 'Visualizar animais',
+    description: 'Permite visualizar animais cadastrados.',
+  },
+  {
+    slug: 'animals:write',
+    name: 'Gerenciar animais',
+    description: 'Permite cadastrar e editar animais.',
+  },
+  {
+    slug: 'services:read',
+    name: 'Visualizar serviços',
+    description: 'Permite visualizar os serviços prestados.',
+  },
+  {
+    slug: 'services:write',
+    name: 'Gerenciar serviços',
+    description: 'Permite registrar e atualizar serviços.',
+  },
+  {
+    slug: 'users:manage',
+    name: 'Administrar usuários',
+    description: 'Permite criar e gerenciar usuários e funções.',
+  },
+] as const;
+
+const DEFAULT_ROLES: Array<{
+  slug: string;
+  name: string;
+  description?: string;
+  modules: string[];
+}> = [
+  {
+    slug: 'ADMINISTRADOR',
+    name: 'Administrador',
+    description: 'Acesso completo ao ecossistema Auravet.',
+    modules: DEFAULT_MODULES.map((module) => module.slug),
+  },
+  {
+    slug: 'AUXILIAR_ADMINISTRATIVO',
+    name: 'Auxiliar Administrativo',
+    modules: ['owners:read', 'owners:write', 'animals:read', 'animals:write', 'services:read'],
+  },
+  {
+    slug: 'ASSISTENTE_ADMINISTRATIVO',
+    name: 'Assistente Administrativo',
+    modules: ['owners:read', 'animals:read', 'services:read'],
+  },
+  {
+    slug: 'ENFERMEIRO',
+    name: 'Enfermeiro',
+    modules: ['owners:read', 'animals:read', 'animals:write', 'services:read', 'services:write'],
+  },
+  {
+    slug: 'MEDICO',
+    name: 'Médico',
+    modules: ['owners:read', 'animals:read', 'services:read', 'services:write'],
+  },
+  {
+    slug: 'CONTADOR',
+    name: 'Contador',
+    modules: ['services:read'],
+  },
+];
+
 async function main() {
+  const modules = await Promise.all(
+    DEFAULT_MODULES.map((module) =>
+      prisma.module.upsert({
+        where: { slug: module.slug },
+        update: {
+          name: module.name,
+          description: module.description,
+          isActive: true,
+        },
+        create: {
+          slug: module.slug,
+          name: module.name,
+          description: module.description,
+        },
+      }),
+    ),
+  );
+
+  const moduleMap = new Map(modules.map((module) => [module.slug, module]));
+
+  const roles = await Promise.all(
+    DEFAULT_ROLES.map(async (role) => {
+      const savedRole = await prisma.role.upsert({
+        where: { slug: role.slug },
+        update: {
+          name: role.name,
+          description: role.description,
+          isActive: true,
+        },
+        create: {
+          slug: role.slug,
+          name: role.name,
+          description: role.description,
+        },
+      });
+
+      await prisma.roleModuleAccess.deleteMany({ where: { roleId: savedRole.id } });
+
+      const modulesToAssign = role.modules
+        .map((slug) => moduleMap.get(slug))
+        .filter((module): module is (typeof modules)[number] => Boolean(module))
+        .map((module) => ({
+          roleId: savedRole.id,
+          moduleId: module.id,
+          isEnabled: true,
+        }));
+
+      if (modulesToAssign.length > 0) {
+        await prisma.roleModuleAccess.createMany({ data: modulesToAssign, skipDuplicates: true });
+      }
+
+      return savedRole;
+    }),
+  );
+
+  const adminRole = roles.find((role) => role.slug === ADMIN_ROLE_SLUG);
+
+  if (!adminRole) {
+    throw new Error('Função de administrador não encontrada na seed.');
+  }
+
   const passwordHash = await hashPassword(DEFAULT_ADMIN_PASSWORD);
 
   const admin = await prisma.user.upsert({
@@ -51,12 +191,12 @@ async function main() {
       nome: DEFAULT_ADMIN_NAME,
       email: DEFAULT_ADMIN_EMAIL,
       passwordHash,
-      role: Role.ADMINISTRADOR,
+      roleId: adminRole.id,
       isActive: true,
     },
     update: {
       nome: DEFAULT_ADMIN_NAME,
-      role: Role.ADMINISTRADOR,
+      roleId: adminRole.id,
       isActive: true,
       passwordHash,
     },

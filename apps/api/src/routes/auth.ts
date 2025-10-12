@@ -25,7 +25,19 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = loginSchema.parse(req.body);
 
-    const user = await prisma.user.findUnique({ where: { email: payload.email } });
+    const user = await prisma.user.findUnique({
+      where: { email: payload.email },
+      include: {
+        role: {
+          include: {
+            modules: {
+              where: { isEnabled: true, module: { isActive: true } },
+              include: { module: true },
+            },
+          },
+        },
+      },
+    });
 
     if (!user) {
       throw new HttpError(401, 'Credenciais inválidas.');
@@ -46,6 +58,16 @@ authRouter.post(
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: now },
+      include: {
+        role: {
+          include: {
+            modules: {
+              where: { isEnabled: true, module: { isActive: true } },
+              include: { module: true },
+            },
+          },
+        },
+      },
     });
 
     const authenticated = buildAuthenticatedUser(updatedUser);
@@ -63,6 +85,12 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = registerSchema.parse(req.body);
 
+    const role = await prisma.role.findUnique({ where: { id: payload.roleId } });
+
+    if (!role || !role.isActive) {
+      throw new HttpError(400, 'Função informada está inativa ou não existe.');
+    }
+
     const passwordHash = await hashPassword(payload.password);
 
     try {
@@ -71,7 +99,17 @@ authRouter.post(
           nome: payload.nome,
           email: payload.email,
           passwordHash,
-          role: payload.role,
+          roleId: payload.roleId,
+        },
+        include: {
+          role: {
+            include: {
+              modules: {
+                where: { isEnabled: true, module: { isActive: true } },
+                include: { module: true },
+              },
+            },
+          },
         },
       });
 
@@ -79,6 +117,10 @@ authRouter.post(
     } catch (error) {
       if (isPrismaKnownError(error, 'P2002')) {
         throw new HttpError(409, 'Já existe um usuário com este e-mail.');
+      }
+
+      if (isPrismaKnownError(error, 'P2003')) {
+        throw new HttpError(400, 'Função informada não existe ou está inativa.');
       }
 
       throw error;
@@ -94,7 +136,19 @@ authRouter.get(
       throw new HttpError(401, 'Sessão inválida.');
     }
 
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        role: {
+          include: {
+            modules: {
+              where: { isEnabled: true, module: { isActive: true } },
+              include: { module: true },
+            },
+          },
+        },
+      },
+    });
 
     if (!user) {
       throw new HttpError(401, 'Sessão inválida.');

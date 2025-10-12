@@ -19,8 +19,8 @@ interface ServiceFilters {
 
 const ServicesPage = () => {
   const [filters, setFilters] = useState<ServiceFilters>({ ownerId: '', animalId: '', from: '', to: '' });
-  const { hasPermission } = useAuth();
-  const canRegisterService = hasPermission('services:write');
+  const { hasModule } = useAuth();
+  const canRegisterService = hasModule('services:write');
 
   const { data: owners } = useQuery({
     queryKey: ['owners'],

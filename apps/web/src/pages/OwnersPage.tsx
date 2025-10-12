@@ -21,8 +21,8 @@ const OwnersPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOwner, setEditingOwner] = useState<Owner | null>(null);
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
-  const canEdit = hasPermission('owners:write');
+  const { hasModule } = useAuth();
+  const canEdit = hasModule('owners:write');
 
   const { data: owners, isLoading, error } = useQuery({
     queryKey: ['owners'],
