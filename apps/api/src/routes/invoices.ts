@@ -1,0 +1,218 @@
+import { Prisma } from '@prisma/client';
+import { Router } from 'express';
+import { z } from 'zod';
+
+import { prisma } from '../lib/prisma';
+import { authenticate } from '../middlewares/authenticate';
+import { requirePermission } from '../middlewares/require-permission';
+import { invoiceExportSchema, invoiceFilterSchema, invoiceGenerateSchema, invoiceIdSchema, invoicePaymentSchema } from '../schema/invoice';
+import { asyncHandler } from '../utils/async-handler';
+import { HttpError } from '../utils/http-error';
+import { fetchInvoiceCandidates, getPaidStatus, invoiceInclude, syncInvoiceForService } from '../utils/invoice';
+import { serializeInvoice } from '../utils/serializers';
+
+export const invoicesRouter = Router();
+
+invoicesRouter.use(authenticate);
+
+const parseDate = (value: string, label: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new HttpError(422, `Data inválida para ${label}. Utilize o formato ISO (YYYY-MM-DD).`);
+  }
+  return date;
+};
+
+const endOfDay = (date: Date) => {
+  const result = new Date(date);
+  result.setHours(23, 59, 59, 999);
+  return result;
+};
+
+invoicesRouter.get(
+  '/statuses',
+  requirePermission('cashier:access'),
+  asyncHandler(async (_req, res) => {
+    const statuses = await prisma.invoiceStatus.findMany({ orderBy: { name: 'asc' } });
+    res.json(
+      statuses.map((status) => ({
+        id: status.id,
+        slug: status.slug,
+        name: status.name,
+      })),
+    );
+  }),
+);
+
+const invoiceCandidateSchema = z.object({ ownerId: z.string().cuid().optional() });
+
+invoicesRouter.get(
+  '/candidates',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const { ownerId } = invoiceCandidateSchema.parse(req.query);
+    const services = await fetchInvoiceCandidates(prisma, ownerId);
+    res.json(services);
+  }),
+);
+
+const buildInvoiceWhere = (filters: z.infer<typeof invoiceFilterSchema>): Prisma.InvoiceWhereInput => {
+  const where: Prisma.InvoiceWhereInput = {};
+
+  if (filters.ownerId) {
+    where.ownerId = filters.ownerId;
+  }
+
+  if (filters.status) {
+    where.status = { slug: filters.status };
+  }
+
+  if (filters.from || filters.to) {
+    where.dueDate = {
+      gte: filters.from ? parseDate(filters.from, 'data inicial') : undefined,
+      lte: filters.to ? endOfDay(parseDate(filters.to, 'data final')) : undefined,
+    };
+  }
+
+  return where;
+};
+
+const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof invoiceInclude }>>) => {
+  let openTotal = new Prisma.Decimal(0);
+  let paidTotal = new Prisma.Decimal(0);
+  let openCount = 0;
+  let paidCount = 0;
+
+  for (const invoice of invoices) {
+    if (invoice.status.slug === 'QUITADA') {
+      paidTotal = paidTotal.add(invoice.total);
+      paidCount += 1;
+    } else {
+      openTotal = openTotal.add(invoice.total);
+      openCount += 1;
+    }
+  }
+
+  return {
+    openTotal: Number(openTotal.toFixed(2)),
+    paidTotal: Number(paidTotal.toFixed(2)),
+    openCount,
+    paidCount,
+  };
+};
+
+invoicesRouter.get(
+  '/',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const filters = invoiceFilterSchema.parse(req.query);
+
+    const invoices = await prisma.invoice.findMany({
+      where: buildInvoiceWhere(filters),
+      include: invoiceInclude,
+      orderBy: { dueDate: 'desc' },
+    });
+
+    res.json({
+      invoices: invoices.map(serializeInvoice),
+      summary: buildSummary(invoices),
+    });
+  }),
+);
+
+const escapeCsv = (value: string) => `"${value.replace(/"/gu, '""')}"`;
+
+invoicesRouter.get(
+  '/export',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const filters = invoiceExportSchema.parse(req.query);
+
+    const invoices = await prisma.invoice.findMany({
+      where: buildInvoiceWhere(filters),
+      include: invoiceInclude,
+      orderBy: { dueDate: 'desc' },
+    });
+
+    const header = ['ID', 'Tutor', 'Status', 'Total', 'Vencimento', 'Pago em', 'Responsável'];
+    const rows = invoices.map((invoice) => [
+      invoice.id,
+      invoice.owner.nome,
+      invoice.status.name,
+      invoice.total.toFixed(2),
+      invoice.dueDate.toISOString(),
+      invoice.paidAt ? invoice.paidAt.toISOString() : '',
+      invoice.responsible?.nome ?? '',
+    ]);
+
+    const csv = [header, ...rows]
+      .map((row) => row.map((value) => escapeCsv(String(value))).join(','))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="invoices.csv"');
+    res.send(`\ufeff${csv}`);
+  }),
+);
+
+invoicesRouter.post(
+  '/',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const payload = invoiceGenerateSchema.parse(req.body);
+
+    const dueDate = payload.dueDate ? parseDate(payload.dueDate, 'vencimento') : undefined;
+    const responsibleId = req.user?.id ?? null;
+
+    const invoice = await prisma.$transaction((tx) =>
+      syncInvoiceForService(tx, payload.serviceId, {
+        dueDate,
+        responsibleId,
+      }),
+    );
+
+    res.status(201).json(serializeInvoice(invoice));
+  }),
+);
+
+invoicesRouter.post(
+  '/:id/pay',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const { id } = invoiceIdSchema.parse(req.params);
+    const payload = invoicePaymentSchema.parse(req.body);
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      const existing = await tx.invoice.findUnique({
+        where: { id },
+        include: {
+          status: true,
+        },
+      });
+
+      if (!existing) {
+        throw new HttpError(404, 'Conta não encontrada.');
+      }
+
+      if (existing.status.slug === 'QUITADA') {
+        throw new HttpError(400, 'Esta conta já está quitada.');
+      }
+
+      const paidStatus = await getPaidStatus(tx);
+      const paidAt = payload.paidAt ? parseDate(payload.paidAt, 'data de pagamento') : new Date();
+
+      return tx.invoice.update({
+        where: { id },
+        data: {
+          statusId: paidStatus.id,
+          paidAt,
+          paymentNotes: payload.paymentNotes ?? null,
+          responsibleId: req.user?.id ?? existing.responsibleId,
+        },
+        include: invoiceInclude,
+      });
+    });
+
+    res.json(serializeInvoice(invoice));
+  }),
+);

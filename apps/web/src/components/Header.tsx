@@ -13,6 +13,7 @@ const navItems: Array<{ to: string; label: string; module?: string }> = [
   { to: '/calendar', label: 'Agenda', module: 'services:read' },
   { to: '/services', label: 'Serviços', module: 'services:read' },
   { to: '/products', label: 'Produtos', module: 'products:read' },
+  { to: '/cashier', label: 'Caixa', module: 'cashier:access' },
   { to: '/new-service', label: 'Registrar serviço', module: 'services:write' },
   { to: '/users', label: 'Usuários', module: 'users:manage' },
   { to: '/roles', label: 'Funções', module: 'users:manage' },
