@@ -13,6 +13,8 @@ import ServicesPage from './pages/ServicesPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import UsersPage from './pages/UsersPage';
 import ProductsPage from './pages/ProductsPage';
+import AppointmentsPage from './pages/AppointmentsPage';
+import CalendarPage from './pages/CalendarPage';
 
 const App = () => {
   return (
@@ -29,6 +31,12 @@ const App = () => {
           </Route>
           <Route element={<RequireModules modules={['services:read']} />}>
             <Route path="services" element={<ServicesPage />} />
+          </Route>
+          <Route element={<RequireModules modules={['services:read']} />}>
+            <Route path="appointments" element={<AppointmentsPage />} />
+          </Route>
+          <Route element={<RequireModules modules={['services:read']} />}>
+            <Route path="calendar" element={<CalendarPage />} />
           </Route>
           <Route element={<RequireModules modules={['products:read']} />}>
             <Route path="products" element={<ProductsPage />} />

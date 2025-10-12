@@ -76,6 +76,7 @@ export type UserWithRole = Prisma.UserGetPayload<{
         };
       };
     };
+    collaboratorProfile: true;
   };
 }>;
 

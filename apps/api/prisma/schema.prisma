@@ -21,6 +21,12 @@ enum TipoServico {
   OUTROS
 }
 
+enum AppointmentStatus {
+  AGENDADO
+  CONFIRMADO
+  CONCLUIDO
+}
+
 model Owner {
   id        String   @id @default(cuid())
   nome      String
@@ -28,6 +34,7 @@ model Owner {
   telefone  String?
   createdAt DateTime @default(now())
   animals   Animal[]
+  appointments Appointment[]
 }
 
 model Animal {
@@ -40,6 +47,7 @@ model Animal {
   owner      Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt  DateTime  @default(now())
   services   Servico[]
+  appointments Appointment[]
 }
 
 model Servico {
@@ -52,6 +60,7 @@ model Servico {
   observacoes  String?
   createdAt    DateTime    @default(now())
   items        ServiceProductUsage[]
+  appointment  Appointment? @relation("AppointmentService")
 }
 
 model Module {
@@ -100,6 +109,45 @@ model User {
   updatedAt    DateTime @updatedAt
 
   role Role @relation(fields: [roleId], references: [id])
+  collaboratorProfile CollaboratorProfile?
+  appointmentsAsVeterinarian Appointment[] @relation("VeterinarianAppointments")
+  appointmentsAsAssistant    Appointment[] @relation("AssistantAppointments")
+}
+
+model CollaboratorProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  especialidade String?
+  crmv         String?
+  turnos       String[] @default([])
+  bio          String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id               String            @id @default(cuid())
+  animalId         String
+  ownerId          String
+  veterinarianId   String
+  assistantId      String?
+  serviceId        String?   @unique
+  status           AppointmentStatus @default(AGENDADO)
+  scheduledStart   DateTime
+  scheduledEnd     DateTime
+  confirmedAt      DateTime?
+  completedAt      DateTime?
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  animal        Animal     @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  owner         Owner      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  veterinarian  User       @relation("VeterinarianAppointments", fields: [veterinarianId], references: [id])
+  assistant     User?      @relation("AssistantAppointments", fields: [assistantId], references: [id])
+  service       Servico?   @relation("AppointmentService", fields: [serviceId], references: [id])
 }
 
 model Product {
