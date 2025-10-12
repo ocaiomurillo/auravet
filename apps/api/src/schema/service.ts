@@ -2,12 +2,47 @@ import { z } from 'zod';
 
 export const tipoServicoValues = ['CONSULTA', 'EXAME', 'VACINACAO', 'CIRURGIA', 'OUTROS'] as const;
 
-const precoSchema = z
-  .union([z.number(), z.string()])
-  .refine((value) => {
-    const numeric = Number(value);
-    return !Number.isNaN(numeric) && numeric >= 0;
-  }, 'Informe um preço válido');
+const toNumber = (
+  value: unknown,
+  ctx: z.RefinementCtx,
+  { allowZero = true }: { allowZero?: boolean } = {},
+): number | undefined => {
+  const numeric = typeof value === 'string' ? Number(value.replace(',', '.')) : Number(value);
+
+  if (Number.isNaN(numeric)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Informe um número válido' });
+    return undefined;
+  }
+
+  if (numeric < 0 || (!allowZero && numeric === 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'O valor informado precisa ser maior que zero' });
+    return undefined;
+  }
+
+  return numeric;
+};
+
+const precoSchema = z.union([z.number(), z.string()]).transform((value, ctx) => {
+  const numeric = toNumber(value, ctx);
+  if (numeric === undefined) return z.NEVER;
+  return Number(numeric.toFixed(2));
+});
+
+const quantidadeSchema = z.union([z.number(), z.string()]).transform((value, ctx) => {
+  const numeric = toNumber(value, ctx, { allowZero: false });
+  if (numeric === undefined) return z.NEVER;
+  if (!Number.isInteger(numeric)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'A quantidade precisa ser um número inteiro' });
+    return z.NEVER;
+  }
+  return numeric;
+});
+
+const serviceItemSchema = z.object({
+  productId: z.string().cuid('Produto inválido'),
+  quantidade: quantidadeSchema,
+  precoUnitario: precoSchema,
+});
 
 export const serviceCreateSchema = z.object({
   animalId: z.string().cuid('Animal inválido'),
@@ -20,9 +55,25 @@ export const serviceCreateSchema = z.object({
     .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   preco: precoSchema,
   observacoes: z.string().optional(),
+  items: z.array(serviceItemSchema).default([]),
 });
 
-export const serviceUpdateSchema = serviceCreateSchema.partial();
+export const serviceUpdateSchema = z.object({
+  animalId: z.string().cuid('Animal inválido').optional(),
+  tipo: z
+    .enum(tipoServicoValues, {
+      errorMap: () => ({ message: 'Tipo de serviço inválido' }),
+    })
+    .optional(),
+  data: z
+    .string()
+    .datetime({ offset: true })
+    .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
+    .optional(),
+  preco: precoSchema.optional(),
+  observacoes: z.string().optional(),
+  items: z.array(serviceItemSchema).optional(),
+});
 
 export const serviceIdSchema = z.object({
   id: z.string().cuid('Serviço inválido'),

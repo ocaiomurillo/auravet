@@ -17,6 +17,14 @@ interface ServiceFilters {
   to: string;
 }
 
+const serviceLabels: Record<Service['tipo'], string> = {
+  CONSULTA: 'Consulta',
+  EXAME: 'Exame',
+  VACINACAO: 'Vacinação',
+  CIRURGIA: 'Cirurgia',
+  OUTROS: 'Outros cuidados',
+};
+
 const ServicesPage = () => {
   const [filters, setFilters] = useState<ServiceFilters>({ ownerId: '', animalId: '', from: '', to: '' });
   const { hasModule } = useAuth();
@@ -130,7 +138,9 @@ const ServicesPage = () => {
           <ul className="space-y-3">
             {services.map((service) => (
               <li key={service.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
-                <p className="font-montserrat text-lg font-semibold text-brand-escuro">{service.tipo}</p>
+                <p className="font-montserrat text-lg font-semibold text-brand-escuro">
+                  {serviceLabels[service.tipo] ?? service.tipo}
+                </p>
                 <p className="text-sm text-brand-grafite/70">
                   {new Date(service.data).toLocaleDateString('pt-BR')} • R$ {service.preco.toFixed(2)}
                 </p>
@@ -139,6 +149,40 @@ const ServicesPage = () => {
                 </p>
                 {service.observacoes ? (
                   <p className="text-sm text-brand-grafite/80">{service.observacoes}</p>
+                ) : null}
+                {service.items?.length ? (
+                  <div className="mt-3 space-y-2 rounded-xl bg-brand-azul/5 p-3">
+                    <p className="text-sm font-semibold text-brand-escuro">Itens utilizados</p>
+                    <ul className="space-y-2 text-sm text-brand-grafite/80">
+                      {service.items.map((item) => {
+                        const isOutOfStock = item.product.estoqueAtual === 0;
+                        const isLowStock = item.product.estoqueAtual <= item.product.estoqueMinimo && !isOutOfStock;
+
+                        return (
+                          <li key={item.id} className="flex flex-col gap-1">
+                            <span>
+                              {item.product.nome}: {item.quantidade} un × R$ {item.valorUnitario.toFixed(2)} = R$ {item.valorTotal.toFixed(2)}
+                            </span>
+                            <span
+                              className={
+                                isOutOfStock
+                                  ? 'text-red-500'
+                                  : isLowStock
+                                    ? 'text-amber-600'
+                                    : 'text-brand-grafite/60'
+                              }
+                            >
+                              {isOutOfStock
+                                ? 'Estoque zerado após o atendimento.'
+                                : isLowStock
+                                  ? `Estoque crítico: ${item.product.estoqueAtual} unidade(s) disponível(is).`
+                                  : `Estoque atual: ${item.product.estoqueAtual} unidade(s).`}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 ) : null}
               </li>
             ))}

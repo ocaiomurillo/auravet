@@ -65,8 +65,35 @@ export const swaggerDocument = {
           observacoes: { type: 'string', nullable: true },
           createdAt: { type: 'string', format: 'date-time' },
           animal: { $ref: '#/components/schemas/Animal' },
+          items: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ServiceItem' },
+          },
         },
         required: ['id', 'animalId', 'tipo', 'data', 'preco', 'createdAt'],
+      },
+      ServiceItemProduct: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          nome: { type: 'string' },
+          precoVenda: { type: 'number', format: 'double' },
+          estoqueAtual: { type: 'integer' },
+          estoqueMinimo: { type: 'integer' },
+        },
+        required: ['id', 'nome', 'precoVenda', 'estoqueAtual', 'estoqueMinimo'],
+      },
+      ServiceItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          productId: { type: 'string', format: 'cuid' },
+          quantidade: { type: 'integer' },
+          valorUnitario: { type: 'number', format: 'double' },
+          valorTotal: { type: 'number', format: 'double' },
+          product: { $ref: '#/components/schemas/ServiceItemProduct' },
+        },
+        required: ['id', 'productId', 'quantidade', 'valorUnitario', 'valorTotal', 'product'],
       },
       Module: {
         type: 'object',
@@ -993,6 +1020,18 @@ export const swaggerDocument = {
                   data: { type: 'string', format: 'date' },
                   preco: { type: 'number', format: 'double' },
                   observacoes: { type: 'string' },
+                  items: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['productId', 'quantidade', 'precoUnitario'],
+                      properties: {
+                        productId: { type: 'string', format: 'cuid' },
+                        quantidade: { type: 'integer', minimum: 1 },
+                        precoUnitario: { type: 'number', format: 'double' },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -1006,6 +1045,9 @@ export const swaggerDocument = {
                 schema: { $ref: '#/components/schemas/Servico' },
               },
             },
+          },
+          '400': {
+            description: 'Estoque insuficiente para os produtos informados',
           },
           '404': {
             description: 'Animal não encontrado',
@@ -1037,6 +1079,18 @@ export const swaggerDocument = {
                   data: { type: 'string', format: 'date' },
                   preco: { type: 'number', format: 'double' },
                   observacoes: { type: 'string' },
+                  items: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['productId', 'quantidade', 'precoUnitario'],
+                      properties: {
+                        productId: { type: 'string', format: 'cuid' },
+                        quantidade: { type: 'integer', minimum: 1 },
+                        precoUnitario: { type: 'number', format: 'double' },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -1053,6 +1107,9 @@ export const swaggerDocument = {
           },
           '404': {
             description: 'Serviço não encontrado',
+          },
+          '400': {
+            description: 'Estoque insuficiente para os produtos informados',
           },
         },
       },

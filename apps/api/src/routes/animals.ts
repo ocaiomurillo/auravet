@@ -41,6 +41,13 @@ animalsRouter.get(
         owner: true,
         services: {
           orderBy: { data: 'desc' },
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -74,7 +81,16 @@ animalsRouter.post(
       },
       include: {
         owner: true,
-        services: true,
+        services: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+          orderBy: { data: 'desc' },
+        },
       },
     });
 
@@ -94,6 +110,13 @@ animalsRouter.get(
         owner: true,
         services: {
           orderBy: { data: 'desc' },
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
         },
       },
     });
@@ -120,6 +143,13 @@ animalsRouter.get(
     const services = await prisma.servico.findMany({
       where: { animalId: id },
       orderBy: { data: 'desc' },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
     });
 
     res.json(services.map((service) => serializeService(service)));
@@ -153,6 +183,13 @@ animalsRouter.put(
           owner: true,
           services: {
             orderBy: { data: 'desc' },
+            include: {
+              items: {
+                include: {
+                  product: true,
+                },
+              },
+            },
           },
         },
       });
