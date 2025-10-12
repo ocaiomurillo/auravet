@@ -10,6 +10,7 @@ const navItems: Array<{ to: string; label: string; module?: string }> = [
   { to: '/owners', label: 'Tutores', module: 'owners:read' },
   { to: '/animals', label: 'Animais', module: 'animals:read' },
   { to: '/services', label: 'Serviços', module: 'services:read' },
+  { to: '/products', label: 'Produtos', module: 'products:read' },
   { to: '/new-service', label: 'Registrar serviço', module: 'services:write' },
   { to: '/users', label: 'Usuários', module: 'users:manage' },
   { to: '/roles', label: 'Funções', module: 'users:manage' },

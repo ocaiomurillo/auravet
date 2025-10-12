@@ -1,4 +1,4 @@
-import type { Animal, Module, Owner, Prisma, Servico } from '@prisma/client';
+import type { Animal, Module, Owner, Prisma, Product, Servico } from '@prisma/client';
 
 import type { UserWithRole } from './auth';
 import { buildAuthenticatedUser } from './auth';
@@ -95,6 +95,20 @@ export type SerializedUser = {
   isActive: boolean;
   lastLoginAt: string | null;
   modules: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedProduct = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  custo: number;
+  precoVenda: number;
+  estoqueAtual: number;
+  estoqueMinimo: number;
+  isActive: boolean;
+  isSellable: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -197,3 +211,17 @@ export const serializeUser = (user: UserWithRole): SerializedUser => {
     updatedAt: user.updatedAt.toISOString(),
   };
 };
+
+export const serializeProduct = (product: Product): SerializedProduct => ({
+  id: product.id,
+  nome: product.nome,
+  descricao: product.descricao ?? null,
+  custo: Number(product.custo),
+  precoVenda: Number(product.precoVenda),
+  estoqueAtual: product.estoqueAtual,
+  estoqueMinimo: product.estoqueMinimo,
+  isActive: product.isActive,
+  isSellable: product.isSellable,
+  createdAt: product.createdAt.toISOString(),
+  updatedAt: product.updatedAt.toISOString(),
+});
