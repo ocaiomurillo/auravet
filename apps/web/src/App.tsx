@@ -12,6 +12,7 @@ import RolesPage from './pages/RolesPage';
 import ServicesPage from './pages/ServicesPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import UsersPage from './pages/UsersPage';
+import ProductsPage from './pages/ProductsPage';
 
 const App = () => {
   return (
@@ -28,6 +29,9 @@ const App = () => {
           </Route>
           <Route element={<RequireModules modules={['services:read']} />}>
             <Route path="services" element={<ServicesPage />} />
+          </Route>
+          <Route element={<RequireModules modules={['products:read']} />}>
+            <Route path="products" element={<ProductsPage />} />
           </Route>
           <Route element={<RequireModules modules={['services:write']} />}>
             <Route path="new-service" element={<NewServicePage />} />

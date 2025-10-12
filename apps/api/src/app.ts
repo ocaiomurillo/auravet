@@ -13,6 +13,7 @@ import { ownersRouter } from './routes/owners';
 import { servicesRouter } from './routes/services';
 import { usersRouter } from './routes/users';
 import { rolesRouter } from './routes/roles';
+import { productsRouter } from './routes/products';
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/animals', animalsRouter);
 app.use('/services', servicesRouter);
 app.use('/users', usersRouter);
 app.use('/roles', rolesRouter);
+app.use('/products', productsRouter);
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use(errorHandler);

@@ -61,6 +61,20 @@ export interface Service {
   animal?: Animal;
 }
 
+export interface Product {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  custo: number;
+  precoVenda: number;
+  estoqueAtual: number;
+  estoqueMinimo: number;
+  isActive: boolean;
+  isSellable: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface User {
   id: string;
   nome: string;

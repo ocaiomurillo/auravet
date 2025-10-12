@@ -76,6 +76,16 @@ const DEFAULT_MODULES = [
     description: 'Permite registrar e atualizar serviços.',
   },
   {
+    slug: 'products:read',
+    name: 'Visualizar produtos',
+    description: 'Permite acompanhar o catálogo e estoque de produtos.',
+  },
+  {
+    slug: 'products:write',
+    name: 'Gerenciar produtos',
+    description: 'Permite cadastrar produtos e ajustar estoque.',
+  },
+  {
     slug: 'users:manage',
     name: 'Administrar usuários',
     description: 'Permite criar e gerenciar usuários e funções.',
@@ -97,27 +107,43 @@ const DEFAULT_ROLES: Array<{
   {
     slug: 'AUXILIAR_ADMINISTRATIVO',
     name: 'Auxiliar Administrativo',
-    modules: ['owners:read', 'owners:write', 'animals:read', 'animals:write', 'services:read'],
+    modules: [
+      'owners:read',
+      'owners:write',
+      'animals:read',
+      'animals:write',
+      'services:read',
+      'products:read',
+      'products:write',
+    ],
   },
   {
     slug: 'ASSISTENTE_ADMINISTRATIVO',
     name: 'Assistente Administrativo',
-    modules: ['owners:read', 'animals:read', 'services:read'],
+    modules: ['owners:read', 'animals:read', 'services:read', 'products:read'],
   },
   {
     slug: 'ENFERMEIRO',
     name: 'Enfermeiro',
-    modules: ['owners:read', 'animals:read', 'animals:write', 'services:read', 'services:write'],
+    modules: [
+      'owners:read',
+      'animals:read',
+      'animals:write',
+      'services:read',
+      'services:write',
+      'products:read',
+      'products:write',
+    ],
   },
   {
     slug: 'MEDICO',
     name: 'Médico',
-    modules: ['owners:read', 'animals:read', 'services:read', 'services:write'],
+    modules: ['owners:read', 'animals:read', 'services:read', 'services:write', 'products:read'],
   },
   {
     slug: 'CONTADOR',
     name: 'Contador',
-    modules: ['services:read'],
+    modules: ['services:read', 'products:read'],
   },
 ];
 

@@ -100,3 +100,17 @@ model User {
 
   role Role @relation(fields: [roleId], references: [id])
 }
+
+model Product {
+  id            String   @id @default(cuid())
+  nome          String
+  descricao     String?
+  custo         Decimal  @db.Decimal(10, 2)
+  precoVenda    Decimal  @db.Decimal(10, 2)
+  estoqueAtual  Int      @default(0)
+  estoqueMinimo Int      @default(0)
+  isActive      Boolean  @default(true)
+  isSellable    Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

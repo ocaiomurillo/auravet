@@ -1,3 +1,4 @@
+import type { Product } from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
@@ -60,4 +61,30 @@ export const apiClient = {
     request<T>(path, {
       method: 'DELETE',
     }),
+};
+
+export interface CreateProductPayload {
+  nome: string;
+  descricao?: string | null;
+  custo: number;
+  precoVenda: number;
+  estoqueAtual: number;
+  estoqueMinimo: number;
+  isActive: boolean;
+  isSellable: boolean;
+}
+
+export type UpdateProductPayload = Partial<CreateProductPayload>;
+
+export interface AdjustProductStockPayload {
+  amount: number;
+}
+
+export const productsApi = {
+  list: () => apiClient.get<Product[]>('/products'),
+  create: (payload: CreateProductPayload) => apiClient.post<Product>('/products', payload),
+  update: (id: string, payload: UpdateProductPayload) => apiClient.put<Product>(`/products/${id}`, payload),
+  remove: (id: string) => apiClient.delete(`/products/${id}`),
+  adjustStock: (id: string, payload: AdjustProductStockPayload) =>
+    apiClient.patch<Product>(`/products/${id}/stock`, payload),
 };
