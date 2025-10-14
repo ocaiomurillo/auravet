@@ -10,7 +10,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --check \"src/**/*.{ts,json}\" \"prisma/**/*.prisma\"",
     "format:fix": "prettier --write \"src/**/*.{ts,json}\" \"prisma/**/*.prisma\"",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "npm run prisma:generate && tsc --noEmit -p tsconfig.json",
     "test": "tsx --test tests/**/*.test.ts",
     "test:watch": "tsx --test --watch tests/**/*.test.ts",
     "prisma:generate": "prisma generate",
