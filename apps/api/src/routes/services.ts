@@ -37,10 +37,17 @@ const parseDate = (value: string) => {
 };
 
 const ensureAnimalExists = async (animalId: string) => {
-  const animal = await prisma.animal.findUnique({ where: { id: animalId } });
+  const animal = await prisma.animal.findUnique({
+    where: { id: animalId },
+    select: { id: true, ownerId: true },
+  });
   if (!animal) {
     throw new HttpError(404, 'Animal não encontrado para o serviço.');
   }
+  if (!animal.ownerId) {
+    throw new HttpError(400, 'Animal selecionado não possui tutor vinculado.');
+  }
+  return animal;
 };
 
 type ServiceItemInput = {

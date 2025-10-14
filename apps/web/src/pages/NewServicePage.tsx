@@ -9,7 +9,7 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { apiClient } from '../lib/apiClient';
-import type { Animal, Owner, Product, Service } from '../types/api';
+import type { Animal, Product, Service } from '../types/api';
 
 interface ServiceItemFormValue {
   productId: string;
@@ -18,7 +18,6 @@ interface ServiceItemFormValue {
 }
 
 interface ServiceFormValues {
-  ownerId: string;
   animalId: string;
   tipo: Service['tipo'];
   data: string;
@@ -56,7 +55,6 @@ const NewServicePage = () => {
 
   const { register, handleSubmit, watch, reset, setValue, control } = useForm<ServiceFormValues>({
     defaultValues: {
-      ownerId: '',
       animalId: '',
       tipo: 'CONSULTA',
       data: '',
@@ -66,24 +64,31 @@ const NewServicePage = () => {
     },
   });
 
-  const ownerId = watch('ownerId');
   const items = watch('items');
+  const animalId = watch('animalId');
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'items',
   });
 
-  const { data: owners } = useQuery({
-    queryKey: ['owners'],
-    queryFn: () => apiClient.get<Owner[]>('/owners'),
+  const { data: animals } = useQuery({
+    queryKey: ['animals'],
+    queryFn: () => apiClient.get<Animal[]>('/animals'),
   });
 
-  const { data: animals } = useQuery({
-    queryKey: ['animals', ownerId],
-    queryFn: () =>
-      ownerId ? apiClient.get<Animal[]>(`/animals?ownerId=${ownerId}`) : apiClient.get<Animal[]>('/animals'),
-  });
+  const selectedAnimal = useMemo(
+    () => animals?.find((animal) => animal.id === animalId) ?? null,
+    [animalId, animals],
+  );
+
+  const tutorHelperText = selectedAnimal
+    ? selectedAnimal.owner?.nome
+      ? 'Tutor definido automaticamente a partir do pet selecionado.'
+      : 'Pet selecionado está sem tutor vinculado.'
+    : 'Selecione um pet para visualizar o tutor responsável.';
+
+  const petWithoutTutor = Boolean(selectedAnimal && !selectedAnimal.owner?.id);
 
   const { data: products } = useQuery({
     queryKey: ['products'],
@@ -143,10 +148,6 @@ const NewServicePage = () => {
   const itemsTotal = itemDetails.reduce((sum, detail) => sum + detail.subtotal, 0);
 
   useEffect(() => {
-    setValue('animalId', '');
-  }, [ownerId, setValue]);
-
-  useEffect(() => {
     (items ?? []).forEach((item, index) => {
       if (!item?.productId) return;
       if (item.precoUnitario) return;
@@ -164,7 +165,7 @@ const NewServicePage = () => {
       toast.success('Serviço registrado com sucesso.');
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: ['animals'] });
-      reset({ ownerId: '', animalId: '', tipo: 'CONSULTA', data: '', preco: '', observacoes: '', items: [] });
+      reset({ animalId: '', tipo: 'CONSULTA', data: '', preco: '', observacoes: '', items: [] });
       navigate(`/animals`, { state: { highlight: service.animalId } });
     },
     onError: (err: unknown) => {
@@ -172,16 +173,17 @@ const NewServicePage = () => {
     },
   });
 
-  const disableSubmit = createService.isPending || insufficientStock || hasDuplicateItems;
+  const disableSubmit =
+    createService.isPending || insufficientStock || hasDuplicateItems || petWithoutTutor;
 
-  const onSubmit = handleSubmit(({ ownerId, items: formItems, ...values }) => {
-    if (!ownerId) {
-      toast.error('Selecione um tutor para registrar o serviço.');
+  const onSubmit = handleSubmit(({ items: formItems, ...values }) => {
+    if (!values.animalId) {
+      toast.error('Selecione um pet para registrar o serviço.');
       return;
     }
 
-    if (!values.animalId) {
-      toast.error('Selecione um pet para registrar o serviço.');
+    if (!selectedAnimal?.owner?.id) {
+      toast.error('Pet selecionado precisa estar vinculado a um tutor.');
       return;
     }
 
@@ -261,15 +263,6 @@ const NewServicePage = () => {
 
       <Card title="Dados do atendimento" description="Preencha com atenção para manter o histórico impecável.">
         <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
-          <SelectField label="Tutor" required {...register('ownerId')}>
-            <option value="">Selecione um tutor</option>
-            {owners?.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.nome}
-              </option>
-            ))}
-          </SelectField>
-
           <SelectField label="Pet" required {...register('animalId')}>
             <option value="">Selecione um pet</option>
             {animals?.map((animal) => (
@@ -278,6 +271,15 @@ const NewServicePage = () => {
               </option>
             ))}
           </SelectField>
+
+          <Field
+            label="Tutor"
+            value={selectedAnimal ? selectedAnimal.owner?.nome ?? '—' : ''}
+            placeholder="Selecione um pet"
+            readOnly
+            helperText={tutorHelperText}
+            error={petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o serviço.' : undefined}
+          />
 
           <SelectField label="Tipo de serviço" required {...register('tipo')}>
             {Object.entries(serviceLabels).map(([value, label]) => (
@@ -443,7 +445,7 @@ const NewServicePage = () => {
               type="button"
               variant="ghost"
               onClick={() =>
-                reset({ ownerId: '', animalId: '', tipo: 'CONSULTA', data: '', preco: '', observacoes: '', items: [] })
+                reset({ animalId: '', tipo: 'CONSULTA', data: '', preco: '', observacoes: '', items: [] })
               }
             >
               Limpar
