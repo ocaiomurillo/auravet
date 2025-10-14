@@ -1,4 +1,11 @@
-import type { Invoice, InvoiceListResponse, InvoiceStatus, Product, Service } from '../types/api';
+import type {
+  Appointment,
+  Invoice,
+  InvoiceListResponse,
+  InvoiceStatus,
+  Product,
+  Service,
+} from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
@@ -70,6 +77,22 @@ export const apiClient = {
     request<T>(path, {
       method: 'DELETE',
     }),
+};
+
+export type CreateAppointmentPayload = {
+  animalId: string;
+  ownerId?: string;
+  veterinarianId: string;
+  assistantId?: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  status?: Appointment['status'];
+  notes?: string;
+};
+
+export const appointmentsApi = {
+  create: (payload: CreateAppointmentPayload) =>
+    apiClient.post<{ appointment: Appointment }>('/appointments', payload),
 };
 
 export interface CreateProductPayload {
