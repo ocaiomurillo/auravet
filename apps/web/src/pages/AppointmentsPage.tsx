@@ -14,6 +14,7 @@ import type {
   CollaboratorSummary,
   Owner,
 } from '../types/api';
+import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 const statusLabels: Record<Appointment['status'], string> = {
   AGENDADO: 'Agendado',
@@ -453,6 +454,8 @@ const AppointmentsPage = () => {
 
             const veterinarianConflict = appointment.availability.veterinarianConflict;
             const assistantConflict = appointment.availability.assistantConflict;
+            const ownerCpf = formatCpf(appointment.owner.cpf);
+            const ownerAddress = buildOwnerAddress(appointment.owner);
 
             return (
               <li key={appointment.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4 shadow-sm">
@@ -468,6 +471,11 @@ const AppointmentsPage = () => {
                     <p className="text-sm text-brand-grafite/70">
                       Tutor(a): {appointment.owner.nome} • Veterinário(a): {appointment.veterinarian.nome}
                     </p>
+                    {appointment.owner.telefone ? (
+                      <p className="text-xs text-brand-grafite/60">{appointment.owner.telefone}</p>
+                    ) : null}
+                    {ownerCpf ? <p className="text-xs text-brand-grafite/60">CPF: {ownerCpf}</p> : null}
+                    {ownerAddress ? <p className="text-xs text-brand-grafite/60">{ownerAddress}</p> : null}
                     {appointment.assistant ? (
                       <p className="text-sm text-brand-grafite/70">Assistente: {appointment.assistant.nome}</p>
                     ) : (

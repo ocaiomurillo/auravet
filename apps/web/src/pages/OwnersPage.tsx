@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -7,14 +7,23 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
+import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Owner } from '../types/api';
-import { useAuth } from '../contexts/AuthContext';
+import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 interface OwnerFormValues {
   nome: string;
   email: string;
   telefone?: string;
+  cpf: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
 }
 
 const OwnersPage = () => {
@@ -29,29 +38,54 @@ const OwnersPage = () => {
     queryFn: () => apiClient.get<Owner[]>('/owners'),
   });
 
-  const { register, handleSubmit, reset } = useForm<OwnerFormValues>({
-    defaultValues: {
+  const initialFormValues = useMemo<OwnerFormValues>(
+    () => ({
       nome: '',
       email: '',
       telefone: '',
-    },
+      cpf: '',
+      logradouro: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+    }),
+    [],
+  );
+
+  const { register, handleSubmit, reset } = useForm<OwnerFormValues>({
+    defaultValues: initialFormValues,
   });
 
   const closeModal = () => {
     setModalOpen(false);
     setEditingOwner(null);
-    reset();
+    reset(initialFormValues);
   };
 
   const openCreateModal = () => {
     setEditingOwner(null);
-    reset({ nome: '', email: '', telefone: '' });
+    reset(initialFormValues);
     setModalOpen(true);
   };
 
   const openEditModal = (owner: Owner) => {
     setEditingOwner(owner);
-    reset({ nome: owner.nome, email: owner.email, telefone: owner.telefone ?? '' });
+    reset({
+      nome: owner.nome,
+      email: owner.email,
+      telefone: owner.telefone ?? '',
+      cpf: owner.cpf ?? '',
+      logradouro: owner.logradouro ?? '',
+      numero: owner.numero ?? '',
+      complemento: owner.complemento ?? '',
+      bairro: owner.bairro ?? '',
+      cidade: owner.cidade ?? '',
+      estado: owner.estado ?? '',
+      cep: owner.cep ?? '',
+    });
     setModalOpen(true);
   };
 
@@ -116,37 +150,48 @@ const OwnersPage = () => {
         {error ? <p className="text-red-500">Não foi possível carregar os tutores.</p> : null}
         {owners?.length ? (
           <ul className="space-y-4">
-            {owners.map((owner) => (
-              <li
-                key={owner.id}
-                className="flex flex-col gap-3 rounded-2xl border border-brand-azul/30 bg-white/70 p-4 transition hover:border-brand-escuro/40 md:flex-row md:items-center md:justify-between"
-              >
-                <div>
-                  <p className="font-montserrat text-lg font-semibold text-brand-escuro">{owner.nome}</p>
-                  <p className="text-sm text-brand-grafite/70">{owner.email}</p>
-                  {owner.telefone ? (
-                    <p className="text-sm text-brand-grafite/70">{owner.telefone}</p>
-                  ) : null}
-                  <p className="text-xs uppercase tracking-wide text-brand-escuro/60">
-                    {owner.animals?.length ?? 0} animais sob cuidado
-                  </p>
-                </div>
-                {canEdit ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="ghost" onClick={() => openEditModal(owner)}>
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="text-red-600 hover:bg-red-100"
-                      onClick={() => deleteOwner.mutate(owner.id)}
-                    >
-                      Remover
-                    </Button>
+            {owners.map((owner) => {
+              const ownerCpf = formatCpf(owner.cpf);
+              const ownerAddress = buildOwnerAddress(owner);
+
+              return (
+                <li
+                  key={owner.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-brand-azul/30 bg-white/70 p-4 transition hover:border-brand-escuro/40 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="font-montserrat text-lg font-semibold text-brand-escuro">{owner.nome}</p>
+                    <p className="text-sm text-brand-grafite/70">{owner.email}</p>
+                    {owner.telefone ? (
+                      <p className="text-sm text-brand-grafite/70">{owner.telefone}</p>
+                    ) : null}
+                    {ownerCpf ? (
+                      <p className="text-sm text-brand-grafite/70">CPF: {ownerCpf}</p>
+                    ) : null}
+                    {ownerAddress ? (
+                      <p className="text-sm text-brand-grafite/70">{ownerAddress}</p>
+                    ) : null}
+                    <p className="text-xs uppercase tracking-wide text-brand-escuro/60">
+                      {owner.animals?.length ?? 0} animais sob cuidado
+                    </p>
                   </div>
-                ) : null}
-              </li>
-            ))}
+                  {canEdit ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="ghost" onClick={() => openEditModal(owner)}>
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="text-red-600 hover:bg-red-100"
+                        onClick={() => deleteOwner.mutate(owner.id)}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         ) : null}
         {!isLoading && !owners?.length ? (
@@ -177,6 +222,18 @@ const OwnersPage = () => {
             <Field label="Nome" placeholder="Nome completo" required {...register('nome')} />
             <Field label="E-mail" type="email" placeholder="email@auravet.com" required {...register('email')} />
             <Field label="Telefone" placeholder="(00) 00000-0000" {...register('telefone')} />
+            <Field label="CPF" placeholder="000.000.000-00" required {...register('cpf')} />
+            <Field label="Logradouro" placeholder="Rua e número" {...register('logradouro')} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Número" placeholder="Número" {...register('numero')} />
+              <Field label="Complemento" placeholder="Apto, bloco..." {...register('complemento')} />
+            </div>
+            <Field label="Bairro" placeholder="Bairro" {...register('bairro')} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Cidade" placeholder="Cidade" {...register('cidade')} />
+              <Field label="Estado" placeholder="UF" maxLength={2} {...register('estado')} />
+            </div>
+            <Field label="CEP" placeholder="00000-000" {...register('cep')} />
           </form>
         </Modal>
       ) : null}

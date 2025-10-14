@@ -28,14 +28,22 @@ enum AppointmentStatus {
 }
 
 model Owner {
-  id        String   @id @default(cuid())
-  nome      String
-  email     String   @unique
-  telefone  String?
-  createdAt DateTime @default(now())
-  animals   Animal[]
+  id          String   @id @default(cuid())
+  nome        String
+  email       String   @unique
+  telefone    String?
+  cpf         String?  @unique
+  logradouro  String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  estado      String?
+  cep         String?
+  createdAt   DateTime @default(now())
+  animals     Animal[]
   appointments Appointment[]
-  invoices  Invoice[]
+  invoices    Invoice[]
 }
 
 model Animal {

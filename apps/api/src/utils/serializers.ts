@@ -119,15 +119,12 @@ export type SerializedInvoice = {
   paymentNotes: string | null;
   createdAt: string;
   updatedAt: string;
-  owner: {
-    id: string;
-    nome: string;
-    email: string;
-    telefone: string | null;
-  };
+  owner: SerializedInvoiceOwner;
   responsible: { id: string; nome: string; email: string } | null;
   items: SerializedInvoiceItem[];
 };
+
+export type SerializedInvoiceOwner = Omit<SerializedOwner, 'animals'>;
 
 export type SerializedService = {
   id: string;
@@ -159,6 +156,14 @@ export type SerializedOwner = {
   nome: string;
   email: string;
   telefone: string | null;
+  cpf: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
   createdAt: string;
   animals?: SerializedAnimal[];
 };
@@ -398,6 +403,14 @@ export const serializeAnimal = (animal: AnimalWithOptionalRelations): Serialized
         nome: animal.owner.nome,
         email: animal.owner.email,
         telefone: animal.owner.telefone ?? null,
+        cpf: animal.owner.cpf ?? null,
+        logradouro: animal.owner.logradouro ?? null,
+        numero: animal.owner.numero ?? null,
+        complemento: animal.owner.complemento ?? null,
+        bairro: animal.owner.bairro ?? null,
+        cidade: animal.owner.cidade ?? null,
+        estado: animal.owner.estado ?? null,
+        cep: animal.owner.cep ?? null,
         createdAt: animal.owner.createdAt.toISOString(),
       }
     : undefined,
@@ -409,6 +422,14 @@ export const serializeOwner = (owner: OwnerWithOptionalRelations): SerializedOwn
   nome: owner.nome,
   email: owner.email,
   telefone: owner.telefone ?? null,
+  cpf: owner.cpf ?? null,
+  logradouro: owner.logradouro ?? null,
+  numero: owner.numero ?? null,
+  complemento: owner.complemento ?? null,
+  bairro: owner.bairro ?? null,
+  cidade: owner.cidade ?? null,
+  estado: owner.estado ?? null,
+  cep: owner.cep ?? null,
   createdAt: owner.createdAt.toISOString(),
   animals: owner.animals?.map((animal) =>
     serializeAnimal({
@@ -515,28 +536,37 @@ export const serializeInvoiceItem = (item: InvoiceItemWithRelations): Serialized
   service: serializeInvoiceItemService(item.service),
 });
 
-export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoice => ({
-  id: invoice.id,
-  ownerId: invoice.ownerId,
-  status: {
-    id: invoice.status.id,
-    slug: invoice.status.slug,
-    name: invoice.status.name,
-  },
-  total: Number(invoice.total),
-  dueDate: invoice.dueDate.toISOString(),
-  paidAt: invoice.paidAt ? invoice.paidAt.toISOString() : null,
-  paymentNotes: invoice.paymentNotes ?? null,
-  createdAt: invoice.createdAt.toISOString(),
-  updatedAt: invoice.updatedAt.toISOString(),
-  owner: {
-    id: invoice.owner.id,
-    nome: invoice.owner.nome,
-    email: invoice.owner.email,
-    telefone: invoice.owner.telefone ?? null,
-  },
-  responsible: invoice.responsible
-    ? { id: invoice.responsible.id, nome: invoice.responsible.nome, email: invoice.responsible.email }
-    : null,
-  items: invoice.items.map((item) => serializeInvoiceItem(item)),
-});
+export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoice => {
+  const owner = (() => {
+    const { animals, ...rest } = serializeOwner({
+      ...invoice.owner,
+      animals: undefined,
+      appointments: undefined,
+    });
+
+    void animals;
+
+    return rest;
+  })();
+
+  return {
+    id: invoice.id,
+    ownerId: invoice.ownerId,
+    status: {
+      id: invoice.status.id,
+      slug: invoice.status.slug,
+      name: invoice.status.name,
+    },
+    total: Number(invoice.total),
+    dueDate: invoice.dueDate.toISOString(),
+    paidAt: invoice.paidAt ? invoice.paidAt.toISOString() : null,
+    paymentNotes: invoice.paymentNotes ?? null,
+    createdAt: invoice.createdAt.toISOString(),
+    updatedAt: invoice.updatedAt.toISOString(),
+    owner,
+    responsible: invoice.responsible
+      ? { id: invoice.responsible.id, nome: invoice.responsible.nome, email: invoice.responsible.email }
+      : null,
+    items: invoice.items.map((item) => serializeInvoiceItem(item)),
+  };
+};

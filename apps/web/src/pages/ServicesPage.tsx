@@ -9,6 +9,7 @@ import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Animal, Owner, Service } from '../types/api';
+import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 interface ServiceFilters {
   ownerId: string;
@@ -136,20 +137,30 @@ const ServicesPage = () => {
         {error ? <p className="text-red-500">Não foi possível carregar os serviços.</p> : null}
         {services?.length ? (
           <ul className="space-y-3">
-            {services.map((service) => (
-              <li key={service.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
-                <p className="font-montserrat text-lg font-semibold text-brand-escuro">
-                  {serviceLabels[service.tipo] ?? service.tipo}
-                </p>
-                <p className="text-sm text-brand-grafite/70">
-                  {new Date(service.data).toLocaleDateString('pt-BR')} • R$ {service.preco.toFixed(2)}
-                </p>
-                <p className="text-sm text-brand-grafite/70">
-                  Pet: {service.animal?.nome ?? '—'} • Tutor(a): {service.animal?.owner?.nome ?? '—'}
-                </p>
-                {service.observacoes ? (
-                  <p className="text-sm text-brand-grafite/80">{service.observacoes}</p>
-                ) : null}
+            {services.map((service) => {
+              const owner = service.animal?.owner ?? null;
+              const ownerCpf = owner ? formatCpf(owner.cpf) : null;
+              const ownerAddress = owner ? buildOwnerAddress(owner) : null;
+
+              return (
+                <li key={service.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
+                  <p className="font-montserrat text-lg font-semibold text-brand-escuro">
+                    {serviceLabels[service.tipo] ?? service.tipo}
+                  </p>
+                  <p className="text-sm text-brand-grafite/70">
+                    {new Date(service.data).toLocaleDateString('pt-BR')} • R$ {service.preco.toFixed(2)}
+                  </p>
+                  <p className="text-sm text-brand-grafite/70">
+                    Pet: {service.animal?.nome ?? '—'} • Tutor(a): {service.animal?.owner?.nome ?? '—'}
+                  </p>
+                  {owner?.telefone ? (
+                    <p className="text-xs text-brand-grafite/60">{owner.telefone}</p>
+                  ) : null}
+                  {ownerCpf ? <p className="text-xs text-brand-grafite/60">CPF: {ownerCpf}</p> : null}
+                  {ownerAddress ? <p className="text-xs text-brand-grafite/60">{ownerAddress}</p> : null}
+                  {service.observacoes ? (
+                    <p className="text-sm text-brand-grafite/80">{service.observacoes}</p>
+                  ) : null}
                 {service.items?.length ? (
                   <div className="mt-3 space-y-2 rounded-xl bg-brand-azul/5 p-3">
                     <p className="text-sm font-semibold text-brand-escuro">Itens utilizados</p>
@@ -184,8 +195,9 @@ const ServicesPage = () => {
                     </ul>
                   </div>
                 ) : null}
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         ) : null}
         {!isLoading && !services?.length ? (

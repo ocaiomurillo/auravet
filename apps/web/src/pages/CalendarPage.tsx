@@ -12,6 +12,7 @@ import type {
   AppointmentCalendarResponse,
   CollaboratorSummary,
 } from '../types/api';
+import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 const statusLabels: Record<Appointment['status'], string> = {
   AGENDADO: 'Agendado',
@@ -248,34 +249,44 @@ const CalendarPage = () => {
                 {formatDayKey(dayKey)}
               </h3>
               <ul className="mt-3 space-y-3">
-                {dayAppointments.map((appointment) => (
-                  <li key={appointment.id} className="rounded-xl bg-brand-azul/5 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-brand-escuro">
-                        {formatDateTime(appointment.scheduledStart)} —{' '}
-                        {formatDateTime(appointment.scheduledEnd)}
+                {dayAppointments.map((appointment) => {
+                  const ownerCpf = formatCpf(appointment.owner.cpf);
+                  const ownerAddress = buildOwnerAddress(appointment.owner);
+
+                  return (
+                    <li key={appointment.id} className="rounded-xl bg-brand-azul/5 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-brand-escuro">
+                          {formatDateTime(appointment.scheduledStart)} —{' '}
+                          {formatDateTime(appointment.scheduledEnd)}
+                        </p>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand-escuro shadow">
+                          {statusLabels[appointment.status]}
+                        </span>
+                      </div>
+                      <p className="text-sm text-brand-grafite/80">
+                        {appointment.animal.nome} • Tutor(a): {appointment.owner.nome}
                       </p>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand-escuro shadow">
-                        {statusLabels[appointment.status]}
-                      </span>
-                    </div>
-                    <p className="text-sm text-brand-grafite/80">
-                      {appointment.animal.nome} • Tutor(a): {appointment.owner.nome}
-                    </p>
-                    <p className="text-xs text-brand-grafite/70">
-                      Vet: {appointment.veterinarian.nome}{' '}
-                      {appointment.availability.veterinarianConflict ? '• conflito de agenda' : ''}
-                      {appointment.assistant
-                        ? ` • Assist.: ${appointment.assistant.nome}${
-                            appointment.availability.assistantConflict ? ' (conflito)' : ''
-                          }`
-                        : ''}
-                    </p>
-                    {appointment.notes ? (
-                      <p className="mt-1 text-xs text-brand-grafite/70">Notas: {appointment.notes}</p>
-                    ) : null}
-                  </li>
-                ))}
+                      {appointment.owner.telefone ? (
+                        <p className="text-xs text-brand-grafite/70">{appointment.owner.telefone}</p>
+                      ) : null}
+                      {ownerCpf ? <p className="text-xs text-brand-grafite/70">CPF: {ownerCpf}</p> : null}
+                      {ownerAddress ? <p className="text-xs text-brand-grafite/70">{ownerAddress}</p> : null}
+                      <p className="text-xs text-brand-grafite/70">
+                        Vet: {appointment.veterinarian.nome}{' '}
+                        {appointment.availability.veterinarianConflict ? '• conflito de agenda' : ''}
+                        {appointment.assistant
+                          ? ` • Assist.: ${appointment.assistant.nome}${
+                              appointment.availability.assistantConflict ? ' (conflito)' : ''
+                            }`
+                          : ''}
+                      </p>
+                      {appointment.notes ? (
+                        <p className="mt-1 text-xs text-brand-grafite/70">Notas: {appointment.notes}</p>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
