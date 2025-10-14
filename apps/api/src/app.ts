@@ -16,6 +16,7 @@ import { usersRouter } from './routes/users';
 import { rolesRouter } from './routes/roles';
 import { productsRouter } from './routes/products';
 import { invoicesRouter } from './routes/invoices';
+import { dashboardRouter } from './routes/dashboard';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/invoices', invoicesRouter);
 app.use('/users', usersRouter);
 app.use('/roles', rolesRouter);
 app.use('/products', productsRouter);
+app.use('/dashboard', dashboardRouter);
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use(errorHandler);

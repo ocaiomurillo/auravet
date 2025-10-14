@@ -1,5 +1,6 @@
 import type {
   Appointment,
+  DashboardSummaryResponse,
   Invoice,
   InvoiceListResponse,
   InvoiceStatus,
@@ -119,6 +120,10 @@ export const productsApi = {
   remove: (id: string) => apiClient.delete(`/products/${id}`),
   adjustStock: (id: string, payload: AdjustProductStockPayload) =>
     apiClient.patch<Product>(`/products/${id}/stock`, payload),
+};
+
+export const dashboardApi = {
+  summary: () => apiClient.get<DashboardSummaryResponse>('/dashboard/summary'),
 };
 
 export interface InvoiceFilters {

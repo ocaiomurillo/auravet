@@ -249,3 +249,32 @@ export interface AppointmentCalendarResponse {
   appointments: Appointment[];
   summary: AppointmentCalendarSummary;
 }
+
+export interface DashboardAppointmentsSummary {
+  scheduled: number;
+  confirmed: number;
+  completed: number;
+  today: number;
+  upcomingWeek: number;
+}
+
+export interface DashboardProductsSummary {
+  critical: number;
+  lowStock: number;
+  totalActive: number;
+}
+
+export interface DashboardEntitySummary {
+  total: number;
+}
+
+export interface DashboardSummary {
+  appointments?: DashboardAppointmentsSummary;
+  products?: DashboardProductsSummary;
+  owners?: DashboardEntitySummary;
+  animals?: DashboardEntitySummary;
+}
+
+export interface DashboardSummaryResponse {
+  summary: DashboardSummary;
+}
