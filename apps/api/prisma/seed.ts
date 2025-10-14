@@ -145,6 +145,7 @@ const DEFAULT_ROLES: Array<{
       'animals:read',
       'animals:write',
       'services:read',
+      'services:write',
       'products:read',
       'products:write',
       'cashier:access',
@@ -153,7 +154,14 @@ const DEFAULT_ROLES: Array<{
   {
     slug: 'ASSISTENTE_ADMINISTRATIVO',
     name: 'Assistente Administrativo',
-    modules: ['owners:read', 'animals:read', 'services:read', 'products:read', 'cashier:access'],
+    modules: [
+      'owners:read',
+      'animals:read',
+      'services:read',
+      'services:write',
+      'products:read',
+      'cashier:access',
+    ],
   },
   {
     slug: 'ENFERMEIRO',

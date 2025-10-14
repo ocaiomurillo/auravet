@@ -6,7 +6,8 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
-import { apiClient } from '../lib/apiClient';
+import Modal from '../components/Modal';
+import { apiClient, appointmentsApi } from '../lib/apiClient';
 import type {
   Animal,
   Appointment,
@@ -19,6 +20,17 @@ const statusLabels: Record<Appointment['status'], string> = {
   CONFIRMADO: 'Confirmado',
   CONCLUIDO: 'Concluído',
 };
+
+interface AppointmentFormState {
+  ownerId: string;
+  animalId: string;
+  veterinarianId: string;
+  assistantId: string;
+  status: Appointment['status'];
+  scheduledStart: string;
+  scheduledEnd: string;
+  notes: string;
+}
 
 interface AppointmentFilters {
   status: Appointment['status'] | '';
@@ -63,6 +75,17 @@ const AppointmentsPage = () => {
     from: '',
     to: '',
   });
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<AppointmentFormState>({
+    ownerId: '',
+    animalId: '',
+    veterinarianId: '',
+    assistantId: '',
+    status: 'AGENDADO',
+    scheduledStart: '',
+    scheduledEnd: '',
+    notes: '',
+  });
   const [rescheduleForm, setRescheduleForm] = useState<RescheduleFormState>({
     id: null,
     start: '',
@@ -88,6 +111,19 @@ const AppointmentsPage = () => {
       filters.ownerId
         ? apiClient.get<Animal[]>(`/animals?ownerId=${filters.ownerId}`)
         : apiClient.get<Animal[]>('/animals'),
+  });
+
+  const createAnimalsQueryKey = useMemo(
+    () => ['animals', 'appointment-form', createForm.ownerId || 'all'] as const,
+    [createForm.ownerId],
+  );
+  const { data: createAnimals } = useQuery({
+    queryKey: createAnimalsQueryKey,
+    queryFn: () =>
+      createForm.ownerId
+        ? apiClient.get<Animal[]>(`/animals?ownerId=${createForm.ownerId}`)
+        : apiClient.get<Animal[]>('/animals'),
+    enabled: isCreateOpen,
   });
 
   const queryString = useMemo(() => {
@@ -155,6 +191,53 @@ const AppointmentsPage = () => {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: (payload: {
+      ownerId: string;
+      animalId: string;
+      veterinarianId: string;
+      assistantId?: string;
+      scheduledStart: string;
+      scheduledEnd: string;
+      status: Appointment['status'];
+      notes?: string;
+    }) =>
+      appointmentsApi.create({
+        ownerId: payload.ownerId,
+        animalId: payload.animalId,
+        veterinarianId: payload.veterinarianId,
+        assistantId: payload.assistantId,
+        scheduledStart: payload.scheduledStart,
+        scheduledEnd: payload.scheduledEnd,
+        status: payload.status,
+        notes: payload.notes,
+      }),
+    onSuccess: (response) => {
+      const { appointment } = response;
+      toast.success('Agendamento criado com sucesso.');
+      if (appointment.availability.veterinarianConflict || appointment.availability.assistantConflict) {
+        toast.warning(
+          'Atenção: existem conflitos de agenda para este horário. Reveja a disponibilidade dos colaboradores.',
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setIsCreateOpen(false);
+      setCreateForm({
+        ownerId: '',
+        animalId: '',
+        veterinarianId: '',
+        assistantId: '',
+        status: 'AGENDADO',
+        scheduledStart: '',
+        scheduledEnd: '',
+        notes: '',
+      });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível criar o agendamento.');
+    },
+  });
+
   const handleSubmitFilters = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     refetch();
@@ -170,6 +253,72 @@ const AppointmentsPage = () => {
       start: toDateTimeLocal(appointment.scheduledStart),
       end: toDateTimeLocal(appointment.scheduledEnd),
       notes: appointment.notes ?? '',
+    });
+  };
+
+  const resetCreateForm = () => {
+    setCreateForm({
+      ownerId: '',
+      animalId: '',
+      veterinarianId: '',
+      assistantId: '',
+      status: 'AGENDADO',
+      scheduledStart: '',
+      scheduledEnd: '',
+      notes: '',
+    });
+  };
+
+  const closeCreateModal = () => {
+    setIsCreateOpen(false);
+    resetCreateForm();
+  };
+
+  const handleCreateSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!createForm.ownerId) {
+      toast.error('Selecione um tutor para o agendamento.');
+      return;
+    }
+
+    if (!createForm.animalId) {
+      toast.error('Selecione um pet para o agendamento.');
+      return;
+    }
+
+    if (!createForm.veterinarianId) {
+      toast.error('Selecione o profissional responsável.');
+      return;
+    }
+
+    if (!createForm.scheduledStart || !createForm.scheduledEnd) {
+      toast.error('Informe o horário inicial e final do agendamento.');
+      return;
+    }
+
+    const startDate = new Date(createForm.scheduledStart);
+    const endDate = new Date(createForm.scheduledEnd);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      toast.error('Informe um horário válido.');
+      return;
+    }
+
+    if (endDate <= startDate) {
+      toast.error('O horário final precisa ser posterior ao horário inicial.');
+      return;
+    }
+
+    createMutation.mutate({
+      ownerId: createForm.ownerId,
+      animalId: createForm.animalId,
+      veterinarianId: createForm.veterinarianId,
+      assistantId: createForm.assistantId || undefined,
+      scheduledStart: startDate.toISOString(),
+      scheduledEnd: endDate.toISOString(),
+      status: createForm.status,
+      notes: createForm.notes.trim() ? createForm.notes : undefined,
     });
   };
 
@@ -193,6 +342,14 @@ const AppointmentsPage = () => {
             Organize consultas, confirme presenças e visualize conflitos de agenda dos colaboradores.
           </p>
         </div>
+        <Button
+          onClick={() => {
+            resetCreateForm();
+            setIsCreateOpen(true);
+          }}
+        >
+          Novo agendamento
+        </Button>
       </div>
 
       <Card title="Filtrar agenda" description="Personalize a visão por status, tutor, pet ou responsável clínico.">
@@ -413,6 +570,161 @@ const AppointmentsPage = () => {
           })}
         </ul>
       </Card>
+
+      <Modal
+        open={isCreateOpen}
+        onClose={closeCreateModal}
+        title="Novo agendamento"
+        description="Selecione tutor, pet e equipe para registrar um novo atendimento."
+        actions={
+          <>
+            <Button type="button" variant="ghost" onClick={closeCreateModal} disabled={createMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="create-appointment-form" disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Salvando...' : 'Criar agendamento'}
+            </Button>
+          </>
+        }
+      >
+        <form id="create-appointment-form" className="grid gap-4" onSubmit={handleCreateSubmit}>
+          <SelectField
+            label="Tutor"
+            value={createForm.ownerId}
+            onChange={(event) =>
+              setCreateForm((prev) => ({
+                ...prev,
+                ownerId: event.target.value,
+                animalId: '',
+              }))
+            }
+            required
+          >
+            <option value="">Selecione um tutor</option>
+            {owners?.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {owner.nome}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField
+            label="Pet"
+            value={createForm.animalId}
+            onChange={(event) =>
+              setCreateForm((prev) => ({
+                ...prev,
+                animalId: event.target.value,
+              }))
+            }
+            required
+          >
+            <option value="">Selecione um pet</option>
+            {(createAnimals ?? []).map((animal) => (
+              <option key={animal.id} value={animal.id}>
+                {animal.nome}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField
+            label="Profissional responsável"
+            value={createForm.veterinarianId}
+            onChange={(event) =>
+              setCreateForm((prev) => ({
+                ...prev,
+                veterinarianId: event.target.value,
+              }))
+            }
+            required
+          >
+            <option value="">Selecione um colaborador</option>
+            {collaborators?.collaborators.map((collaborator) => (
+              <option key={collaborator.id} value={collaborator.id}>
+                {collaborator.nome}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField
+            label="Assistência (opcional)"
+            value={createForm.assistantId}
+            onChange={(event) =>
+              setCreateForm((prev) => ({
+                ...prev,
+                assistantId: event.target.value,
+              }))
+            }
+          >
+            <option value="">Sem assistente</option>
+            {collaborators?.collaborators.map((collaborator) => (
+              <option key={collaborator.id} value={collaborator.id}>
+                {collaborator.nome}
+              </option>
+            ))}
+          </SelectField>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field
+              label="Início"
+              type="datetime-local"
+              value={createForm.scheduledStart}
+              onChange={(event) =>
+                setCreateForm((prev) => ({
+                  ...prev,
+                  scheduledStart: event.target.value,
+                }))
+              }
+              required
+            />
+            <Field
+              label="Fim"
+              type="datetime-local"
+              value={createForm.scheduledEnd}
+              onChange={(event) =>
+                setCreateForm((prev) => ({
+                  ...prev,
+                  scheduledEnd: event.target.value,
+                }))
+              }
+              required
+            />
+          </div>
+
+          <SelectField
+            label="Status"
+            value={createForm.status}
+            onChange={(event) =>
+              setCreateForm((prev) => ({
+                ...prev,
+                status: event.target.value as Appointment['status'],
+              }))
+            }
+          >
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </SelectField>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-brand-grafite">
+            <span className="font-semibold text-brand-escuro">Observações (opcional)</span>
+            <textarea
+              className="min-h-[96px] w-full rounded-xl border border-brand-azul/60 bg-white/90 px-4 py-2 text-brand-grafite shadow-inner focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/50"
+              value={createForm.notes}
+              onChange={(event) =>
+                setCreateForm((prev) => ({
+                  ...prev,
+                  notes: event.target.value,
+                }))
+              }
+              placeholder="Anotações internas, orientações ao tutor ou observações clínicas"
+              maxLength={2000}
+            />
+          </label>
+        </form>
+      </Modal>
     </div>
   );
 };
