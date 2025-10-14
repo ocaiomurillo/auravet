@@ -34,6 +34,14 @@ export interface Owner {
   nome: string;
   email: string;
   telefone?: string | null;
+  cpf?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  cep?: string | null;
   createdAt: string;
   animals?: Animal[];
 }
@@ -124,12 +132,7 @@ export interface Invoice {
   paymentNotes: string | null;
   createdAt: string;
   updatedAt: string;
-  owner: {
-    id: string;
-    nome: string;
-    email: string;
-    telefone: string | null;
-  };
+  owner: Owner;
   responsible: {
     id: string;
     nome: string;

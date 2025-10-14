@@ -11,6 +11,20 @@ import { serializeOwner } from '../utils/serializers';
 
 export const ownersRouter = Router();
 
+const getUniqueConstraintTarget = (error: { meta?: unknown }): string | undefined => {
+  if (!error.meta || typeof error.meta !== 'object') {
+    return undefined;
+  }
+
+  const { target } = error.meta as { target?: unknown };
+
+  if (Array.isArray(target)) {
+    return typeof target[0] === 'string' ? target[0] : undefined;
+  }
+
+  return typeof target === 'string' ? target : undefined;
+};
+
 ownersRouter.use(authenticate);
 
 ownersRouter.get(
@@ -52,6 +66,12 @@ ownersRouter.post(
       res.status(201).json(serializeOwner(owner));
     } catch (error) {
       if (isPrismaKnownError(error, 'P2002')) {
+        const target = getUniqueConstraintTarget(error);
+
+        if (target === 'cpf') {
+          throw new HttpError(409, 'Já existe um tutor com este CPF.');
+        }
+
         throw new HttpError(409, 'Já existe um tutor com este e-mail.');
       }
       throw error;
@@ -111,6 +131,12 @@ ownersRouter.put(
         throw new HttpError(404, 'Tutor não encontrado.');
       }
       if (isPrismaKnownError(error, 'P2002')) {
+        const target = getUniqueConstraintTarget(error);
+
+        if (target === 'cpf') {
+          throw new HttpError(409, 'Já existe um tutor com este CPF.');
+        }
+
         throw new HttpError(409, 'Já existe um tutor com este e-mail.');
       }
       throw error;

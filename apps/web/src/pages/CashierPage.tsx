@@ -9,6 +9,7 @@ import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
 import type { Invoice, InvoiceListResponse, Owner, Service } from '../types/api';
 import { apiClient, invoicesApi } from '../lib/apiClient';
+import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -38,6 +39,8 @@ const CashierPage = () => {
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const selectedInvoiceOwnerCpf = selectedInvoice ? formatCpf(selectedInvoice.owner.cpf) : null;
+  const selectedInvoiceOwnerAddress = selectedInvoice ? buildOwnerAddress(selectedInvoice.owner) : null;
   const [paymentNotes, setPaymentNotes] = useState('');
 
   const { data: owners } = useQuery({
@@ -335,12 +338,25 @@ const CashierPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-azul/10 bg-white/90">
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="text-sm text-brand-grafite/80">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-brand-escuro">{invoice.owner.nome}</p>
-                      <p className="text-xs text-brand-grafite/60">{invoice.owner.email}</p>
-                    </td>
+                {invoices.map((invoice) => {
+                  const ownerCpf = formatCpf(invoice.owner.cpf);
+                  const ownerAddress = buildOwnerAddress(invoice.owner);
+
+                  return (
+                    <tr key={invoice.id} className="text-sm text-brand-grafite/80">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-brand-escuro">{invoice.owner.nome}</p>
+                        <p className="text-xs text-brand-grafite/60">{invoice.owner.email}</p>
+                        {invoice.owner.telefone ? (
+                          <p className="text-xs text-brand-grafite/60">{invoice.owner.telefone}</p>
+                        ) : null}
+                        {ownerCpf ? (
+                          <p className="text-xs text-brand-grafite/60">CPF: {ownerCpf}</p>
+                        ) : null}
+                        {ownerAddress ? (
+                          <p className="text-xs text-brand-grafite/60">{ownerAddress}</p>
+                        ) : null}
+                      </td>
                     <td className="px-4 py-3 font-semibold text-brand-escuro">
                       {currencyFormatter.format(invoice.total)}
                     </td>
@@ -368,17 +384,18 @@ const CashierPage = () => {
                         <span className="text-xs text-brand-grafite/60">Aguardando registro</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        className="px-3 py-1 text-xs"
-                        onClick={() => handleOpenInvoice(invoice)}
-                      >
-                        Ver detalhes
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          variant="ghost"
+                          className="px-3 py-1 text-xs"
+                          onClick={() => handleOpenInvoice(invoice)}
+                        >
+                          Ver detalhes
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -475,6 +492,15 @@ const CashierPage = () => {
                 <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Tutor</p>
                 <p className="text-brand-escuro">{selectedInvoice.owner.nome}</p>
                 <p className="text-xs text-brand-grafite/60">{selectedInvoice.owner.email}</p>
+                {selectedInvoice.owner.telefone ? (
+                  <p className="text-xs text-brand-grafite/60">{selectedInvoice.owner.telefone}</p>
+                ) : null}
+                {selectedInvoiceOwnerCpf ? (
+                  <p className="text-xs text-brand-grafite/60">CPF: {selectedInvoiceOwnerCpf}</p>
+                ) : null}
+                {selectedInvoiceOwnerAddress ? (
+                  <p className="text-xs text-brand-grafite/60">{selectedInvoiceOwnerAddress}</p>
+                ) : null}
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Status</p>

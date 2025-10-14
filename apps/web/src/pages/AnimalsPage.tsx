@@ -12,6 +12,7 @@ import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Animal, Owner } from '../types/api';
+import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 interface AnimalFormValues {
   nome: string;
@@ -64,6 +65,9 @@ const AnimalsPage = () => {
     () => animals?.find((animal) => animal.id === selectedAnimalId) ?? null,
     [animals, selectedAnimalId],
   );
+  const selectedOwner = selectedAnimal?.owner ?? null;
+  const selectedOwnerCpf = formatCpf(selectedOwner?.cpf);
+  const selectedOwnerAddress = selectedOwner ? buildOwnerAddress(selectedOwner) : null;
   useEffect(() => {
     const highlight = (location.state as { highlight?: string } | null)?.highlight;
     if (highlight) {
@@ -231,6 +235,15 @@ const AnimalsPage = () => {
                   <p className="text-xs uppercase tracking-wide text-brand-grafite/60">
                     Nascimento: {new Date(selectedAnimal.nascimento).toLocaleDateString('pt-BR')}
                   </p>
+                ) : null}
+                {selectedOwner ? (
+                  <div className="mt-3 rounded-xl border border-brand-azul/20 bg-white/80 p-3 text-xs text-brand-grafite/70">
+                    <p className="font-semibold text-brand-escuro">Contato do tutor</p>
+                    <p>{selectedOwner.email}</p>
+                    {selectedOwner.telefone ? <p>{selectedOwner.telefone}</p> : null}
+                    {selectedOwnerCpf ? <p>CPF: {selectedOwnerCpf}</p> : null}
+                    {selectedOwnerAddress ? <p>{selectedOwnerAddress}</p> : null}
+                  </div>
                 ) : null}
               </div>
               {canViewServices ? (
