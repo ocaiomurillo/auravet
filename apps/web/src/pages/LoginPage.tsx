@@ -8,6 +8,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Field from '../components/Field';
 import { useAuth } from '../contexts/AuthContext';
+import { ApiConfigurationError, ensureApiConfigured } from '../lib/apiClient';
 
 interface LoginFormValues {
   email: string;
@@ -44,6 +45,17 @@ const LoginPage = () => {
   }
 
   const onSubmit = handleSubmit(async (values) => {
+    try {
+      ensureApiConfigured();
+    } catch (error) {
+      if (error instanceof ApiConfigurationError) {
+        toast.error(error.message);
+        return;
+      }
+
+      throw error;
+    }
+
     await loginMutation.mutateAsync(values);
   });
 

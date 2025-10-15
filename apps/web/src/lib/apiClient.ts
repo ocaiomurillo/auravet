@@ -9,7 +9,42 @@ import type {
 } from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+export class ApiConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ApiConfigurationError';
+  }
+}
+
+const resolveApiUrl = (): string => {
+  const configuredUrl = import.meta.env.VITE_API_URL;
+
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  if (import.meta.env.DEV) {
+    return 'http://localhost:4000';
+  }
+
+  throw new ApiConfigurationError(
+    'Configuração ausente: defina a variável de ambiente VITE_API_URL antes de gerar o build de produção do frontend.',
+  );
+};
+
+let cachedApiUrl: string | null = null;
+
+export const getApiBaseUrl = (): string => {
+  if (cachedApiUrl === null) {
+    cachedApiUrl = resolveApiUrl();
+  }
+
+  return cachedApiUrl;
+};
+
+export const ensureApiConfigured = (): void => {
+  getApiBaseUrl();
+};
 
 async function request<T>(
   path: string,
@@ -28,7 +63,7 @@ async function request<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...options,
     headers,
   });
