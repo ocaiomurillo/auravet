@@ -5,11 +5,20 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
 import { requirePermission } from '../middlewares/require-permission';
-import { invoiceExportSchema, invoiceFilterSchema, invoiceGenerateSchema, invoiceIdSchema, invoicePaymentSchema } from '../schema/invoice';
+import {
+  invoiceExportSchema,
+  invoiceFilterSchema,
+  invoiceGenerateSchema,
+  invoiceIdSchema,
+  invoiceItemPathSchema,
+  invoiceManualItemSchema,
+  invoicePaymentSchema,
+} from '../schema/invoice';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
 import { fetchInvoiceCandidates, getPaidStatus, invoiceInclude, syncInvoiceForService } from '../utils/invoice';
 import { serializeInvoice } from '../utils/serializers';
+import { buildInvoicePrintHtml } from '../utils/invoice-print';
 
 export const invoicesRouter = Router();
 
@@ -211,6 +220,193 @@ invoicesRouter.post(
         },
         include: invoiceInclude,
       });
+    });
+
+    res.json(serializeInvoice(invoice));
+  }),
+);
+
+invoicesRouter.get(
+  '/:id/print',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const { id } = invoiceIdSchema.parse(req.params);
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: invoiceInclude,
+    });
+
+    if (!invoice) {
+      throw new HttpError(404, 'Conta não encontrada.');
+    }
+
+    const serialized = serializeInvoice(invoice);
+    const html = buildInvoicePrintHtml(serialized);
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }),
+);
+
+invoicesRouter.get(
+  '/:id',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const { id } = invoiceIdSchema.parse(req.params);
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: invoiceInclude,
+    });
+
+    if (!invoice) {
+      throw new HttpError(404, 'Conta não encontrada.');
+    }
+
+    res.json(serializeInvoice(invoice));
+  }),
+);
+
+const ensureInvoiceEditable = async (tx: Prisma.TransactionClient, id: string) => {
+  const invoice = await tx.invoice.findUnique({
+    where: { id },
+    include: { status: true },
+  });
+
+  if (!invoice) {
+    throw new HttpError(404, 'Conta não encontrada.');
+  }
+
+  if (invoice.status.slug === 'QUITADA') {
+    throw new HttpError(400, 'Não é possível alterar uma conta que já está quitada.');
+  }
+
+  return invoice;
+};
+
+const recalculateInvoiceTotal = async (tx: Prisma.TransactionClient, invoiceId: string) => {
+  const aggregate = await tx.invoiceItem.aggregate({
+    where: { invoiceId },
+    _sum: { total: true },
+  });
+
+  const total = aggregate._sum.total ?? new Prisma.Decimal(0);
+
+  return tx.invoice.update({
+    where: { id: invoiceId },
+    data: { total },
+    include: invoiceInclude,
+  });
+};
+
+invoicesRouter.post(
+  '/:id/items',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const { id } = invoiceIdSchema.parse(req.params);
+    const payload = invoiceManualItemSchema.parse(req.body);
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      const editableInvoice = await ensureInvoiceEditable(tx, id);
+
+      let product:
+        | {
+            id: string;
+            nome: string;
+            estoqueAtual: number;
+            isSellable: boolean;
+            isActive: boolean;
+          }
+        | null = null;
+      if (payload.productId) {
+        product = await tx.product.findUnique({
+          where: { id: payload.productId },
+          select: {
+            id: true,
+            nome: true,
+            estoqueAtual: true,
+            isSellable: true,
+            isActive: true,
+          },
+        });
+
+        if (!product) {
+          throw new HttpError(404, 'Produto selecionado não foi encontrado.');
+        }
+
+        if (!product.isActive || !product.isSellable) {
+          throw new HttpError(400, 'Este produto não está disponível para venda.');
+        }
+
+        if (product.estoqueAtual < payload.quantity) {
+          throw new HttpError(
+            400,
+            `Estoque insuficiente para o produto ${product.nome}. Disponível: ${product.estoqueAtual}.`,
+          );
+        }
+      }
+
+      const description = payload.description.trim();
+
+      const unitPrice = new Prisma.Decimal(payload.unitPrice.toFixed(2));
+      const total = unitPrice.mul(payload.quantity);
+
+      await tx.invoiceItem.create({
+        data: {
+          invoiceId: editableInvoice.id,
+          description,
+          quantity: payload.quantity,
+          unitPrice,
+          total,
+          productId: product?.id ?? null,
+          servicoId: null,
+        },
+      });
+
+      if (product) {
+        await tx.product.update({
+          where: { id: product.id },
+          data: { estoqueAtual: { decrement: payload.quantity } },
+        });
+      }
+
+      return recalculateInvoiceTotal(tx, editableInvoice.id);
+    });
+
+    res.status(201).json(serializeInvoice(invoice));
+  }),
+);
+
+invoicesRouter.delete(
+  '/:id/items/:itemId',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const { id, itemId } = invoiceItemPathSchema.parse(req.params);
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      await ensureInvoiceEditable(tx, id);
+
+      const item = await tx.invoiceItem.findUnique({ where: { id: itemId } });
+
+      if (!item || item.invoiceId !== id) {
+        throw new HttpError(404, 'Item não encontrado para esta conta.');
+      }
+
+      if (item.servicoId) {
+        throw new HttpError(400, 'Itens vinculados a serviços não podem ser removidos manualmente.');
+      }
+
+      await tx.invoiceItem.delete({ where: { id: item.id } });
+
+      if (item.productId) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { estoqueAtual: { increment: item.quantity } },
+        });
+      }
+
+      return recalculateInvoiceTotal(tx, id);
     });
 
     res.json(serializeInvoice(invoice));
