@@ -5,6 +5,7 @@ node_modules/
 # Build
 apps/web/dist/
 apps/api/dist/
+apps/api/prisma/dist/
 apps/**/tsconfig*.tsbuildinfo
 apps/web/vite.config.js
 apps/web/vite.config.d.ts
