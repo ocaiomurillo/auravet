@@ -68,7 +68,9 @@ export interface Service {
   createdAt: string;
   appointmentId: string | null;
   animal?: Animal;
+  catalogItems: ServiceCatalogItem[];
   items: ServiceItem[];
+  responsavel: ServiceResponsible | null;
 }
 
 export interface ServiceItem {
@@ -84,6 +86,32 @@ export interface ServiceItem {
     estoqueAtual: number;
     estoqueMinimo: number;
   };
+}
+
+export interface ServiceDefinition {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  tipo: Service['tipo'];
+  precoSugerido: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceCatalogItem {
+  id: string;
+  serviceDefinitionId: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  observacoes: string | null;
+  definition: ServiceDefinition;
+}
+
+export interface ServiceResponsible {
+  id: string;
+  nome: string;
+  email: string;
 }
 
 export interface InvoiceStatus {

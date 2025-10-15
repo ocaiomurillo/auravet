@@ -7,6 +7,8 @@ import type {
   Prisma,
   Product,
   Role,
+  ServiceCatalogUsage,
+  ServiceDefinition,
   ServiceProductUsage,
   Servico,
   User,
@@ -16,6 +18,7 @@ import type { UserWithRole } from './auth';
 import { buildAuthenticatedUser } from './auth';
 
 type ServiceItemWithProduct = ServiceProductUsage & { product: Product };
+type ServiceCatalogUsageWithDefinition = ServiceCatalogUsage & { definition: ServiceDefinition };
 
 type InvoiceItemWithRelations = Prisma.InvoiceItemGetPayload<{
   include: {
@@ -57,7 +60,9 @@ type InvoiceWithRelations = Prisma.InvoiceGetPayload<{
 type ServiceWithOptionalRelations = Servico & {
   animal?: AnimalWithOptionalRelations | null;
   items?: ServiceItemWithProduct[];
+  catalogItems?: ServiceCatalogUsageWithDefinition[];
   appointment?: Appointment | null;
+  responsavel?: { id: string; nome: string; email: string } | null;
 };
 
 type AnimalWithOptionalRelations = Animal & {
@@ -83,6 +88,22 @@ export type SerializedServiceItem = {
     precoVenda: number;
     estoqueAtual: number;
     estoqueMinimo: number;
+  };
+};
+
+export type SerializedServiceCatalogItem = {
+  id: string;
+  serviceDefinitionId: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  observacoes: string | null;
+  definition: {
+    id: string;
+    nome: string;
+    tipo: Servico['tipo'];
+    precoSugerido: number;
+    descricao: string | null;
   };
 };
 
@@ -136,7 +157,9 @@ export type SerializedService = {
   createdAt: string;
   appointmentId: string | null;
   animal?: SerializedAnimal;
+  catalogItems: SerializedServiceCatalogItem[];
   items: SerializedServiceItem[];
+  responsavel: { id: string; nome: string; email: string } | null;
 };
 
 export type SerializedAnimal = {
@@ -365,6 +388,22 @@ export const serializeService = (
     observacoes: service.observacoes ?? null,
     createdAt: service.createdAt.toISOString(),
     appointmentId: service.appointment?.id ?? null,
+    catalogItems:
+      service.catalogItems?.map((item) => ({
+        id: item.id,
+        serviceDefinitionId: item.serviceDefinitionId,
+        quantidade: item.quantidade,
+        valorUnitario: Number(item.valorUnitario),
+        valorTotal: Number(item.valorTotal),
+        observacoes: item.observacoes ?? null,
+        definition: {
+          id: item.definition.id,
+          nome: item.definition.nome,
+          tipo: item.definition.tipo,
+          precoSugerido: Number(item.definition.precoSugerido),
+          descricao: item.definition.descricao ?? null,
+        },
+      })) ?? [],
     items:
       service.items?.map((item) => ({
         id: item.id,
@@ -380,6 +419,13 @@ export const serializeService = (
           estoqueMinimo: item.product.estoqueMinimo,
         },
       })) ?? [],
+    responsavel: service.responsavel
+      ? {
+          id: service.responsavel.id,
+          nome: service.responsavel.nome,
+          email: service.responsavel.email,
+        }
+      : null,
   };
 
   if (options?.includeAnimal && service.animal) {

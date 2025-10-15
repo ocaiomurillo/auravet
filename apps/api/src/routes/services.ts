@@ -1,4 +1,4 @@
-import { Prisma, Product } from '@prisma/client';
+import { Prisma, Product, ServiceDefinition } from '@prisma/client';
 import { Router } from 'express';
 
 import { prisma } from '../lib/prisma';
@@ -24,6 +24,18 @@ const serviceInclude = {
   items: {
     include: {
       product: true,
+    },
+  },
+  catalogItems: {
+    include: {
+      definition: true,
+    },
+  },
+  responsavel: {
+    select: {
+      id: true,
+      nome: true,
+      email: true,
     },
   },
 } as const;
@@ -56,6 +68,13 @@ type ServiceItemInput = {
   precoUnitario: number;
 };
 
+type ServiceCatalogItemInput = {
+  serviceDefinitionId: string;
+  quantidade: number;
+  precoUnitario: number;
+  observacoes?: string | null;
+};
+
 const ensureDistinctItems = (items: ServiceItemInput[]) => {
   const seen = new Set<string>();
   for (const item of items) {
@@ -63,6 +82,16 @@ const ensureDistinctItems = (items: ServiceItemInput[]) => {
       throw new HttpError(400, 'Informe cada produto apenas uma vez na lista de itens do serviço.');
     }
     seen.add(item.productId);
+  }
+};
+
+const ensureDistinctCatalogItems = (items: ServiceCatalogItemInput[]) => {
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (seen.has(item.serviceDefinitionId)) {
+      throw new HttpError(400, 'Selecione cada serviço do catálogo apenas uma vez. Ajuste a quantidade se necessário.');
+    }
+    seen.add(item.serviceDefinitionId);
   }
 };
 
@@ -102,6 +131,50 @@ const validateStockForCreation = async (
   return productsMap;
 };
 
+const loadServiceDefinitionsMap = async (
+  tx: Prisma.TransactionClient,
+  ids: string[],
+): Promise<Map<string, ServiceDefinition>> => {
+  if (!ids.length) {
+    return new Map();
+  }
+
+  const definitions = await tx.serviceDefinition.findMany({
+    where: { id: { in: ids }, isActive: true },
+  });
+
+  if (definitions.length !== ids.length) {
+    throw new HttpError(404, 'Serviço de catálogo selecionado não foi encontrado ou está inativo.');
+  }
+
+  return new Map(definitions.map((definition) => [definition.id, definition]));
+};
+
+const ensureResponsibleExists = async (tx: Prisma.TransactionClient, userId: string) => {
+  const responsible = await tx.user.findFirst({
+    where: {
+      id: userId,
+      isActive: true,
+      role: {
+        modules: {
+          some: {
+            isEnabled: true,
+            module: { slug: 'services:write', isActive: true },
+          },
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!responsible) {
+    throw new HttpError(404, 'Responsável informado não possui acesso ao módulo de serviços.');
+  }
+};
+
+const calculateCatalogItemsTotal = (items: ServiceCatalogItemInput[]) =>
+  items.reduce((sum, item) => sum + item.precoUnitario * item.quantidade, 0);
+
 const toDecimal = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
 servicesRouter.get(
@@ -131,6 +204,57 @@ servicesRouter.get(
   }),
 );
 
+servicesRouter.get(
+  '/catalog',
+  requirePermission('services:write'),
+  asyncHandler(async (_req, res) => {
+    const definitions = await prisma.serviceDefinition.findMany({
+      where: { isActive: true },
+      orderBy: { nome: 'asc' },
+    });
+
+    res.json({
+      definitions: definitions.map((definition) => ({
+        id: definition.id,
+        nome: definition.nome,
+        descricao: definition.descricao ?? null,
+        tipo: definition.tipo,
+        precoSugerido: Number(definition.precoSugerido),
+        createdAt: definition.createdAt.toISOString(),
+        updatedAt: definition.updatedAt.toISOString(),
+      })),
+    });
+  }),
+);
+
+servicesRouter.get(
+  '/responsibles',
+  requirePermission('services:write'),
+  asyncHandler(async (_req, res) => {
+    const responsibles = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        role: {
+          modules: {
+            some: {
+              isEnabled: true,
+              module: { slug: 'services:write', isActive: true },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+      },
+      orderBy: { nome: 'asc' },
+    });
+
+    res.json({ responsibles });
+  }),
+);
+
 servicesRouter.post(
   '/',
   requirePermission('services:write'),
@@ -142,18 +266,40 @@ servicesRouter.post(
     const items: ServiceItemInput[] = payload.items ?? [];
     ensureDistinctItems(items);
 
-    const responsibleId = req.user?.id ?? null;
+    const catalogItems: ServiceCatalogItemInput[] = payload.catalogItems ?? [];
+    ensureDistinctCatalogItems(catalogItems);
+
+    const responsibleId = payload.responsavelId ?? req.user?.id ?? null;
 
     const service = await prisma.$transaction(async (tx) => {
+      if (responsibleId) {
+        await ensureResponsibleExists(tx, responsibleId);
+      }
+
       await validateStockForCreation(tx, items);
+      await loadServiceDefinitionsMap(tx, catalogItems.map((item) => item.serviceDefinitionId));
+
+      const catalogTotal = calculateCatalogItemsTotal(catalogItems);
+      const resolvedPriceValue = payload.preco ?? catalogTotal;
+      const normalizedPriceValue = Number(resolvedPriceValue.toFixed(2));
 
       const created = await tx.servico.create({
         data: {
           animalId: payload.animalId,
           tipo: payload.tipo,
           data: parseDate(payload.data),
-          preco: payload.preco,
+          preco: toDecimal(normalizedPriceValue),
           observacoes: payload.observacoes ?? null,
+          responsavelId: responsibleId,
+          catalogItems: {
+            create: catalogItems.map((item) => ({
+              serviceDefinitionId: item.serviceDefinitionId,
+              quantidade: item.quantidade,
+              valorUnitario: toDecimal(item.precoUnitario),
+              valorTotal: toDecimal(item.precoUnitario * item.quantidade),
+              observacoes: item.observacoes?.trim() ? item.observacoes.trim() : null,
+            })),
+          },
           items: {
             create: items.map((item) => ({
               productId: item.productId,
@@ -173,7 +319,7 @@ servicesRouter.post(
         });
       }
 
-      await syncInvoiceForService(tx, created.id, { responsibleId });
+      await syncInvoiceForService(tx, created.id, { responsibleId: created.responsavelId ?? responsibleId });
 
       return created;
     });
@@ -194,13 +340,12 @@ servicesRouter.put(
     }
 
     try {
-      const responsibleId = req.user?.id ?? null;
-
       const service = await prisma.$transaction(async (tx) => {
         const existing = await tx.servico.findUnique({
           where: { id },
           include: {
             items: true,
+            catalogItems: true,
             invoiceItems: {
               include: {
                 invoice: {
@@ -227,7 +372,8 @@ servicesRouter.put(
             payload.tipo !== undefined ||
             payload.data !== undefined ||
             payload.preco !== undefined ||
-            payload.items !== undefined)
+            payload.items !== undefined ||
+            payload.catalogItems !== undefined)
         ) {
           throw new HttpError(
             400,
@@ -246,15 +392,31 @@ servicesRouter.put(
         if (payload.data !== undefined) {
           updateData.data = parseDate(payload.data);
         }
-        if (payload.preco !== undefined) {
-          updateData.preco = payload.preco;
-        }
         if (payload.observacoes !== undefined) {
           updateData.observacoes = payload.observacoes ?? null;
         }
 
-        if (!payload.items && Object.keys(updateData).length === 0) {
-          throw new HttpError(400, 'Informe ao menos um campo para atualizar.');
+        let resolvedPrice: number | undefined = payload.preco;
+
+        if (payload.catalogItems) {
+          const catalogItems: ServiceCatalogItemInput[] = payload.catalogItems;
+          ensureDistinctCatalogItems(catalogItems);
+          await loadServiceDefinitionsMap(tx, catalogItems.map((item) => item.serviceDefinitionId));
+
+          if (resolvedPrice === undefined) {
+            resolvedPrice = calculateCatalogItemsTotal(catalogItems);
+          }
+
+          updateData.catalogItems = {
+            deleteMany: {},
+            create: catalogItems.map((item) => ({
+              serviceDefinitionId: item.serviceDefinitionId,
+              quantidade: item.quantidade,
+              valorUnitario: toDecimal(item.precoUnitario),
+              valorTotal: toDecimal(item.precoUnitario * item.quantidade),
+              observacoes: item.observacoes?.trim() ? item.observacoes.trim() : null,
+            })),
+          };
         }
 
         if (payload.items) {
@@ -314,13 +476,32 @@ servicesRouter.put(
           }
         }
 
+        if (payload.responsavelId !== undefined) {
+          await ensureResponsibleExists(tx, payload.responsavelId);
+          updateData.responsavel = { connect: { id: payload.responsavelId } };
+        }
+
+        const hasCatalogUpdate = payload.catalogItems !== undefined;
+        const hasProductUpdate = payload.items !== undefined;
+        const hasFieldUpdate = Object.keys(updateData).length > 0 || resolvedPrice !== undefined;
+
+        if (!hasCatalogUpdate && !hasProductUpdate && !hasFieldUpdate) {
+          throw new HttpError(400, 'Informe ao menos um campo para atualizar.');
+        }
+
+        if (resolvedPrice !== undefined) {
+          updateData.preco = toDecimal(Number(resolvedPrice.toFixed(2)));
+        }
+
         const updated = await tx.servico.update({
           where: { id },
           data: updateData,
           include: serviceInclude,
         });
 
-        await syncInvoiceForService(tx, id, { responsibleId });
+        await syncInvoiceForService(tx, id, {
+          responsibleId: updated.responsavelId ?? req.user?.id ?? null,
+        });
 
         return updated;
       });

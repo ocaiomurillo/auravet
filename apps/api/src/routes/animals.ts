@@ -149,6 +149,18 @@ animalsRouter.get(
             product: true,
           },
         },
+        catalogItems: {
+          include: {
+            definition: true,
+          },
+        },
+        responsavel: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -187,6 +199,18 @@ animalsRouter.put(
               items: {
                 include: {
                   product: true,
+                },
+              },
+              catalogItems: {
+                include: {
+                  definition: true,
+                },
+              },
+              responsavel: {
+                select: {
+                  id: true,
+                  nome: true,
+                  email: true,
                 },
               },
             },
