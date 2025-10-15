@@ -37,7 +37,7 @@ auravet/
    - `API_PORT`, `API_HOST`, `CORS_ORIGIN`
    - `JWT_SECRET`, `JWT_EXPIRES_IN`, `PASSWORD_SALT_ROUNDS`
    - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME` (opcionais)
-   - `VITE_API_URL` (URL consumida pelo frontend)
+   - `VITE_API_URL` (URL consumida pelo frontend; defina antes de gerar o build de produção)
 
 > `PASSWORD_SALT_ROUNDS` controla o custo exponencial (`2^N`) usado pelo Scrypt ao hashear senhas.
 
