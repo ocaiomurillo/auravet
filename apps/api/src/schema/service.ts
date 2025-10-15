@@ -44,6 +44,13 @@ const serviceItemSchema = z.object({
   precoUnitario: precoSchema,
 });
 
+const catalogItemSchema = z.object({
+  serviceDefinitionId: z.string().cuid('Serviço de catálogo inválido'),
+  quantidade: quantidadeSchema,
+  precoUnitario: precoSchema,
+  observacoes: z.string().optional(),
+});
+
 export const serviceCreateSchema = z.object({
   animalId: z.string().cuid('Animal inválido'),
   tipo: z.enum(tipoServicoValues, {
@@ -53,9 +60,11 @@ export const serviceCreateSchema = z.object({
     .string()
     .datetime({ offset: true })
     .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
-  preco: precoSchema,
+  preco: precoSchema.optional(),
   observacoes: z.string().optional(),
   items: z.array(serviceItemSchema).default([]),
+  catalogItems: z.array(catalogItemSchema).default([]),
+  responsavelId: z.string().cuid('Responsável inválido').optional(),
 });
 
 export const serviceUpdateSchema = z.object({
@@ -73,6 +82,8 @@ export const serviceUpdateSchema = z.object({
   preco: precoSchema.optional(),
   observacoes: z.string().optional(),
   items: z.array(serviceItemSchema).optional(),
+  catalogItems: z.array(catalogItemSchema).optional(),
+  responsavelId: z.string().cuid('Responsável inválido').optional(),
 });
 
 export const serviceIdSchema = z.object({

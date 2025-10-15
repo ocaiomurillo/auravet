@@ -141,6 +141,11 @@ const ServicesPage = () => {
               const owner = service.animal?.owner ?? null;
               const ownerCpf = owner ? formatCpf(owner.cpf) : null;
               const ownerAddress = owner ? buildOwnerAddress(owner) : null;
+              const catalogItems = service.catalogItems ?? [];
+              const productItems = service.items ?? [];
+              const servicesTotal = catalogItems.reduce((sum, item) => sum + item.valorTotal, 0);
+              const productsTotal = productItems.reduce((sum, item) => sum + item.valorTotal, 0);
+              const overallTotal = servicesTotal + productsTotal;
 
               return (
                 <li key={service.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
@@ -148,11 +153,16 @@ const ServicesPage = () => {
                     {serviceLabels[service.tipo] ?? service.tipo}
                   </p>
                   <p className="text-sm text-brand-grafite/70">
-                    {new Date(service.data).toLocaleDateString('pt-BR')} • R$ {service.preco.toFixed(2)}
+                    {new Date(service.data).toLocaleDateString('pt-BR')} • Serviços: R$ {servicesTotal.toFixed(2)} • Produtos: R$ {productsTotal.toFixed(2)} • Total: R$ {overallTotal.toFixed(2)}
                   </p>
                   <p className="text-sm text-brand-grafite/70">
                     Pet: {service.animal?.nome ?? '—'} • Tutor(a): {service.animal?.owner?.nome ?? '—'}
                   </p>
+                  {service.responsavel ? (
+                    <p className="text-sm text-brand-grafite/70">
+                      Responsável: {service.responsavel.nome} ({service.responsavel.email})
+                    </p>
+                  ) : null}
                   {owner?.telefone ? (
                     <p className="text-xs text-brand-grafite/60">{owner.telefone}</p>
                   ) : null}
@@ -161,11 +171,29 @@ const ServicesPage = () => {
                   {service.observacoes ? (
                     <p className="text-sm text-brand-grafite/80">{service.observacoes}</p>
                   ) : null}
-                {service.items?.length ? (
+                  {catalogItems.length ? (
+                    <div className="mt-3 space-y-2 rounded-xl bg-brand-azul/5 p-3">
+                      <p className="text-sm font-semibold text-brand-escuro">Serviços aplicados</p>
+                      <ul className="space-y-2 text-sm text-brand-grafite/80">
+                        {catalogItems.map((item) => (
+                          <li key={item.id} className="flex flex-col gap-1">
+                            <span>
+                              {item.definition.nome}: {item.quantidade} un × R$ {item.valorUnitario.toFixed(2)} = R$ {item.valorTotal.toFixed(2)}
+                            </span>
+                            {item.observacoes ? (
+                              <span className="text-brand-grafite/60">Observações: {item.observacoes}</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-sm font-semibold text-brand-escuro">Total de serviços: R$ {servicesTotal.toFixed(2)}</p>
+                    </div>
+                  ) : null}
+                  {productItems.length ? (
                   <div className="mt-3 space-y-2 rounded-xl bg-brand-azul/5 p-3">
                     <p className="text-sm font-semibold text-brand-escuro">Itens utilizados</p>
                     <ul className="space-y-2 text-sm text-brand-grafite/80">
-                      {service.items.map((item) => {
+                      {productItems.map((item) => {
                         const isOutOfStock = item.product.estoqueAtual === 0;
                         const isLowStock = item.product.estoqueAtual <= item.product.estoqueMinimo && !isOutOfStock;
 
@@ -187,14 +215,15 @@ const ServicesPage = () => {
                                 ? 'Estoque zerado após o atendimento.'
                                 : isLowStock
                                   ? `Estoque crítico: ${item.product.estoqueAtual} unidade(s) disponível(is).`
-                                  : `Estoque atual: ${item.product.estoqueAtual} unidade(s).`}
+                              : `Estoque atual: ${item.product.estoqueAtual} unidade(s).`}
                             </span>
                           </li>
                         );
                       })}
                     </ul>
+                    <p className="text-sm font-semibold text-brand-escuro">Total dos produtos: R$ {productsTotal.toFixed(2)}</p>
                   </div>
-                ) : null}
+                  ) : null}
                 </li>
               );
             })}

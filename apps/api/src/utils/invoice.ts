@@ -51,6 +51,7 @@ type ServiceForInvoice = Prisma.ServicoGetPayload<{
   include: {
     animal: { include: { owner: true } };
     items: { include: { product: true } };
+    catalogItems: { include: { definition: true } };
     invoiceItems: {
       include: {
         invoice: {
@@ -80,6 +81,7 @@ const loadServiceForInvoice = async (
     include: {
       animal: { include: { owner: true } },
       items: { include: { product: true } },
+      catalogItems: { include: { definition: true } },
       invoiceItems: {
         include: {
           invoice: {
@@ -100,13 +102,23 @@ const loadServiceForInvoice = async (
 };
 
 const buildInvoiceItemsData = (service: ServiceForInvoice) => {
-  const serviceItem = {
-    servicoId: service.id,
-    description: `Serviço: ${service.tipo}`,
-    quantity: 1,
-    unitPrice: service.preco,
-    total: service.preco,
-  };
+  const serviceItems = service.catalogItems.length
+    ? service.catalogItems.map((item) => ({
+        servicoId: service.id,
+        description: item.definition ? `Serviço: ${item.definition.nome}` : 'Serviço prestado',
+        quantity: item.quantidade,
+        unitPrice: item.valorUnitario,
+        total: item.valorTotal,
+      }))
+    : [
+        {
+          servicoId: service.id,
+          description: `Serviço: ${service.tipo}`,
+          quantity: 1,
+          unitPrice: service.preco,
+          total: service.preco,
+        },
+      ];
 
   const productItems = service.items.map((item) => ({
     productId: item.productId,
@@ -116,15 +128,21 @@ const buildInvoiceItemsData = (service: ServiceForInvoice) => {
     total: item.valorTotal,
   }));
 
-  return { serviceItem, productItems };
+  return { serviceItems, productItems };
 };
 
 const calculateInvoiceTotal = (service: ServiceForInvoice) => {
+  const servicesTotal = service.catalogItems.length
+    ? service.catalogItems.reduce(
+        (acc, item) => acc.add(item.valorTotal),
+        new Prisma.Decimal(0),
+      )
+    : service.preco;
   const productsTotal = service.items.reduce(
     (acc, item) => acc.add(item.valorTotal),
     new Prisma.Decimal(0),
   );
-  return service.preco.add(productsTotal);
+  return servicesTotal.add(productsTotal);
 };
 
 export interface SyncInvoiceOptions {
@@ -152,7 +170,7 @@ export const syncInvoiceForService = async (
     return invoice;
   }
 
-  const { serviceItem, productItems } = buildInvoiceItemsData(service);
+  const { serviceItems, productItems } = buildInvoiceItemsData(service);
   const total = calculateInvoiceTotal(service);
 
   const resolvedDueDate = dueDate ?? existingInvoice?.dueDate ?? addDays(new Date(service.data), 7);
@@ -167,7 +185,7 @@ export const syncInvoiceForService = async (
         total,
         items: {
           deleteMany: {},
-          create: [serviceItem, ...productItems],
+          create: [...serviceItems, ...productItems],
         },
       },
       include: invoiceInclude,
@@ -186,7 +204,7 @@ export const syncInvoiceForService = async (
       dueDate: resolvedDueDate,
       total,
       items: {
-        create: [serviceItem, ...productItems],
+        create: [...serviceItems, ...productItems],
       },
     },
     include: invoiceInclude,
@@ -207,6 +225,7 @@ export const fetchInvoiceCandidates = async (
     include: {
       animal: { include: { owner: true } },
       items: { include: { product: true } },
+      catalogItems: { include: { definition: true } },
     },
     orderBy: { data: 'desc' },
   });

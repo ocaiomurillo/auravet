@@ -21,6 +21,19 @@ enum TipoServico {
   OUTROS
 }
 
+model ServiceDefinition {
+  id            String  @id @default(cuid())
+  nome          String  @unique
+  descricao     String?
+  tipo          TipoServico
+  precoSugerido Decimal @db.Decimal(10, 2)
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  catalogUsages ServiceCatalogUsage[]
+}
+
 enum AppointmentStatus {
   AGENDADO
   CONFIRMADO
@@ -68,9 +81,12 @@ model Servico {
   preco        Decimal     @db.Decimal(10, 2)
   observacoes  String?
   createdAt    DateTime    @default(now())
+  responsavelId String?
   items        ServiceProductUsage[]
+  catalogItems ServiceCatalogUsage[]
   appointment  Appointment? @relation("AppointmentService")
   invoiceItems InvoiceItem[]
+  responsavel  User?        @relation("ServiceResponsavel", fields: [responsavelId], references: [id])
 }
 
 model Module {
@@ -123,6 +139,7 @@ model User {
   appointmentsAsVeterinarian Appointment[] @relation("VeterinarianAppointments")
   appointmentsAsAssistant    Appointment[] @relation("AssistantAppointments")
   invoicesResponsible         Invoice[]     @relation("InvoiceResponsible")
+  servicesResponsavel         Servico[]     @relation("ServiceResponsavel")
 }
 
 model CollaboratorProfile {
@@ -193,6 +210,21 @@ model ServiceProductUsage {
   @@unique([servicoId, productId])
 }
 
+model ServiceCatalogUsage {
+  id                  String            @id @default(cuid())
+  servicoId           String
+  serviceDefinitionId String
+  quantidade          Int               @default(1)
+  valorUnitario       Decimal           @db.Decimal(10, 2)
+  valorTotal          Decimal           @db.Decimal(10, 2)
+  observacoes         String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  servico    Servico           @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  definition ServiceDefinition @relation(fields: [serviceDefinitionId], references: [id])
+}
+
 model Invoice {
   id             String   @id @default(cuid())
   ownerId        String
@@ -234,6 +266,4 @@ model InvoiceItem {
   invoice  Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   service  Servico? @relation(fields: [servicoId], references: [id])
   product  Product? @relation(fields: [productId], references: [id])
-
-  @@unique([servicoId])
 }

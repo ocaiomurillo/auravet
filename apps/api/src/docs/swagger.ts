@@ -65,9 +65,17 @@ export const swaggerDocument = {
           observacoes: { type: 'string', nullable: true },
           createdAt: { type: 'string', format: 'date-time' },
           animal: { $ref: '#/components/schemas/Animal' },
+          catalogItems: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ServiceCatalogItem' },
+          },
           items: {
             type: 'array',
             items: { $ref: '#/components/schemas/ServiceItem' },
+          },
+          responsavel: {
+            allOf: [{ $ref: '#/components/schemas/ServiceResponsible' }],
+            nullable: true,
           },
         },
         required: ['id', 'animalId', 'tipo', 'data', 'preco', 'createdAt'],
@@ -94,6 +102,48 @@ export const swaggerDocument = {
           product: { $ref: '#/components/schemas/ServiceItemProduct' },
         },
         required: ['id', 'productId', 'quantidade', 'valorUnitario', 'valorTotal', 'product'],
+      },
+      ServiceCatalogItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          serviceDefinitionId: { type: 'string', format: 'cuid' },
+          quantidade: { type: 'integer' },
+          valorUnitario: { type: 'number', format: 'double' },
+          valorTotal: { type: 'number', format: 'double' },
+          observacoes: { type: 'string', nullable: true },
+          definition: { $ref: '#/components/schemas/ServiceDefinition' },
+        },
+        required: [
+          'id',
+          'serviceDefinitionId',
+          'quantidade',
+          'valorUnitario',
+          'valorTotal',
+          'definition',
+        ],
+      },
+      ServiceDefinition: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          nome: { type: 'string' },
+          descricao: { type: 'string', nullable: true },
+          tipo: { type: 'string', enum: ['CONSULTA', 'EXAME', 'VACINACAO', 'CIRURGIA', 'OUTROS'] },
+          precoSugerido: { type: 'number', format: 'double' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+        required: ['id', 'nome', 'tipo', 'precoSugerido', 'createdAt', 'updatedAt'],
+      },
+      ServiceResponsible: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'cuid' },
+          nome: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+        },
+        required: ['id', 'nome', 'email'],
       },
       Module: {
         type: 'object',
@@ -1010,7 +1060,7 @@ export const swaggerDocument = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['animalId', 'tipo', 'data', 'preco'],
+                required: ['animalId', 'tipo', 'data'],
                 properties: {
                   animalId: { type: 'string', format: 'cuid' },
                   tipo: {
@@ -1020,6 +1070,20 @@ export const swaggerDocument = {
                   data: { type: 'string', format: 'date' },
                   preco: { type: 'number', format: 'double' },
                   observacoes: { type: 'string' },
+                  responsavelId: { type: 'string', format: 'cuid' },
+                  catalogItems: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['serviceDefinitionId', 'quantidade', 'precoUnitario'],
+                      properties: {
+                        serviceDefinitionId: { type: 'string', format: 'cuid' },
+                        quantidade: { type: 'integer', minimum: 1 },
+                        precoUnitario: { type: 'number', format: 'double' },
+                        observacoes: { type: 'string' },
+                      },
+                    },
+                  },
                   items: {
                     type: 'array',
                     items: {
@@ -1055,6 +1119,56 @@ export const swaggerDocument = {
         },
       },
     },
+    '/services/catalog': {
+      get: {
+        summary: 'Lista serviços disponíveis no catálogo padrão',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Catálogo de serviços ativos',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    definitions: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/ServiceDefinition' },
+                    },
+                  },
+                  required: ['definitions'],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/services/responsibles': {
+      get: {
+        summary: 'Lista usuários aptos a serem responsáveis por serviços',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Responsáveis disponíveis',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    responsibles: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/ServiceResponsible' },
+                    },
+                  },
+                  required: ['responsibles'],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     '/services/{id}': {
       put: {
         summary: 'Atualiza um serviço',
@@ -1079,6 +1193,20 @@ export const swaggerDocument = {
                   data: { type: 'string', format: 'date' },
                   preco: { type: 'number', format: 'double' },
                   observacoes: { type: 'string' },
+                  responsavelId: { type: 'string', format: 'cuid' },
+                  catalogItems: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['serviceDefinitionId', 'quantidade', 'precoUnitario'],
+                      properties: {
+                        serviceDefinitionId: { type: 'string', format: 'cuid' },
+                        quantidade: { type: 'integer', minimum: 1 },
+                        precoUnitario: { type: 'number', format: 'double' },
+                        observacoes: { type: 'string' },
+                      },
+                    },
+                  },
                   items: {
                     type: 'array',
                     items: {

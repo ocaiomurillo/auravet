@@ -1,6 +1,6 @@
 import { randomBytes, scrypt as scryptCallback } from 'crypto';
 
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient, TipoServico } from '@prisma/client';
 
 const SALT_LENGTH = 16;
 const KEY_LENGTH = 64;
@@ -193,6 +193,38 @@ const DEFAULT_INVOICE_STATUSES = [
   { slug: 'QUITADA', name: 'Quitada' },
 ] as const;
 
+const DEFAULT_SERVICE_DEFINITIONS: Array<{
+  nome: string;
+  tipo: TipoServico;
+  precoSugerido: number;
+  descricao?: string;
+}> = [
+  {
+    nome: 'Consulta clínica geral',
+    tipo: TipoServico.CONSULTA,
+    precoSugerido: 120,
+    descricao: 'Avaliação clínica completa com orientações preventivas.',
+  },
+  {
+    nome: 'Vacinação polivalente',
+    tipo: TipoServico.VACINACAO,
+    precoSugerido: 90,
+    descricao: 'Aplicação de vacina polivalente com atualização de carteira.',
+  },
+  {
+    nome: 'Exame laboratorial básico',
+    tipo: TipoServico.EXAME,
+    precoSugerido: 75,
+    descricao: 'Coleta e análise de exames laboratoriais de rotina.',
+  },
+  {
+    nome: 'Curativo avançado',
+    tipo: TipoServico.OUTROS,
+    precoSugerido: 60,
+    descricao: 'Limpeza, desinfecção e curativo de feridas.',
+  },
+];
+
 async function main() {
   const modules = await Promise.all(
     DEFAULT_MODULES.map((module) =>
@@ -254,6 +286,26 @@ async function main() {
   if (!adminRole) {
     throw new Error('Função de administrador não encontrada na seed.');
   }
+
+  await Promise.all(
+    DEFAULT_SERVICE_DEFINITIONS.map((definition) =>
+      prisma.serviceDefinition.upsert({
+        where: { nome: definition.nome },
+        update: {
+          descricao: definition.descricao,
+          tipo: definition.tipo,
+          precoSugerido: new Prisma.Decimal(definition.precoSugerido),
+          isActive: true,
+        },
+        create: {
+          nome: definition.nome,
+          descricao: definition.descricao,
+          tipo: definition.tipo,
+          precoSugerido: new Prisma.Decimal(definition.precoSugerido),
+        },
+      }),
+    ),
+  );
 
   const passwordHash = await hashPassword(DEFAULT_ADMIN_PASSWORD);
 
