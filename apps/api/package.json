@@ -15,7 +15,8 @@
     "test:watch": "tsx --test --watch tests/**/*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "seed:build": "tsc --project prisma/tsconfig.seed.json"
   },
   "dependencies": {
     "@prisma/client": "^5.11.0",
@@ -43,6 +44,6 @@
     "typescript": "^5.4.2"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "npm run prisma:generate && npm run seed:build && node prisma/dist/seed.js"
   }
 }
