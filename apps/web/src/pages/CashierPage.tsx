@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import clsx from 'clsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -7,8 +8,8 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
-import type { Invoice, InvoiceListResponse, Owner, Service } from '../types/api';
-import { apiClient, invoicesApi } from '../lib/apiClient';
+import type { Invoice, InvoiceListResponse, Owner, Product, Service } from '../types/api';
+import { apiClient, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -42,6 +43,14 @@ const CashierPage = () => {
   const selectedInvoiceOwnerCpf = selectedInvoice ? formatCpf(selectedInvoice.owner.cpf) : null;
   const selectedInvoiceOwnerAddress = selectedInvoice ? buildOwnerAddress(selectedInvoice.owner) : null;
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [isExtraItemFormOpen, setIsExtraItemFormOpen] = useState(false);
+  const [extraItemMode, setExtraItemMode] = useState<'product' | 'custom'>('product');
+  const [extraItemProductId, setExtraItemProductId] = useState('');
+  const [extraItemDescription, setExtraItemDescription] = useState('');
+  const [extraItemQuantity, setExtraItemQuantity] = useState('1');
+  const [extraItemUnitPrice, setExtraItemUnitPrice] = useState('');
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [removingItemId, setRemovingItemId] = useState<string | null>(null);
 
   const { data: owners } = useQuery({
     queryKey: ['owners'],
@@ -72,6 +81,12 @@ const CashierPage = () => {
     queryKey: ['invoice-candidates', ownerForModal],
     queryFn: () => invoicesApi.candidates(ownerForModal || undefined),
     enabled: isGenerateModalOpen,
+  });
+
+  const productsQuery = useQuery<Product[]>({
+    queryKey: ['sellable-products'],
+    queryFn: () => productsApi.list(),
+    enabled: Boolean(selectedInvoice),
   });
 
   const generateMutation = useMutation({
@@ -106,8 +121,60 @@ const CashierPage = () => {
     },
   });
 
+  const addManualItemMutation = useMutation({
+    mutationFn: (params: {
+      invoiceId: string;
+      payload: { description: string; quantity: number; unitPrice: number; productId?: string };
+    }) => invoicesApi.addManualItem(params.invoiceId, params.payload),
+    onSuccess: (invoice) => {
+      toast.success('Item extra adicionado à conta.');
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
+      setSelectedInvoice(invoice);
+      setPaymentNotes(invoice.paymentNotes ?? '');
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível adicionar o item extra.');
+    },
+  });
+
+  const removeManualItemMutation = useMutation({
+    mutationFn: (params: { invoiceId: string; itemId: string }) =>
+      invoicesApi.removeManualItem(params.invoiceId, params.itemId),
+    onMutate: (params) => {
+      setRemovingItemId(params.itemId);
+    },
+    onSuccess: (invoice) => {
+      toast.success('Item removido da conta.');
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
+      setSelectedInvoice(invoice);
+      setPaymentNotes(invoice.paymentNotes ?? '');
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível remover o item.');
+    },
+    onSettled: () => {
+      setRemovingItemId(null);
+    },
+  });
+
   const invoices = invoicesResponse?.invoices ?? [];
   const summary = invoicesResponse?.summary;
+
+  const availableProducts = useMemo(
+    () => (productsQuery.data ?? []).filter((product) => product.isActive && product.isSellable),
+    [productsQuery.data],
+  );
+
+  const extraItemTotal = useMemo(() => {
+    const quantity = Number(extraItemQuantity);
+    const unitPrice = Number(extraItemUnitPrice);
+    if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
+      return 0;
+    }
+    return quantity > 0 && unitPrice >= 0 ? quantity * unitPrice : 0;
+  }, [extraItemQuantity, extraItemUnitPrice]);
 
   const selectedService = candidateServicesQuery.data?.find((service) => service.id === selectedServiceId);
 
@@ -136,8 +203,36 @@ const CashierPage = () => {
   useEffect(() => {
     if (selectedInvoice) {
       setPaymentNotes(selectedInvoice.paymentNotes ?? '');
+    } else {
+      setPaymentNotes('');
     }
+
+    setIsExtraItemFormOpen(false);
+    setExtraItemMode('product');
+    setExtraItemProductId('');
+    setExtraItemDescription('');
+    setExtraItemQuantity('1');
+    setExtraItemUnitPrice('');
   }, [selectedInvoice]);
+
+  useEffect(() => {
+    if (extraItemMode !== 'product') {
+      return;
+    }
+
+    const selectedProduct = availableProducts.find((product) => product.id === extraItemProductId);
+    if (selectedProduct) {
+      setExtraItemUnitPrice(selectedProduct.precoVenda.toFixed(2));
+      setExtraItemDescription((current) => {
+        if (!current || current.startsWith('Produto avulso:')) {
+          return `Produto avulso: ${selectedProduct.nome}`;
+        }
+        return current;
+      });
+    } else {
+      setExtraItemUnitPrice('');
+    }
+  }, [availableProducts, extraItemMode, extraItemProductId]);
 
   const handleFiltersSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -202,6 +297,100 @@ const CashierPage = () => {
       id: selectedInvoice.id,
       paymentNotes: paymentNotes || undefined,
     });
+  };
+
+  const handleExtraItemModeChange = (mode: 'product' | 'custom') => {
+    setExtraItemMode(mode);
+    if (mode === 'product') {
+      setExtraItemDescription('');
+    } else {
+      setExtraItemProductId('');
+      setExtraItemDescription('');
+      setExtraItemUnitPrice('');
+    }
+  };
+
+  const handleAddExtraItem = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!selectedInvoice) return;
+
+    if (selectedInvoice.status.slug === 'QUITADA') {
+      toast.error('Esta conta já foi quitada e não aceita novos itens.');
+      return;
+    }
+
+    const quantity = Number(extraItemQuantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      toast.error('Informe uma quantidade válida para o item extra.');
+      return;
+    }
+
+    const unitPrice = Number(extraItemUnitPrice);
+    if (Number.isNaN(unitPrice) || unitPrice < 0) {
+      toast.error('Informe um valor unitário válido.');
+      return;
+    }
+
+    const description = extraItemDescription.trim();
+    if (!description) {
+      toast.error('Descreva o item que será adicionado à conta.');
+      return;
+    }
+
+    const payload: { description: string; quantity: number; unitPrice: number; productId?: string } = {
+      description,
+      quantity,
+      unitPrice,
+    };
+
+    if (extraItemMode === 'product') {
+      if (!extraItemProductId) {
+        toast.error('Selecione um produto para adicionar.');
+        return;
+      }
+      payload.productId = extraItemProductId;
+    }
+
+    try {
+      await addManualItemMutation.mutateAsync({ invoiceId: selectedInvoice.id, payload });
+      setExtraItemQuantity('1');
+      if (extraItemMode === 'custom') {
+        setExtraItemDescription('');
+        setExtraItemUnitPrice('');
+      }
+    } catch (err) {
+      void err;
+    }
+  };
+
+  const handleRemoveManualItem = (itemId: string) => {
+    if (!selectedInvoice) return;
+    removeManualItemMutation.mutate({ invoiceId: selectedInvoice.id, itemId });
+  };
+
+  const handlePrintInvoice = async () => {
+    if (!selectedInvoice) return;
+
+    try {
+      setIsPrinting(true);
+      const html = await invoicesApi.print(selectedInvoice.id);
+      const printWindow = window.open('', '_blank');
+
+      if (!printWindow) {
+        throw new Error('Não foi possível abrir a janela de impressão.');
+      }
+
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Não foi possível preparar a impressão desta conta.',
+      );
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   return (
@@ -469,20 +658,19 @@ const CashierPage = () => {
         title="Detalhes da conta"
         description="Veja itens faturados, valores e registre o pagamento quando necessário."
         actions={
-          selectedInvoice?.status.slug === 'QUITADA' ? (
+          <>
             <Button variant="ghost" onClick={handleCloseInvoice}>
               Fechar
             </Button>
-          ) : (
-            <>
-              <Button variant="ghost" onClick={handleCloseInvoice}>
-                Fechar
-              </Button>
+            <Button variant="ghost" onClick={handlePrintInvoice} disabled={isPrinting}>
+              {isPrinting ? 'Preparando...' : 'Imprimir'}
+            </Button>
+            {selectedInvoice?.status.slug !== 'QUITADA' ? (
               <Button onClick={handleMarkAsPaid} disabled={markPaidMutation.isPending}>
                 {markPaidMutation.isPending ? 'Registrando...' : 'Registrar pagamento'}
               </Button>
-            </>
-          )
+            ) : null}
+          </>
         }
       >
         {selectedInvoice ? (
@@ -535,20 +723,164 @@ const CashierPage = () => {
               <ul className="mt-3 space-y-3">
                 {selectedInvoice.items.map((item) => (
                   <li key={item.id} className="rounded-xl bg-white/90 p-3 shadow-sm">
-                    <p className="font-semibold text-brand-escuro">{item.description}</p>
-                    <p className="text-xs text-brand-grafite/60">
-                      {item.quantity} × {currencyFormatter.format(item.unitPrice)} ={' '}
-                      {currencyFormatter.format(item.total)}
-                    </p>
-                    {item.service ? (
-                      <p className="text-xs text-brand-grafite/60">
-                        Serviço em {new Date(item.service.data).toLocaleDateString('pt-BR')} • Pet:{' '}
-                        {item.service.animal?.nome ?? '—'}
-                      </p>
-                    ) : null}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-brand-escuro">{item.description}</p>
+                        <p className="text-xs text-brand-grafite/60">
+                          {item.quantity} × {currencyFormatter.format(item.unitPrice)} ={' '}
+                          {currencyFormatter.format(item.total)}
+                        </p>
+                        {item.service ? (
+                          <p className="text-xs text-brand-grafite/60">
+                            Serviço em {new Date(item.service.data).toLocaleDateString('pt-BR')} • Pet:{' '}
+                            {item.service.animal?.nome ?? '—'}
+                          </p>
+                        ) : null}
+                        {!item.servicoId && item.product ? (
+                          <p className="text-xs text-brand-grafite/60">Produto em estoque: {item.product.nome}</p>
+                        ) : null}
+                        {!item.servicoId ? (
+                          <span className="inline-flex rounded-full bg-brand-azul/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-escuro/70">
+                            Item extra
+                          </span>
+                        ) : null}
+                      </div>
+                      {selectedInvoice.status.slug !== 'QUITADA' && !item.servicoId ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="rounded-lg bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
+                          onClick={() => handleRemoveManualItem(item.id)}
+                          disabled={
+                            removeManualItemMutation.isPending && removingItemId === item.id
+                          }
+                        >
+                          {removeManualItemMutation.isPending && removingItemId === item.id
+                            ? 'Removendo...'
+                            : 'Remover'}
+                        </Button>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
+
+              {selectedInvoice.status.slug !== 'QUITADA' ? (
+                <div className="mt-4 rounded-2xl border border-dashed border-brand-azul/40 bg-white/95 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-brand-escuro">Itens extras</p>
+                      <p className="text-xs text-brand-grafite/60">
+                        Registre produtos vendidos no balcão ou cobranças avulsas para esta conta.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="px-4 py-2 text-xs"
+                      onClick={() => setIsExtraItemFormOpen((prev) => !prev)}
+                    >
+                      {isExtraItemFormOpen ? 'Ocultar formulário' : 'Adicionar item'}
+                    </Button>
+                  </div>
+
+                  {isExtraItemFormOpen ? (
+                    <form className="mt-4 space-y-4" onSubmit={handleAddExtraItem}>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className={clsx(
+                            'rounded-full px-4 py-2 text-xs font-semibold transition',
+                            extraItemMode === 'product'
+                              ? 'bg-brand-escuro text-white shadow-md shadow-brand-escuro/30'
+                              : 'bg-brand-azul/20 text-brand-escuro hover:bg-brand-azul/30',
+                          )}
+                          onClick={() => handleExtraItemModeChange('product')}
+                        >
+                          Produto em estoque
+                        </button>
+                        <button
+                          type="button"
+                          className={clsx(
+                            'rounded-full px-4 py-2 text-xs font-semibold transition',
+                            extraItemMode === 'custom'
+                              ? 'bg-brand-escuro text-white shadow-md shadow-brand-escuro/30'
+                              : 'bg-brand-azul/20 text-brand-escuro hover:bg-brand-azul/30',
+                          )}
+                          onClick={() => handleExtraItemModeChange('custom')}
+                        >
+                          Descrição livre
+                        </button>
+                      </div>
+
+                      {extraItemMode === 'product' ? (
+                        <div className="space-y-2">
+                          <SelectField
+                            label="Produto"
+                            value={extraItemProductId}
+                            onChange={(event) => setExtraItemProductId(event.target.value)}
+                          >
+                            <option value="">Selecione o produto em estoque</option>
+                            {availableProducts.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.nome} — {currencyFormatter.format(product.precoVenda)} • Estoque:{' '}
+                                {product.estoqueAtual}
+                              </option>
+                            ))}
+                          </SelectField>
+                          {productsQuery.isLoading ? (
+                            <p className="text-xs text-brand-grafite/60">Carregando produtos vendáveis...</p>
+                          ) : null}
+                          {!productsQuery.isLoading && availableProducts.length === 0 ? (
+                            <p className="text-xs text-brand-grafite/60">
+                              Nenhum produto vendável disponível no momento.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <Field
+                        label="Descrição"
+                        value={extraItemDescription}
+                        onChange={(event) => setExtraItemDescription(event.target.value)}
+                        placeholder={
+                          extraItemMode === 'product'
+                            ? 'Ex.: Produto avulso: Coleira antipulgas'
+                            : 'Descreva o item ou serviço cobrado'
+                        }
+                      />
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Field
+                          label="Quantidade"
+                          type="number"
+                          min={1}
+                          value={extraItemQuantity}
+                          onChange={(event) => setExtraItemQuantity(event.target.value)}
+                        />
+                        <Field
+                          label="Valor unitário (R$)"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={extraItemUnitPrice}
+                          onChange={(event) => setExtraItemUnitPrice(event.target.value)}
+                        />
+                      </div>
+
+                      <p className="text-xs text-brand-grafite/60">
+                        Total estimado: {currencyFormatter.format(extraItemTotal)}
+                      </p>
+
+                      <div className="flex justify-end">
+                        <Button type="submit" disabled={addManualItemMutation.isPending}>
+                          {addManualItemMutation.isPending ? 'Adicionando...' : 'Adicionar item à conta'}
+                        </Button>
+                      </div>
+                    </form>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div>

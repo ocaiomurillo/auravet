@@ -146,6 +146,7 @@ const buildInvoiceQuery = (filters: InvoiceFilters = {}) => {
 export const invoicesApi = {
   list: (filters: InvoiceFilters = {}) => apiClient.get<InvoiceListResponse>(`/invoices${buildInvoiceQuery(filters)}`),
   statuses: () => apiClient.get<InvoiceStatus[]>('/invoices/statuses'),
+  getById: (id: string) => apiClient.get<Invoice>(`/invoices/${id}`),
   candidates: (ownerId?: string) => {
     const query = ownerId ? `?ownerId=${ownerId}` : '';
     return apiClient.get<Service[]>(`/invoices/candidates${query}`);
@@ -154,10 +155,17 @@ export const invoicesApi = {
     apiClient.post<Invoice>('/invoices', payload),
   markAsPaid: (id: string, payload: { paidAt?: string; paymentNotes?: string }) =>
     apiClient.post<Invoice>(`/invoices/${id}/pay`, payload),
+  addManualItem: (
+    invoiceId: string,
+    payload: { description: string; quantity: number; unitPrice: number; productId?: string },
+  ) => apiClient.post<Invoice>(`/invoices/${invoiceId}/items`, payload),
+  removeManualItem: (invoiceId: string, itemId: string) =>
+    apiClient.delete<Invoice>(`/invoices/${invoiceId}/items/${itemId}`),
   exportCsv: (filters: InvoiceFilters = {}) =>
     (() => {
       const query = buildInvoiceQuery(filters);
       const separator = query ? '&' : '?';
       return apiClient.getText(`/invoices/export${query}${separator}format=csv`);
     })(),
+  print: (id: string) => apiClient.getText(`/invoices/${id}/print`),
 };

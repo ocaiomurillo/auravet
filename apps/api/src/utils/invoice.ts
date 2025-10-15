@@ -121,6 +121,7 @@ const buildInvoiceItemsData = (service: ServiceForInvoice) => {
       ];
 
   const productItems = service.items.map((item) => ({
+    servicoId: service.id,
     productId: item.productId,
     description: item.product ? `Produto: ${item.product.nome}` : 'Produto utilizado',
     quantity: item.quantidade,
@@ -171,12 +172,33 @@ export const syncInvoiceForService = async (
   }
 
   const { serviceItems, productItems } = buildInvoiceItemsData(service);
-  const total = calculateInvoiceTotal(service);
+  const serviceTotal = calculateInvoiceTotal(service);
 
   const resolvedDueDate = dueDate ?? existingInvoice?.dueDate ?? addDays(new Date(service.data), 7);
   const resolvedResponsible = responsibleId ?? existingInvoice?.responsibleId ?? null;
 
   if (existingInvoice) {
+    const productIds = service.items.map((item) => item.productId);
+
+    if (productIds.length > 0) {
+      await tx.invoiceItem.updateMany({
+        where: {
+          invoiceId: existingInvoice.id,
+          servicoId: null,
+          productId: { in: productIds },
+          description: { startsWith: 'Produto: ' },
+        },
+        data: { servicoId: service.id },
+      });
+    }
+
+    const manualItemsTotalResult = await tx.invoiceItem.aggregate({
+      where: { invoiceId: existingInvoice.id, servicoId: null },
+      _sum: { total: true },
+    });
+    const manualItemsTotal = manualItemsTotalResult._sum.total ?? new Prisma.Decimal(0);
+    const total = serviceTotal.add(manualItemsTotal);
+
     const updated = await tx.invoice.update({
       where: { id: existingInvoice.id },
       data: {
@@ -184,7 +206,7 @@ export const syncInvoiceForService = async (
         responsibleId: resolvedResponsible,
         total,
         items: {
-          deleteMany: {},
+          deleteMany: { invoiceId: existingInvoice.id, servicoId: service.id },
           create: [...serviceItems, ...productItems],
         },
       },
@@ -202,7 +224,7 @@ export const syncInvoiceForService = async (
       statusId: openStatus.id,
       responsibleId: resolvedResponsible,
       dueDate: resolvedDueDate,
-      total,
+      total: serviceTotal,
       items: {
         create: [...serviceItems, ...productItems],
       },
