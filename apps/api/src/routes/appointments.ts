@@ -549,11 +549,11 @@ appointmentsRouter.put(
     }
 
     if (payload.assistantId !== undefined) {
-      if (payload.assistantId) {
+      if (payload.assistantId === null) {
+        data.assistant = { disconnect: true };
+      } else {
         await ensureCollaboratorExists(payload.assistantId, { requireProfile: false });
         data.assistant = { connect: { id: payload.assistantId } };
-      } else {
-        data.assistant = { disconnect: true };
       }
     }
 
