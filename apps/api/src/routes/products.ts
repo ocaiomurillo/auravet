@@ -165,6 +165,13 @@ productsRouter.delete(
         throw new HttpError(404, 'Produto não encontrado.');
       }
 
+      if (isPrismaKnownError(error, 'P2003')) {
+        throw new HttpError(
+          400,
+          'Produto vinculado a atendimentos ou faturas; remova os vínculos antes de excluir.',
+        );
+      }
+
       throw error;
     }
 
