@@ -63,10 +63,7 @@ export const appointmentUpdateSchema = z
     animalId: cuidSchema('Animal inválido').optional(),
     ownerId: cuidSchema('Tutor inválido').optional(),
     veterinarianId: cuidSchema('Veterinário inválido').optional(),
-    assistantId: z
-      .union([cuidSchema('Assistente inválido'), z.literal(null)])
-      .optional()
-      .transform((value) => value ?? undefined),
+    assistantId: cuidSchema('Assistente inválido').nullable().optional(),
     scheduledStart: dateTimeSchema.optional(),
     scheduledEnd: dateTimeSchema.optional(),
     status: appointmentStatusEnum.optional(),
