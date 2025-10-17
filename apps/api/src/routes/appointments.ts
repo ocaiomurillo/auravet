@@ -73,6 +73,14 @@ const defaultAvailability: AppointmentAvailability = {
   assistantConflict: false,
 };
 
+const handleAppointmentUpdateError = (error: unknown): never => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+    throw new HttpError(404, 'Agendamento não encontrado.');
+  }
+
+  throw error;
+};
+
 const ensureEndAfterStart = (start: Date, end: Date) => {
   if (end <= start) {
     throw new HttpError(400, 'O horário final precisa ser posterior ao horário inicial.');
@@ -609,15 +617,21 @@ appointmentsRouter.patch(
     const { id } = appointmentIdSchema.parse(req.params);
     const payload = appointmentConfirmSchema.parse(req.body);
 
-    const updated = await prisma.appointment.update({
-      where: { id },
-      data: {
-        status: PrismaAppointmentStatus.CONFIRMADO,
-        confirmedAt: new Date(),
-        notes: normalizeNotes(payload.notes),
-      },
-      include: appointmentInclude,
-    });
+    let updated: AppointmentWithAllRelations;
+    try {
+      updated = await prisma.appointment.update({
+        where: { id },
+        data: {
+          status: PrismaAppointmentStatus.CONFIRMADO,
+          confirmedAt: new Date(),
+          notes: normalizeNotes(payload.notes),
+        },
+        include: appointmentInclude,
+      });
+    } catch (error) {
+      handleAppointmentUpdateError(error);
+      throw error;
+    }
 
     const availability = await detectScheduleConflicts({
       appointmentId: updated.id,
@@ -642,17 +656,23 @@ appointmentsRouter.patch(
     const scheduledEnd = toDate(payload.scheduledEnd);
     ensureEndAfterStart(scheduledStart, scheduledEnd);
 
-    const updated = await prisma.appointment.update({
-      where: { id },
-      data: {
-        scheduledStart,
-        scheduledEnd,
-        status: PrismaAppointmentStatus.AGENDADO,
-        confirmedAt: null,
-        notes: normalizeNotes(payload.notes),
-      },
-      include: appointmentInclude,
-    });
+    let updated: AppointmentWithAllRelations;
+    try {
+      updated = await prisma.appointment.update({
+        where: { id },
+        data: {
+          scheduledStart,
+          scheduledEnd,
+          status: PrismaAppointmentStatus.AGENDADO,
+          confirmedAt: null,
+          notes: normalizeNotes(payload.notes),
+        },
+        include: appointmentInclude,
+      });
+    } catch (error) {
+      handleAppointmentUpdateError(error);
+      throw error;
+    }
 
     const availability = await detectScheduleConflicts({
       appointmentId: updated.id,
