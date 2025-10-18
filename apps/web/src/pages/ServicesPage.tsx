@@ -8,7 +8,7 @@ import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
-import type { Animal, Owner, Service } from '../types/api';
+import type { Animal, OwnerSummary, Service } from '../types/api';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 interface ServiceFilters {
@@ -32,8 +32,8 @@ const ServicesPage = () => {
   const canRegisterService = hasModule('services:write');
 
   const { data: owners } = useQuery({
-    queryKey: ['owners'],
-    queryFn: () => apiClient.get<Owner[]>('/owners'),
+    queryKey: ['owners', 'basic'],
+    queryFn: () => apiClient.get<OwnerSummary[]>('/owners/basic'),
   });
 
   const animalsQueryKey = useMemo(() => ['animals', filters.ownerId] as const, [filters.ownerId]);
