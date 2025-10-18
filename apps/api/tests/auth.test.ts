@@ -83,6 +83,20 @@ const post = async (path: string, body: unknown, token?: string) => {
   return { response, data } as const;
 };
 
+const patch = async (path: string, body: unknown, token?: string) => {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  const contentType = response.headers.get('content-type');
+  const data = contentType?.includes('application/json') ? await response.json() : null;
+  return { response, data } as const;
+};
+
 before(async () => {
   globalThis.__PRISMA__ = prismaMock;
   const [{ app: importedApp }, authModule] = await Promise.all<[
@@ -161,6 +175,31 @@ describe('Authentication flows', () => {
     assert.ok(!data?.user.modules.includes('users:manage'));
   });
 
+  it('allows administrators to register new collaborators using role slug identifiers', async () => {
+    const login = await post('/auth/login', {
+      email: 'admin@auravet.com',
+      password: 'Admin123!',
+    });
+
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const { response, data } = await post(
+      '/auth/register',
+      {
+        nome: 'Colaborador Slug',
+        email: 'colaborador.slug@auravet.com',
+        password: 'Assist123!',
+        roleId: 'ASSISTENTE_ADMINISTRATIVO',
+      },
+      token,
+    );
+
+    assert.equal(response.status, 201);
+    assert.equal(data?.user.email, 'colaborador.slug@auravet.com');
+    assert.equal(data?.user.role.slug, 'ASSISTENTE_ADMINISTRATIVO');
+  });
+
   it('blocks non administrators from creating users', async () => {
     const assistantPassword = 'Assist123!';
     const assistantHash = await hashPassword(assistantPassword);
@@ -197,5 +236,36 @@ describe('Authentication flows', () => {
     );
 
     assert.equal(response.status, 403);
+  });
+});
+
+describe('Role management flows', () => {
+  it('allows administrators to update role modules using slug identifiers', async () => {
+    const login = await post('/auth/login', {
+      email: 'admin@auravet.com',
+      password: 'Admin123!',
+    });
+
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const { response, data } = await patch(
+      '/roles/ADMINISTRADOR/modules',
+      {
+        modules: [
+          {
+            moduleId: 'owners:read',
+            isEnabled: false,
+          },
+        ],
+      },
+      token,
+    );
+
+    assert.equal(response.status, 200);
+    const modules = (data as { role: { modules: Array<{ slug: string; isEnabled: boolean }> } }).role.modules;
+    const ownersReadModule = modules.find((module) => module.slug === 'owners:read');
+    assert.ok(ownersReadModule);
+    assert.equal(ownersReadModule?.isEnabled, false);
   });
 });

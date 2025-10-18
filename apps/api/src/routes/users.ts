@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
 import { requirePermission } from '../middlewares/require-permission';
 import { userIdSchema, userStatusSchema, userUpdateSchema } from '../schema/user';
+import { isCuid } from '../schema/ids';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
 import { isPrismaKnownError } from '../utils/prisma-error';
@@ -42,10 +43,22 @@ usersRouter.patch(
     const { id } = userIdSchema.parse(req.params);
     const payload = userUpdateSchema.parse(req.body);
 
+    const data = { ...payload };
+
+    if (payload.roleId && !isCuid(payload.roleId)) {
+      const role = await prisma.role.findUnique({ where: { slug: payload.roleId } });
+
+      if (!role) {
+        throw new HttpError(400, 'Função informada não existe.');
+      }
+
+      data.roleId = role.id;
+    }
+
     try {
       const user = await prisma.user.update({
         where: { id },
-        data: payload,
+        data,
         include: {
           role: {
             include: {
