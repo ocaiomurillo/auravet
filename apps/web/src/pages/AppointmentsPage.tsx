@@ -12,7 +12,7 @@ import type {
   Animal,
   Appointment,
   CollaboratorSummary,
-  Owner,
+  OwnerSummary,
 } from '../types/api';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
@@ -101,8 +101,8 @@ const AppointmentsPage = () => {
   });
 
   const { data: owners } = useQuery({
-    queryKey: ['owners'],
-    queryFn: () => apiClient.get<Owner[]>('/owners'),
+    queryKey: ['owners', 'basic'],
+    queryFn: () => apiClient.get<OwnerSummary[]>('/owners/basic'),
   });
 
   const animalsQueryKey = useMemo(() => ['animals', filters.ownerId] as const, [filters.ownerId]);
