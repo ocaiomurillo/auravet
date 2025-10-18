@@ -68,8 +68,10 @@ type FindManyArgs = {
   orderBy?: { createdAt: 'asc' | 'desc' };
 } & UserInclude;
 
+type RoleWhere = { id?: string; slug?: string; OR?: RoleWhere[] };
+
 type RoleFindArgs = {
-  where?: { id?: string; slug?: string };
+  where?: RoleWhere;
   include?: {
     modules?: {
       include?: {
@@ -375,6 +377,26 @@ const attachRole = (user: UserRecord, include?: UserInclude['include']) => {
   return userClone;
 };
 
+const matchesRoleWhere = (role: RoleRecord, where?: RoleWhere): boolean => {
+  if (!where) {
+    return true;
+  }
+
+  if (where.OR?.length) {
+    return where.OR.some((condition) => matchesRoleWhere(role, condition));
+  }
+
+  if (where.id && role.id !== where.id) {
+    return false;
+  }
+
+  if (where.slug && role.slug !== where.slug) {
+    return false;
+  }
+
+  return true;
+};
+
 const applyRoleInclude = (role: RoleRecord, include?: RoleFindArgs['include']) => {
   const roleClone: any = clone(role);
 
@@ -390,6 +412,12 @@ const applyRoleInclude = (role: RoleRecord, include?: RoleFindArgs['include']) =
   }
 
   return roleClone;
+};
+
+const getRolesByWhere = (where?: RoleWhere) => {
+  const filtered = where ? roles.filter((role) => matchesRoleWhere(role, where)) : [...roles];
+  filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return filtered;
 };
 
 let modules: ModuleRecord[] = [];
@@ -484,23 +512,22 @@ export const createInMemoryPrisma = (): InMemoryPrisma => {
 
   const roleClient = {
     async findMany({ include, where }: RoleFindArgs = {}): Promise<any[]> {
-      let result = [...roles];
-      if (where?.slug) {
-        result = result.filter((role) => role.slug === where.slug);
-      }
-      if (where?.id) {
-        result = result.filter((role) => role.id === where.id);
-      }
-      result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const result = getRolesByWhere(where);
       return result.map((role) => applyRoleInclude(role, include));
     },
     async findUnique({ where, include }: RoleFindArgs): Promise<any | null> {
       if (!where) return null;
-      const record = where.id
-        ? roles.find((role) => role.id === where.id)
-        : where.slug
-        ? roles.find((role) => role.slug === where.slug)
-        : null;
+      if (where.id || where.slug) {
+        const record = where.id
+          ? roles.find((role) => role.id === where.id)
+          : roles.find((role) => role.slug === where.slug);
+        return record ? applyRoleInclude(record, include) : null;
+      }
+      const [record] = getRolesByWhere(where);
+      return record ? applyRoleInclude(record, include) : null;
+    },
+    async findFirst({ where, include }: RoleFindArgs = {}): Promise<any | null> {
+      const [record] = getRolesByWhere(where);
       return record ? applyRoleInclude(record, include) : null;
     },
     async create({ data, include }: RoleCreateArgs): Promise<any> {

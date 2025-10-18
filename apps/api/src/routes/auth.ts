@@ -6,7 +6,6 @@ import { authenticate } from '../middlewares/authenticate';
 import { createRateLimiter } from '../middlewares/rate-limiter';
 import { requirePermission } from '../middlewares/require-permission';
 import { loginSchema, registerSchema } from '../schema/auth';
-import { isCuid } from '../schema/ids';
 import { asyncHandler } from '../utils/async-handler';
 import { hashPassword, verifyPassword, createAccessToken, buildAuthenticatedUser } from '../utils/auth';
 import { HttpError } from '../utils/http-error';
@@ -88,8 +87,10 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = registerSchema.parse(req.body);
 
-    const role = await prisma.role.findUnique({
-      where: isCuid(payload.roleId) ? { id: payload.roleId } : { slug: payload.roleId },
+    const role = await prisma.role.findFirst({
+      where: {
+        OR: [{ id: payload.roleId }, { slug: payload.roleId }],
+      },
     });
 
     if (!role || !role.isActive) {

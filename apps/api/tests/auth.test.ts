@@ -184,6 +184,22 @@ describe('Authentication flows', () => {
     const token = login.data?.token as string;
     assert.ok(token);
 
+    const assistantRole = await prisma.role.findUnique({
+      where: { slug: 'ASSISTENTE_ADMINISTRATIVO' },
+      include: {
+        modules: {
+          include: { module: true },
+        },
+      },
+    });
+
+    assert.ok(assistantRole);
+
+    const expectedModules = assistantRole.modules
+      .filter((module) => module.isEnabled && module.module.isActive)
+      .map((module) => module.module.slug)
+      .sort();
+
     const { response, data } = await post(
       '/auth/register',
       {
@@ -198,6 +214,8 @@ describe('Authentication flows', () => {
     assert.equal(response.status, 201);
     assert.equal(data?.user.email, 'colaborador.slug@auravet.com');
     assert.equal(data?.user.role.slug, 'ASSISTENTE_ADMINISTRATIVO');
+    assert.equal(data?.user.role.id, assistantRole.id);
+    assert.deepEqual(data?.user.modules, expectedModules);
   });
 
   it('blocks non administrators from creating users', async () => {
