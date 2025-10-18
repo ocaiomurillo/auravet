@@ -10,7 +10,8 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "format": "prettier --check \"src/**/*.{ts,tsx,css,md}\"",
     "format:fix": "prettier --write \"src/**/*.{ts,tsx,css,md}\"",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx src/components/RequireModules.test.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.1.3",
