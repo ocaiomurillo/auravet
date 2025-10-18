@@ -56,12 +56,14 @@ const stopServer = async () =>
 const seedAdminUser = async () => {
   await prisma.user.deleteMany();
   const passwordHash = await hashPassword('Admin123!');
+  const adminRole = await prisma.role.findUnique({ where: { slug: 'ADMINISTRADOR' } });
+  assert.ok(adminRole);
   await prisma.user.create({
     data: {
       nome: 'Admin Auravet',
       email: 'admin@auravet.com',
       passwordHash,
-      roleId: 'ADMINISTRADOR',
+      roleId: adminRole.id,
       isActive: true,
     },
   });
@@ -139,13 +141,16 @@ describe('Authentication flows', () => {
     const token = login.data?.token as string;
     assert.ok(token);
 
+    const assistantRole = await prisma.role.findUnique({ where: { slug: 'ASSISTENTE_ADMINISTRATIVO' } });
+    assert.ok(assistantRole);
+
     const { response, data } = await post(
       '/auth/register',
       {
         nome: 'Novo Colaborador',
         email: 'colaborador@auravet.com',
         password: 'Assist123!',
-        roleId: 'ASSISTENTE_ADMINISTRATIVO',
+        roleId: assistantRole.id,
       },
       token,
     );
@@ -159,13 +164,15 @@ describe('Authentication flows', () => {
   it('blocks non administrators from creating users', async () => {
     const assistantPassword = 'Assist123!';
     const assistantHash = await hashPassword(assistantPassword);
+    const assistantRole = await prisma.role.findUnique({ where: { slug: 'ASSISTENTE_ADMINISTRATIVO' } });
+    assert.ok(assistantRole);
 
     await prisma.user.create({
       data: {
         nome: 'Assistente',
         email: 'assistente@auravet.com',
         passwordHash: assistantHash,
-        roleId: 'ASSISTENTE_ADMINISTRATIVO',
+        roleId: assistantRole.id,
         isActive: true,
       },
     });
@@ -184,7 +191,7 @@ describe('Authentication flows', () => {
         nome: 'Outro Usuário',
         email: 'outro@auravet.com',
         password: 'Assist123!',
-        roleId: 'ASSISTENTE_ADMINISTRATIVO',
+        roleId: assistantRole.id,
       },
       token,
     );

@@ -8,7 +8,7 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
-import type { Invoice, InvoiceListResponse, Owner, Product, Service } from '../types/api';
+import type { Invoice, InvoiceListResponse, OwnerSummary, Product, Service } from '../types/api';
 import { apiClient, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
@@ -53,8 +53,8 @@ const CashierPage = () => {
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
 
   const { data: owners } = useQuery({
-    queryKey: ['owners'],
-    queryFn: () => apiClient.get<Owner[]>('/owners'),
+    queryKey: ['owners', 'basic'],
+    queryFn: () => apiClient.get<OwnerSummary[]>('/owners/basic'),
   });
 
   const { data: statuses } = useQuery({

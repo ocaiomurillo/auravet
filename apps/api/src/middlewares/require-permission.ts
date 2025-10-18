@@ -21,3 +21,5 @@ export const requirePermission = (...modules: string[]): RequestHandler => {
     next();
   };
 };
+
+export const requireAnyPermission = (...modules: string[]): RequestHandler => requirePermission(...modules);

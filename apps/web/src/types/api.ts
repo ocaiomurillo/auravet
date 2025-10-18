@@ -46,6 +46,8 @@ export interface Owner {
   animals?: Animal[];
 }
 
+export type OwnerSummary = Pick<Owner, 'id' | 'nome' | 'email' | 'telefone' | 'cpf' | 'createdAt'>;
+
 export interface Animal {
   id: string;
   nome: string;

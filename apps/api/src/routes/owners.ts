@@ -2,12 +2,12 @@ import { Router } from 'express';
 
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
-import { requirePermission } from '../middlewares/require-permission';
+import { requireAnyPermission, requirePermission } from '../middlewares/require-permission';
 import { ownerCreateSchema, ownerIdSchema, ownerUpdateSchema } from '../schema/owner';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
 import { isPrismaKnownError } from '../utils/prisma-error';
-import { serializeOwner } from '../utils/serializers';
+import { serializeOwner, serializeOwnerSummary } from '../utils/serializers';
 
 export const ownersRouter = Router();
 
@@ -26,6 +26,26 @@ const getUniqueConstraintTarget = (error: { meta?: unknown }): string | undefine
 };
 
 ownersRouter.use(authenticate);
+
+ownersRouter.get(
+  '/basic',
+  requireAnyPermission('owners:read', 'cashier:access'),
+  asyncHandler(async (_req, res) => {
+    const owners = await prisma.owner.findMany({
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        telefone: true,
+        cpf: true,
+        createdAt: true,
+      },
+      orderBy: { nome: 'asc' },
+    });
+
+    res.json(owners.map(serializeOwnerSummary));
+  }),
+);
 
 ownersRouter.get(
   '/',
