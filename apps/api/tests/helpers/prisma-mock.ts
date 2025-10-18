@@ -1,6 +1,17 @@
 import { randomUUID } from 'node:crypto';
 
+import * as PrismaModule from '@prisma/client';
 import type { Module, PrismaClient, Role, RoleModuleAccess, User } from '@prisma/client';
+
+const { Prisma } = PrismaModule;
+const appointmentStatus = {
+  AGENDADO: 'AGENDADO',
+  CONFIRMADO: 'CONFIRMADO',
+  CONCLUIDO: 'CONCLUIDO',
+};
+
+(Prisma as unknown as { AppointmentStatus?: Record<string, string> }).AppointmentStatus ??= appointmentStatus;
+(PrismaModule as unknown as { AppointmentStatus?: Record<string, string> }).AppointmentStatus ??= appointmentStatus;
 
 export type InMemoryPrisma = PrismaClient & { reset(): void };
 

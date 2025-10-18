@@ -22,6 +22,7 @@ import {
   serializeAppointment,
   serializeAppointmentUser,
 } from '../utils/serializers';
+import { syncInvoiceForService } from '../utils/invoice';
 
 export const appointmentsRouter = Router();
 
@@ -72,6 +73,12 @@ const defaultAvailability: AppointmentAvailability = {
   veterinarianConflict: false,
   assistantConflict: false,
 };
+
+const AppointmentStatusMap = {
+  AGENDADO: PrismaAppointmentStatus?.AGENDADO ?? 'AGENDADO',
+  CONFIRMADO: PrismaAppointmentStatus?.CONFIRMADO ?? 'CONFIRMADO',
+  CONCLUIDO: PrismaAppointmentStatus?.CONCLUIDO ?? 'CONCLUIDO',
+} as const;
 
 const handleAppointmentUpdateError = (error: unknown): never => {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -150,7 +157,7 @@ const computeAvailabilityMap = (appointments: AppointmentWithAllRelations[]) => 
   }
 
   const relevant = appointments.filter(
-    (appointment) => appointment.status !== PrismaAppointmentStatus.CONCLUIDO,
+    (appointment) => appointment.status !== AppointmentStatusMap.CONCLUIDO,
   );
 
   const detectConflicts = (key: 'veterinarianId' | 'assistantId') => {
@@ -225,7 +232,7 @@ const detectScheduleConflicts = async (args: {
   scheduledEnd: Date;
 }) => {
   const baseWhere: Prisma.AppointmentWhereInput = {
-    status: { in: [PrismaAppointmentStatus.AGENDADO, PrismaAppointmentStatus.CONFIRMADO] },
+    status: { in: [AppointmentStatusMap.AGENDADO, AppointmentStatusMap.CONFIRMADO] },
     scheduledStart: { lt: args.scheduledEnd },
     scheduledEnd: { gt: args.scheduledStart },
     id: args.appointmentId ? { not: args.appointmentId } : undefined,
@@ -349,10 +356,10 @@ appointmentsRouter.post(
     const now = new Date();
     const status = payload.status;
     const confirmedAt =
-      status === PrismaAppointmentStatus.CONFIRMADO || status === PrismaAppointmentStatus.CONCLUIDO
+      status === AppointmentStatusMap.CONFIRMADO || status === AppointmentStatusMap.CONCLUIDO
         ? now
         : null;
-    const completedAt = status === PrismaAppointmentStatus.CONCLUIDO ? now : null;
+    const completedAt = status === AppointmentStatusMap.CONCLUIDO ? now : null;
 
     const appointment = await prisma.appointment.create({
       data: {
@@ -443,7 +450,7 @@ appointmentsRouter.get(
       const daysInRange = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       const totalSlots = slotsPerDay * Math.max(daysInRange, 1);
       const bookedSlots = appointments.filter(
-        (appointment) => appointment.status !== PrismaAppointmentStatus.CONCLUIDO,
+        (appointment) => appointment.status !== AppointmentStatusMap.CONCLUIDO,
       ).length;
 
       capacity = {
@@ -455,7 +462,7 @@ appointmentsRouter.get(
       capacity = {
         totalSlots: null,
         bookedSlots: appointments.filter(
-          (appointment) => appointment.status !== PrismaAppointmentStatus.CONCLUIDO,
+          (appointment) => appointment.status !== AppointmentStatusMap.CONCLUIDO,
         ).length,
         availableSlots: null,
       };
@@ -470,11 +477,11 @@ appointmentsRouter.get(
       appointments,
       summary: {
         total: appointments.length,
-        confirmed: appointments.filter((appointment) => appointment.status === PrismaAppointmentStatus.CONFIRMADO)
+        confirmed: appointments.filter((appointment) => appointment.status === AppointmentStatusMap.CONFIRMADO)
           .length,
-        concluded: appointments.filter((appointment) => appointment.status === PrismaAppointmentStatus.CONCLUIDO)
+        concluded: appointments.filter((appointment) => appointment.status === AppointmentStatusMap.CONCLUIDO)
           .length,
-        pending: appointments.filter((appointment) => appointment.status === PrismaAppointmentStatus.AGENDADO)
+        pending: appointments.filter((appointment) => appointment.status === AppointmentStatusMap.AGENDADO)
           .length,
         capacity,
       },
@@ -580,13 +587,13 @@ appointmentsRouter.put(
     if (payload.status) {
       data.status = payload.status;
 
-      if (payload.status === PrismaAppointmentStatus.AGENDADO) {
+      if (payload.status === AppointmentStatusMap.AGENDADO) {
         data.confirmedAt = null;
         data.completedAt = null;
-      } else if (payload.status === PrismaAppointmentStatus.CONFIRMADO) {
+      } else if (payload.status === AppointmentStatusMap.CONFIRMADO) {
         data.confirmedAt = appointment.confirmedAt ?? new Date();
         data.completedAt = null;
-      } else if (payload.status === PrismaAppointmentStatus.CONCLUIDO) {
+      } else if (payload.status === AppointmentStatusMap.CONCLUIDO) {
         data.confirmedAt = appointment.confirmedAt ?? new Date();
         data.completedAt = new Date();
       }
@@ -622,7 +629,7 @@ appointmentsRouter.patch(
       updated = await prisma.appointment.update({
         where: { id },
         data: {
-          status: PrismaAppointmentStatus.CONFIRMADO,
+          status: AppointmentStatusMap.CONFIRMADO,
           confirmedAt: new Date(),
           notes: normalizeNotes(payload.notes),
         },
@@ -663,7 +670,7 @@ appointmentsRouter.patch(
         data: {
           scheduledStart,
           scheduledEnd,
-          status: PrismaAppointmentStatus.AGENDADO,
+          status: AppointmentStatusMap.AGENDADO,
           confirmedAt: null,
           notes: normalizeNotes(payload.notes),
         },
@@ -707,7 +714,7 @@ appointmentsRouter.patch(
 
       const now = new Date();
       const data: Prisma.AppointmentUpdateInput = {
-        status: PrismaAppointmentStatus.CONCLUIDO,
+        status: AppointmentStatusMap.CONCLUIDO,
         confirmedAt: existing.confirmedAt ?? now,
         completedAt: now,
       };
@@ -715,6 +722,8 @@ appointmentsRouter.patch(
       if (payload.notes !== undefined) {
         data.notes = normalizeNotes(payload.notes);
       }
+
+      let serviceId = existing.serviceId ?? null;
 
       if (!existing.serviceId) {
         const servicePayload = payload.service ?? { tipo: 'CONSULTA', preco: 0, observacoes: undefined };
@@ -731,6 +740,7 @@ appointmentsRouter.patch(
         });
 
         data.service = { connect: { id: createdService.id } };
+        serviceId = createdService.id;
       } else if (payload.service) {
         await tx.servico.update({
           where: { id: existing.serviceId },
@@ -741,6 +751,8 @@ appointmentsRouter.patch(
               payload.service.observacoes ?? normalizeNotes(payload.notes ?? existing.notes ?? undefined) ?? null,
           },
         });
+
+        serviceId = existing.serviceId;
       }
 
       const updated = await tx.appointment.update({
@@ -748,6 +760,12 @@ appointmentsRouter.patch(
         data,
         include: appointmentInclude,
       });
+
+      if (serviceId) {
+        await syncInvoiceForService(tx, serviceId, {
+          responsibleId: req.user?.id ?? null,
+        });
+      }
 
       return updated;
     });
