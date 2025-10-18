@@ -76,6 +76,8 @@ type OwnerWithOptionalRelations = Owner & {
   appointments?: AppointmentWithRelations[];
 };
 
+type OwnerSummary = Pick<Owner, 'id' | 'nome' | 'email' | 'telefone' | 'cpf' | 'createdAt'>;
+
 export type SerializedServiceItem = {
   id: string;
   productId: string;
@@ -190,6 +192,8 @@ export type SerializedOwner = {
   createdAt: string;
   animals?: SerializedAnimal[];
 };
+
+export type SerializedOwnerSummary = Pick<SerializedOwner, 'id' | 'nome' | 'email' | 'telefone' | 'cpf' | 'createdAt'>;
 
 export type SerializedModule = {
   id: string;
@@ -484,6 +488,15 @@ export const serializeOwner = (owner: OwnerWithOptionalRelations): SerializedOwn
       services: animal.services?.map((service) => ({ ...service, animal: undefined })),
     }),
   ),
+});
+
+export const serializeOwnerSummary = (owner: OwnerSummary): SerializedOwnerSummary => ({
+  id: owner.id,
+  nome: owner.nome,
+  email: owner.email,
+  telefone: owner.telefone ?? null,
+  cpf: owner.cpf ?? null,
+  createdAt: owner.createdAt.toISOString(),
 });
 
 export const serializeModule = (module: Module): SerializedModule => ({

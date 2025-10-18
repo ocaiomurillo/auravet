@@ -4,10 +4,34 @@ import type { Module, PrismaClient, Role, RoleModuleAccess, User } from '@prisma
 
 export type InMemoryPrisma = PrismaClient & { reset(): void };
 
+const ROLE_IDS = {
+  ADMINISTRADOR: 'ckadmin000000000000000001',
+  AUXILIAR_ADMINISTRATIVO: 'ckauxadm00000000000000001',
+  ASSISTENTE_ADMINISTRATIVO: 'ckassist00000000000000001',
+  ENFERMEIRO: 'ckenferm00000000000000001',
+  MEDICO: 'ckmedico00000000000000001',
+  CONTADOR: 'ckcontab00000000000000001',
+} as const;
+
 type ModuleRecord = Omit<Module, 'createdAt' | 'updatedAt'> & { createdAt: Date; updatedAt: Date };
 type RoleRecord = Omit<Role, 'createdAt' | 'updatedAt'> & { createdAt: Date; updatedAt: Date };
 type RoleModuleRecord = RoleModuleAccess;
 type UserRecord = Omit<User, 'lastLoginAt'> & { lastLoginAt: Date | null };
+type OwnerRecord = {
+  id: string;
+  nome: string;
+  email: string;
+  telefone: string | null;
+  cpf: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+  createdAt: Date;
+};
 
 type UserInclude = {
   include?: {
@@ -86,6 +110,32 @@ type UpsertArgs = {
   update: { isEnabled?: boolean };
 };
 
+type OwnerWhere = { id?: string; email?: string; cpf?: string };
+type OwnerSelect = Partial<Record<keyof OwnerRecord, boolean>>;
+type OwnerOrderBy = Partial<Record<'createdAt' | 'nome', 'asc' | 'desc'>>;
+type OwnerFindManyArgs = { where?: OwnerWhere; select?: OwnerSelect; orderBy?: OwnerOrderBy };
+type OwnerFindUniqueArgs = { where: OwnerWhere; select?: OwnerSelect };
+type OwnerCreateArgs = {
+  data: {
+    id?: string;
+    nome: string;
+    email: string;
+    telefone?: string | null;
+    cpf?: string | null;
+    logradouro?: string | null;
+    numero?: string | null;
+    complemento?: string | null;
+    bairro?: string | null;
+    cidade?: string | null;
+    estado?: string | null;
+    cep?: string | null;
+  };
+};
+type OwnerUpdateArgs = {
+  where: { id: string };
+  data: Partial<Omit<OwnerCreateArgs['data'], 'id'>>;
+};
+
 const clone = <T>(value: T): T => structuredClone(value);
 
 const buildBaseModules = (): ModuleRecord[] => {
@@ -154,14 +204,58 @@ const buildBaseModules = (): ModuleRecord[] => {
       createdAt: now,
       updatedAt: now,
     },
+    {
+      id: 'cashier:access',
+      slug: 'cashier:access',
+      name: 'Caixa',
+      description: 'Permite gerenciar contas a receber e registrar pagamentos.',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    },
   ];
+};
+
+const projectOwnerRecord = (owner: OwnerRecord, select?: OwnerSelect) => {
+  const base = {
+    id: owner.id,
+    nome: owner.nome,
+    email: owner.email,
+    telefone: owner.telefone,
+    cpf: owner.cpf,
+    logradouro: owner.logradouro,
+    numero: owner.numero,
+    complemento: owner.complemento,
+    bairro: owner.bairro,
+    cidade: owner.cidade,
+    estado: owner.estado,
+    cep: owner.cep,
+    createdAt: owner.createdAt,
+  };
+
+  if (select && Object.keys(select).length > 0) {
+    const partial: Record<string, unknown> = {};
+    for (const key of Object.keys(select) as Array<keyof typeof base>) {
+      if (select[key]) {
+        partial[key as string] = base[key];
+      }
+    }
+    return partial as Partial<typeof base>;
+  }
+
+  return {
+    ...base,
+    animals: [],
+    appointments: [],
+    invoices: [],
+  };
 };
 
 const buildBaseRoles = (): RoleRecord[] => {
   const now = new Date();
   return [
     {
-      id: 'ADMINISTRADOR',
+      id: ROLE_IDS.ADMINISTRADOR,
       slug: 'ADMINISTRADOR',
       name: 'Administrador',
       description: 'Acesso completo ao ecossistema Auravet.',
@@ -170,7 +264,7 @@ const buildBaseRoles = (): RoleRecord[] => {
       updatedAt: now,
     },
     {
-      id: 'AUXILIAR_ADMINISTRATIVO',
+      id: ROLE_IDS.AUXILIAR_ADMINISTRATIVO,
       slug: 'AUXILIAR_ADMINISTRATIVO',
       name: 'Auxiliar Administrativo',
       description: null,
@@ -179,7 +273,7 @@ const buildBaseRoles = (): RoleRecord[] => {
       updatedAt: now,
     },
     {
-      id: 'ASSISTENTE_ADMINISTRATIVO',
+      id: ROLE_IDS.ASSISTENTE_ADMINISTRATIVO,
       slug: 'ASSISTENTE_ADMINISTRATIVO',
       name: 'Assistente Administrativo',
       description: null,
@@ -188,7 +282,7 @@ const buildBaseRoles = (): RoleRecord[] => {
       updatedAt: now,
     },
     {
-      id: 'ENFERMEIRO',
+      id: ROLE_IDS.ENFERMEIRO,
       slug: 'ENFERMEIRO',
       name: 'Enfermeiro',
       description: null,
@@ -197,7 +291,7 @@ const buildBaseRoles = (): RoleRecord[] => {
       updatedAt: now,
     },
     {
-      id: 'MEDICO',
+      id: ROLE_IDS.MEDICO,
       slug: 'MEDICO',
       name: 'Médico',
       description: null,
@@ -206,7 +300,7 @@ const buildBaseRoles = (): RoleRecord[] => {
       updatedAt: now,
     },
     {
-      id: 'CONTADOR',
+      id: ROLE_IDS.CONTADOR,
       slug: 'CONTADOR',
       name: 'Contador',
       description: null,
@@ -218,31 +312,35 @@ const buildBaseRoles = (): RoleRecord[] => {
 };
 
 const buildBaseRoleModules = (): RoleModuleRecord[] => [
-  { roleId: 'ADMINISTRADOR', moduleId: 'owners:read', isEnabled: true },
-  { roleId: 'ADMINISTRADOR', moduleId: 'owners:write', isEnabled: true },
-  { roleId: 'ADMINISTRADOR', moduleId: 'animals:read', isEnabled: true },
-  { roleId: 'ADMINISTRADOR', moduleId: 'animals:write', isEnabled: true },
-  { roleId: 'ADMINISTRADOR', moduleId: 'services:read', isEnabled: true },
-  { roleId: 'ADMINISTRADOR', moduleId: 'services:write', isEnabled: true },
-  { roleId: 'ADMINISTRADOR', moduleId: 'users:manage', isEnabled: true },
-  { roleId: 'AUXILIAR_ADMINISTRATIVO', moduleId: 'owners:read', isEnabled: true },
-  { roleId: 'AUXILIAR_ADMINISTRATIVO', moduleId: 'owners:write', isEnabled: true },
-  { roleId: 'AUXILIAR_ADMINISTRATIVO', moduleId: 'animals:read', isEnabled: true },
-  { roleId: 'AUXILIAR_ADMINISTRATIVO', moduleId: 'animals:write', isEnabled: true },
-  { roleId: 'AUXILIAR_ADMINISTRATIVO', moduleId: 'services:read', isEnabled: true },
-  { roleId: 'ASSISTENTE_ADMINISTRATIVO', moduleId: 'owners:read', isEnabled: true },
-  { roleId: 'ASSISTENTE_ADMINISTRATIVO', moduleId: 'animals:read', isEnabled: true },
-  { roleId: 'ASSISTENTE_ADMINISTRATIVO', moduleId: 'services:read', isEnabled: true },
-  { roleId: 'ENFERMEIRO', moduleId: 'owners:read', isEnabled: true },
-  { roleId: 'ENFERMEIRO', moduleId: 'animals:read', isEnabled: true },
-  { roleId: 'ENFERMEIRO', moduleId: 'animals:write', isEnabled: true },
-  { roleId: 'ENFERMEIRO', moduleId: 'services:read', isEnabled: true },
-  { roleId: 'ENFERMEIRO', moduleId: 'services:write', isEnabled: true },
-  { roleId: 'MEDICO', moduleId: 'owners:read', isEnabled: true },
-  { roleId: 'MEDICO', moduleId: 'animals:read', isEnabled: true },
-  { roleId: 'MEDICO', moduleId: 'services:read', isEnabled: true },
-  { roleId: 'MEDICO', moduleId: 'services:write', isEnabled: true },
-  { roleId: 'CONTADOR', moduleId: 'services:read', isEnabled: true },
+  { roleId: ROLE_IDS.ADMINISTRADOR, moduleId: 'owners:read', isEnabled: true },
+  { roleId: ROLE_IDS.ADMINISTRADOR, moduleId: 'owners:write', isEnabled: true },
+  { roleId: ROLE_IDS.ADMINISTRADOR, moduleId: 'animals:read', isEnabled: true },
+  { roleId: ROLE_IDS.ADMINISTRADOR, moduleId: 'animals:write', isEnabled: true },
+  { roleId: ROLE_IDS.ADMINISTRADOR, moduleId: 'services:read', isEnabled: true },
+  { roleId: ROLE_IDS.ADMINISTRADOR, moduleId: 'services:write', isEnabled: true },
+  { roleId: ROLE_IDS.ADMINISTRADOR, moduleId: 'users:manage', isEnabled: true },
+  { roleId: ROLE_IDS.ADMINISTRADOR, moduleId: 'cashier:access', isEnabled: true },
+  { roleId: ROLE_IDS.AUXILIAR_ADMINISTRATIVO, moduleId: 'owners:read', isEnabled: true },
+  { roleId: ROLE_IDS.AUXILIAR_ADMINISTRATIVO, moduleId: 'owners:write', isEnabled: true },
+  { roleId: ROLE_IDS.AUXILIAR_ADMINISTRATIVO, moduleId: 'animals:read', isEnabled: true },
+  { roleId: ROLE_IDS.AUXILIAR_ADMINISTRATIVO, moduleId: 'animals:write', isEnabled: true },
+  { roleId: ROLE_IDS.AUXILIAR_ADMINISTRATIVO, moduleId: 'services:read', isEnabled: true },
+  { roleId: ROLE_IDS.AUXILIAR_ADMINISTRATIVO, moduleId: 'cashier:access', isEnabled: true },
+  { roleId: ROLE_IDS.ASSISTENTE_ADMINISTRATIVO, moduleId: 'owners:read', isEnabled: true },
+  { roleId: ROLE_IDS.ASSISTENTE_ADMINISTRATIVO, moduleId: 'animals:read', isEnabled: true },
+  { roleId: ROLE_IDS.ASSISTENTE_ADMINISTRATIVO, moduleId: 'services:read', isEnabled: true },
+  { roleId: ROLE_IDS.ASSISTENTE_ADMINISTRATIVO, moduleId: 'cashier:access', isEnabled: true },
+  { roleId: ROLE_IDS.ENFERMEIRO, moduleId: 'owners:read', isEnabled: true },
+  { roleId: ROLE_IDS.ENFERMEIRO, moduleId: 'animals:read', isEnabled: true },
+  { roleId: ROLE_IDS.ENFERMEIRO, moduleId: 'animals:write', isEnabled: true },
+  { roleId: ROLE_IDS.ENFERMEIRO, moduleId: 'services:read', isEnabled: true },
+  { roleId: ROLE_IDS.ENFERMEIRO, moduleId: 'services:write', isEnabled: true },
+  { roleId: ROLE_IDS.MEDICO, moduleId: 'owners:read', isEnabled: true },
+  { roleId: ROLE_IDS.MEDICO, moduleId: 'animals:read', isEnabled: true },
+  { roleId: ROLE_IDS.MEDICO, moduleId: 'services:read', isEnabled: true },
+  { roleId: ROLE_IDS.MEDICO, moduleId: 'services:write', isEnabled: true },
+  { roleId: ROLE_IDS.CONTADOR, moduleId: 'services:read', isEnabled: true },
+  { roleId: ROLE_IDS.CONTADOR, moduleId: 'cashier:access', isEnabled: true },
 ];
 
 const attachRole = (user: UserRecord, include?: UserInclude['include']) => {
@@ -298,12 +396,14 @@ let modules: ModuleRecord[] = [];
 let roles: RoleRecord[] = [];
 let roleModules: RoleModuleRecord[] = [];
 let users: UserRecord[] = [];
+let owners: OwnerRecord[] = [];
 
 const resetState = () => {
   modules = buildBaseModules();
   roles = buildBaseRoles();
   roleModules = buildBaseRoleModules();
   users = [];
+  owners = [];
 };
 
 resetState();
@@ -311,6 +411,9 @@ resetState();
 export const createInMemoryPrisma = (): InMemoryPrisma => {
   const findUserById = (id: string) => users.find((user) => user.id === id) ?? null;
   const findUserByEmail = (email: string) => users.find((user) => user.email === email) ?? null;
+  const findOwnerById = (id: string) => owners.find((owner) => owner.id === id) ?? null;
+  const findOwnerByEmail = (email: string) => owners.find((owner) => owner.email === email) ?? null;
+  const findOwnerByCpf = (cpf: string) => owners.find((owner) => owner.cpf === cpf) ?? null;
 
   const userClient = {
     async findUnique({ where, include }: FindUniqueArgs): Promise<any | null> {
@@ -497,12 +600,142 @@ export const createInMemoryPrisma = (): InMemoryPrisma => {
     },
   } as unknown as PrismaClient['roleModuleAccess'];
 
+  const ownerClient = {
+    async create({ data }: OwnerCreateArgs): Promise<any> {
+      if (findOwnerByEmail(data.email)) {
+        const error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' as const });
+        throw error;
+      }
+
+      if (data.cpf && findOwnerByCpf(data.cpf)) {
+        const error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' as const });
+        throw error;
+      }
+
+      const now = new Date();
+      const record: OwnerRecord = {
+        id: data.id ?? randomUUID(),
+        nome: data.nome,
+        email: data.email,
+        telefone: data.telefone ?? null,
+        cpf: data.cpf ?? null,
+        logradouro: data.logradouro ?? null,
+        numero: data.numero ?? null,
+        complemento: data.complemento ?? null,
+        bairro: data.bairro ?? null,
+        cidade: data.cidade ?? null,
+        estado: data.estado ?? null,
+        cep: data.cep ?? null,
+        createdAt: now,
+      };
+
+      owners.push(record);
+      return projectOwnerRecord(record);
+    },
+    async findMany({ where, select, orderBy }: OwnerFindManyArgs = {}): Promise<any[]> {
+      let result = [...owners];
+
+      if (where?.id) {
+        result = result.filter((owner) => owner.id === where.id);
+      }
+      if (where?.email) {
+        result = result.filter((owner) => owner.email === where.email);
+      }
+      if (where?.cpf) {
+        result = result.filter((owner) => owner.cpf === where.cpf);
+      }
+
+      if (orderBy?.nome) {
+        result.sort((a, b) =>
+          orderBy.nome === 'asc' ? a.nome.localeCompare(b.nome) : b.nome.localeCompare(a.nome),
+        );
+      } else if (orderBy?.createdAt) {
+        result.sort((a, b) =>
+          orderBy.createdAt === 'asc'
+            ? a.createdAt.getTime() - b.createdAt.getTime()
+            : b.createdAt.getTime() - a.createdAt.getTime(),
+        );
+      } else {
+        result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      }
+
+      return result.map((owner) => projectOwnerRecord(owner, select));
+    },
+    async findUnique({ where, select }: OwnerFindUniqueArgs): Promise<any | null> {
+      if (!where.id && !where.email && !where.cpf) {
+        return null;
+      }
+
+      const record = where.id
+        ? findOwnerById(where.id)
+        : where.email
+        ? findOwnerByEmail(where.email)
+        : where.cpf
+        ? findOwnerByCpf(where.cpf)
+        : null;
+
+      return record ? projectOwnerRecord(record, select) : null;
+    },
+    async update({ where, data }: OwnerUpdateArgs): Promise<any> {
+      const existingIndex = owners.findIndex((owner) => owner.id === where.id);
+
+      if (existingIndex < 0) {
+        const error = Object.assign(new Error('Record not found'), { code: 'P2025' as const });
+        throw error;
+      }
+
+      if (data.email && owners.some((owner) => owner.email === data.email && owner.id !== where.id)) {
+        const error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' as const });
+        throw error;
+      }
+
+      if (data.cpf && owners.some((owner) => owner.cpf === data.cpf && owner.id !== where.id)) {
+        const error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' as const });
+        throw error;
+      }
+
+      const existing = owners[existingIndex];
+      const updated: OwnerRecord = {
+        ...existing,
+        nome: data.nome ?? existing.nome,
+        email: data.email ?? existing.email,
+        telefone: data.telefone ?? existing.telefone,
+        cpf: data.cpf ?? existing.cpf,
+        logradouro: data.logradouro ?? existing.logradouro,
+        numero: data.numero ?? existing.numero,
+        complemento: data.complemento ?? existing.complemento,
+        bairro: data.bairro ?? existing.bairro,
+        cidade: data.cidade ?? existing.cidade,
+        estado: data.estado ?? existing.estado,
+        cep: data.cep ?? existing.cep,
+        createdAt: existing.createdAt,
+      };
+
+      owners[existingIndex] = updated;
+      return projectOwnerRecord(updated);
+    },
+    async delete({ where }: { where: { id: string } }): Promise<any> {
+      const existingIndex = owners.findIndex((owner) => owner.id === where.id);
+
+      if (existingIndex < 0) {
+        const error = Object.assign(new Error('Record not found'), { code: 'P2025' as const });
+        throw error;
+      }
+
+      const [removed] = owners.splice(existingIndex, 1);
+      return projectOwnerRecord(removed);
+    },
+    async count(): Promise<number> {
+      return owners.length;
+    },
+  } as unknown as PrismaClient['owner'];
+
   const prisma = {
     user: userClient,
     module: moduleClient,
     role: roleClient,
     roleModuleAccess: roleModuleAccessClient,
-    owner: {} as PrismaClient['owner'],
+    owner: ownerClient,
     animal: {} as PrismaClient['animal'],
     servico: {} as PrismaClient['servico'],
     async $transaction<T>(operations: Promise<T>[]): Promise<T[]> {
