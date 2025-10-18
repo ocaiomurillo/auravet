@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { roleIdentifierSchema } from './ids';
+
 export const passwordSchema = z
   .string()
   .min(8, 'A senha deve ter ao menos 8 caracteres.')
@@ -11,7 +13,7 @@ export const registerSchema = z.object({
   nome: z.string().min(3, 'Informe ao menos 3 caracteres para o nome.'),
   email: z.string().email('Informe um e-mail válido.'),
   password: passwordSchema,
-  roleId: z.string().cuid('Função inválida.'),
+  roleId: roleIdentifierSchema,
 });
 
 export const loginSchema = z.object({

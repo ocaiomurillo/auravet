@@ -4,10 +4,56 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
 import { requirePermission } from '../middlewares/require-permission';
 import { roleCreateSchema, roleIdParamSchema, roleModuleUpdateSchema, roleUpdateSchema } from '../schema/role';
+import { isCuid } from '../schema/ids';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
 import { isPrismaKnownError } from '../utils/prisma-error';
 import { serializeModule, serializeRole } from '../utils/serializers';
+
+const resolveRoleWhere = (identifier: string) =>
+  isCuid(identifier) ? { id: identifier } : { slug: identifier };
+
+const resolveModuleIdentifiers = async (moduleIdentifiers: string[]) => {
+  if (moduleIdentifiers.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const identifiersByType = moduleIdentifiers.reduce<{
+    ids: string[];
+    slugs: string[];
+  }>(
+    (accumulator, identifier) => {
+      if (isCuid(identifier)) {
+        accumulator.ids.push(identifier);
+      } else {
+        accumulator.slugs.push(identifier);
+      }
+
+      return accumulator;
+    },
+    { ids: [], slugs: [] },
+  );
+
+  const modulesById = identifiersByType.ids.length
+    ? await prisma.module.findMany({ where: { id: { in: identifiersByType.ids } } })
+    : [];
+
+  const modulesBySlug = identifiersByType.slugs.length
+    ? await prisma.module.findMany({ where: { slug: { in: identifiersByType.slugs } } })
+    : [];
+
+  const resolvedIdentifiers = new Map<string, string>();
+
+  modulesById.forEach((module) => {
+    resolvedIdentifiers.set(module.id, module.id);
+  });
+
+  modulesBySlug.forEach((module) => {
+    resolvedIdentifiers.set(module.slug, module.id);
+  });
+
+  return resolvedIdentifiers;
+};
 
 export const rolesRouter = Router();
 
@@ -55,7 +101,9 @@ rolesRouter.post(
           modules: payload.moduleIds.length
             ? {
                 create: payload.moduleIds.map((moduleId) => ({
-                  module: { connect: { id: moduleId } },
+                  module: {
+                    connect: isCuid(moduleId) ? { id: moduleId } : { slug: moduleId },
+                  },
                   isEnabled: true,
                 })),
               }
@@ -89,7 +137,7 @@ rolesRouter.get(
     const { id } = roleIdParamSchema.parse(req.params);
 
     const role = await prisma.role.findUnique({
-      where: { id },
+      where: resolveRoleWhere(id),
       include: {
         modules: {
           include: { module: true },
@@ -113,7 +161,7 @@ rolesRouter.patch(
 
     try {
       const role = await prisma.role.update({
-        where: { id },
+        where: resolveRoleWhere(id),
         data: payload,
         include: {
           modules: {
@@ -139,10 +187,20 @@ rolesRouter.patch(
     const { id } = roleIdParamSchema.parse(req.params);
     const payload = roleModuleUpdateSchema.parse(req.body);
 
-    const role = await prisma.role.findUnique({ where: { id } });
+    const role = await prisma.role.findUnique({ where: resolveRoleWhere(id) });
 
     if (!role) {
       throw new HttpError(404, 'Função não encontrada.');
+    }
+
+    const identifiersMap = await resolveModuleIdentifiers(
+      payload.modules.map((module) => module.moduleId),
+    );
+
+    for (const { moduleId } of payload.modules) {
+      if (!identifiersMap.has(moduleId)) {
+        throw new HttpError(400, 'Um dos módulos informados não existe.');
+      }
     }
 
     await prisma.$transaction(
@@ -150,18 +208,18 @@ rolesRouter.patch(
         prisma.roleModuleAccess.upsert({
           where: {
             roleId_moduleId: {
-              roleId: id,
-              moduleId,
+              roleId: role.id,
+              moduleId: identifiersMap.get(moduleId)!,
             },
           },
           update: { isEnabled },
-          create: { roleId: id, moduleId, isEnabled },
+          create: { roleId: role.id, moduleId: identifiersMap.get(moduleId)!, isEnabled },
         }),
       ),
     );
 
     const updatedRole = await prisma.role.findUnique({
-      where: { id },
+      where: { id: role.id },
       include: {
         modules: {
           include: { module: true },
@@ -183,7 +241,7 @@ rolesRouter.delete(
     const { id } = roleIdParamSchema.parse(req.params);
 
     try {
-      await prisma.role.delete({ where: { id } });
+      await prisma.role.delete({ where: resolveRoleWhere(id) });
     } catch (error) {
       if (isPrismaKnownError(error, 'P2025')) {
         throw new HttpError(404, 'Função não encontrada.');

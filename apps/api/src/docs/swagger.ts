@@ -237,7 +237,7 @@ export const swaggerDocument = {
           nome: { type: 'string' },
           email: { type: 'string', format: 'email' },
           password: { type: 'string', minLength: 8 },
-          roleId: { type: 'string', format: 'cuid' },
+          roleId: { type: 'string', pattern: '^(c[0-9a-z]{24}|[A-Z0-9_]+)$' },
         },
       },
       CreateRoleRequest: {
@@ -249,7 +249,7 @@ export const swaggerDocument = {
           description: { type: 'string' },
           moduleIds: {
             type: 'array',
-            items: { type: 'string', format: 'cuid' },
+            items: { type: 'string', pattern: '^(c[0-9a-z]{24}|[a-z0-9:-]+)$' },
           },
         },
       },
@@ -271,7 +271,7 @@ export const swaggerDocument = {
               type: 'object',
               required: ['moduleId', 'isEnabled'],
               properties: {
-                moduleId: { type: 'string', format: 'cuid' },
+                moduleId: { type: 'string', pattern: '^(c[0-9a-z]{24}|[a-z0-9:-]+)$' },
                 isEnabled: { type: 'boolean' },
               },
             },
@@ -449,7 +449,7 @@ export const swaggerDocument = {
                 type: 'object',
                 properties: {
                   nome: { type: 'string' },
-                  roleId: { type: 'string', format: 'cuid' },
+                  roleId: { type: 'string', pattern: '^(c[0-9a-z]{24}|[A-Z0-9_]+)$' },
                 },
               },
             },
@@ -603,7 +603,14 @@ export const swaggerDocument = {
       get: {
         summary: 'Obtém uma função específica',
         security: [{ BearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'cuid' } }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', pattern: '^(c[0-9a-z]{24}|[A-Z0-9_]+)$' },
+          },
+        ],
         responses: {
           '200': {
             description: 'Função encontrada',
@@ -623,7 +630,14 @@ export const swaggerDocument = {
       patch: {
         summary: 'Atualiza informações básicas de uma função',
         security: [{ BearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'cuid' } }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', pattern: '^(c[0-9a-z]{24}|[A-Z0-9_]+)$' },
+          },
+        ],
         requestBody: {
           required: true,
           content: {
@@ -651,7 +665,14 @@ export const swaggerDocument = {
       delete: {
         summary: 'Remove uma função',
         security: [{ BearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'cuid' } }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', pattern: '^(c[0-9a-z]{24}|[A-Z0-9_]+)$' },
+          },
+        ],
         responses: {
           '204': { description: 'Função removida' },
           '400': { description: 'Função em uso' },
@@ -663,7 +684,14 @@ export const swaggerDocument = {
       patch: {
         summary: 'Atualiza os módulos disponíveis para uma função',
         security: [{ BearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'cuid' } }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', pattern: '^(c[0-9a-z]{24}|[A-Z0-9_]+)$' },
+          },
+        ],
         requestBody: {
           required: true,
           content: {

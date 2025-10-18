@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { moduleIdentifierSchema, roleIdentifierSchema } from './ids';
+
 export const roleIdParamSchema = z.object({
-  id: z.string().cuid('Identificador de função inválido.'),
+  id: roleIdentifierSchema,
 });
 
 export const roleCreateSchema = z.object({
@@ -12,7 +14,7 @@ export const roleCreateSchema = z.object({
     .regex(/^[A-Z0-9_]+$/u, 'Use apenas letras maiúsculas, números e _ no identificador.')
     .transform((value) => value.toUpperCase()),
   description: z.string().max(200, 'Descreva em até 200 caracteres.').optional().nullable(),
-  moduleIds: z.array(z.string().cuid('Identificador de módulo inválido.')).optional().default([]),
+  moduleIds: z.array(moduleIdentifierSchema).optional().default([]),
 });
 
 export const roleUpdateSchema = z
@@ -29,7 +31,7 @@ export const roleModuleUpdateSchema = z.object({
   modules: z
     .array(
       z.object({
-        moduleId: z.string().cuid('Identificador de módulo inválido.'),
+        moduleId: moduleIdentifierSchema,
         isEnabled: z.boolean(),
       }),
     )
