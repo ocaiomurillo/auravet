@@ -1,9 +1,9 @@
 # Build stage
-FROM node:20-bullseye-slim AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends libssl1.1 \
+  && apt-get install -y --no-install-recommends libssl3 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json tsconfig.base.json ./
@@ -17,12 +17,12 @@ RUN npm run prisma:generate --workspace apps/api
 RUN npm run build --workspace apps/api
 
 # Production stage
-FROM node:20-bullseye-slim
+FROM node:20-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends libssl1.1 \
+  && apt-get install -y --no-install-recommends libssl3 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/node_modules ./node_modules
