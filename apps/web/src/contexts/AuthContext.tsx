@@ -66,10 +66,11 @@ export const AuthProvider = ({ children }: PropsWithChildren): JSX.Element => {
 
       authStorage.setToken(result.token);
       setToken(result.token);
-      await refetch();
+      queryClient.setQueryData(currentUserQueryKey, result.user);
+      void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
       navigate('/');
     },
-    [navigate, refetch],
+    [navigate, queryClient],
   );
 
   const logout = useCallback(() => {
