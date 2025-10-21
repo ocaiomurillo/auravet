@@ -1,6 +1,9 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
 COPY package.json tsconfig.base.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/api/package.json ./apps/api/

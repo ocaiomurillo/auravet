@@ -90,12 +90,13 @@ auravet/
 ## 🐳 Instalação com Docker
 1. **Preparar variáveis**
    - Garanta que o arquivo `.env` na raiz contenha os valores desejados.
+   - Defina `VITE_API_URL` apontando para o endpoint público da API (no `.env` ou exportando no shell) para que o build do frontend injete o valor correto.
    - (Opcional) Exponha `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`, `API_PORT`, `WEB_PORT` diretamente no shell antes de subir o Compose para sobrescrever os padrões.
 
 2. **Subir a stack**
    ```bash
    cd infra/docker
-   docker compose up --build -d
+   docker compose up --build -d         # use "--build-arg VITE_API_URL=..." se preferir não tocar no .env
    ```
    Serviços publicados:
    - PostgreSQL (`db`): porta padrão 5432
