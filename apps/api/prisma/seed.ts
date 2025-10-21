@@ -16,7 +16,7 @@ const parseSaltRounds = () => {
   return parsedValue;
 };
 
-const SCRYPT_COST = Math.min(Math.max(parseSaltRounds(), 10), 18);
+const SCRYPT_COST = Math.min(Math.max(Math.round(parseSaltRounds()), 10), 18);
 const SCRYPT_OPTIONS = { N: 2 ** SCRYPT_COST, r: 8, p: 1 } as const;
 
 const runScrypt = (password: string, salt: string) =>
@@ -34,7 +34,7 @@ const runScrypt = (password: string, salt: string) =>
 const hashPassword = async (password: string) => {
   const salt = randomBytes(SALT_LENGTH).toString('hex');
   const derivedKey = await runScrypt(password, salt);
-  return `${salt}:${derivedKey.toString('hex')}`;
+  return `${SCRYPT_COST}:${salt}:${derivedKey.toString('hex')}`;
 };
 
 const prisma = new PrismaClient();

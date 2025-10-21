@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { once } from 'node:events';
+import { randomBytes, scryptSync } from 'node:crypto';
 import type { Server } from 'node:http';
 
 import type { InMemoryPrisma } from './helpers/prisma-mock';
@@ -13,10 +14,33 @@ process.env.PASSWORD_SALT_ROUNDS ??= '12';
 process.env.AUTH_RATE_LIMIT_WINDOW_MS ??= '60000';
 process.env.AUTH_RATE_LIMIT_MAX ??= '10';
 
+const LEGACY_SALT_LENGTH = 16;
+const LEGACY_KEY_LENGTH = 64;
+const MIN_SCRYPT_COST = 10;
+const MAX_SCRYPT_COST = 18;
+
+const clampCost = (cost: number) =>
+  Math.min(Math.max(Math.round(cost), MIN_SCRYPT_COST), MAX_SCRYPT_COST);
+
+const createLegacyPasswordHash = (password: string, cost: number) => {
+  const normalizedCost = clampCost(cost);
+  const salt = randomBytes(LEGACY_SALT_LENGTH).toString('hex');
+  const derivedKey = scryptSync(password, salt, LEGACY_KEY_LENGTH, {
+    N: 2 ** normalizedCost,
+    r: 8,
+    p: 1,
+  });
+
+  return `${salt}:${derivedKey.toString('hex')}`;
+};
+
+const ADMIN_EMAIL = 'admin@auravet.com';
+const ADMIN_PASSWORD = 'Admin123!';
+
 const prismaMock = createInMemoryPrisma();
 const prisma = prismaMock as InMemoryPrisma;
 
-type HashPassword = (password: string) => Promise<string>;
+type HashPassword = (password: string, cost?: number) => Promise<string>;
 
 type AppModule = typeof import('../src/app.js');
 type AuthModule = typeof import('../src/utils/auth.js');
@@ -55,18 +79,24 @@ const stopServer = async () =>
 
 const seedAdminUser = async () => {
   await prisma.user.deleteMany();
-  const passwordHash = await hashPassword('Admin123!');
+  const passwordHash = await hashPassword(ADMIN_PASSWORD);
   const adminRole = await prisma.role.findUnique({ where: { slug: 'ADMINISTRADOR' } });
   assert.ok(adminRole);
   await prisma.user.create({
     data: {
       nome: 'Admin Auravet',
-      email: 'admin@auravet.com',
+      email: ADMIN_EMAIL,
       passwordHash,
       roleId: adminRole.id,
       isActive: true,
     },
   });
+};
+
+const updateAdminPasswordHash = async (passwordHash: string) => {
+  const admin = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
+  assert.ok(admin);
+  await prisma.user.update({ where: { id: admin.id }, data: { passwordHash } });
 };
 
 const post = async (path: string, body: unknown, token?: string) => {
@@ -125,13 +155,13 @@ beforeEach(async () => {
 describe('Authentication flows', () => {
   it('allows a user to login with valid credentials', async () => {
     const { response, data } = await post('/auth/login', {
-      email: 'admin@auravet.com',
-      password: 'Admin123!',
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
     });
 
     assert.equal(response.status, 200);
     assert.ok(data?.token);
-    assert.equal(data?.user.email, 'admin@auravet.com');
+    assert.equal(data?.user.email, ADMIN_EMAIL);
     assert.ok(Array.isArray(data?.user.modules));
     assert.ok(data?.user.modules.includes('users:manage'));
     assert.equal(data?.user.role.slug, 'ADMINISTRADOR');
@@ -139,7 +169,7 @@ describe('Authentication flows', () => {
 
   it('rejects login with invalid credentials', async () => {
     const { response } = await post('/auth/login', {
-      email: 'admin@auravet.com',
+      email: ADMIN_EMAIL,
       password: 'invalid-password',
     });
 
@@ -148,8 +178,8 @@ describe('Authentication flows', () => {
 
   it('allows administrators to register new collaborators', async () => {
     const login = await post('/auth/login', {
-      email: 'admin@auravet.com',
-      password: 'Admin123!',
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
     });
 
     const token = login.data?.token as string;
@@ -177,8 +207,8 @@ describe('Authentication flows', () => {
 
   it('allows administrators to register new collaborators using role slug identifiers', async () => {
     const login = await post('/auth/login', {
-      email: 'admin@auravet.com',
-      password: 'Admin123!',
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
     });
 
     const token = login.data?.token as string;
@@ -255,13 +285,43 @@ describe('Authentication flows', () => {
 
     assert.equal(response.status, 403);
   });
+
+  it('allows a user to login when the password hash uses a different cost', async () => {
+    const increasedCost = 13;
+    const passwordHash = await hashPassword(ADMIN_PASSWORD, increasedCost);
+    await updateAdminPasswordHash(passwordHash);
+
+    const { response, data } = await post('/auth/login', {
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+    });
+
+    assert.equal(response.status, 200);
+    assert.ok(data?.token);
+    assert.equal(data?.user.email, ADMIN_EMAIL);
+  });
+
+  it('allows a user to login with a legacy password hash after cost changes', async () => {
+    const legacyCost = 11;
+    const legacyHash = createLegacyPasswordHash(ADMIN_PASSWORD, legacyCost);
+    await updateAdminPasswordHash(legacyHash);
+
+    const { response, data } = await post('/auth/login', {
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+    });
+
+    assert.equal(response.status, 200);
+    assert.ok(data?.token);
+    assert.equal(data?.user.email, ADMIN_EMAIL);
+  });
 });
 
 describe('Role management flows', () => {
   it('allows administrators to update role modules using slug identifiers', async () => {
     const login = await post('/auth/login', {
-      email: 'admin@auravet.com',
-      password: 'Admin123!',
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
     });
 
     const token = login.data?.token as string;
