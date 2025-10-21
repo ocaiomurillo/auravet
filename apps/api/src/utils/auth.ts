@@ -6,12 +6,20 @@ import { extractEnabledModuleSlugs } from './permissions';
 
 const SALT_LENGTH = 16;
 const KEY_LENGTH = 64;
-const SCRYPT_COST = Math.min(Math.max(env.PASSWORD_SALT_ROUNDS, 10), 18);
-const SCRYPT_OPTIONS = { N: 2 ** SCRYPT_COST, r: 8, p: 1 } as const;
+const MIN_SCRYPT_COST = 10;
+const MAX_SCRYPT_COST = 18;
 
-const runScrypt = (password: string, salt: string) =>
+const clampCost = (cost: number) =>
+  Math.min(Math.max(Math.round(cost), MIN_SCRYPT_COST), MAX_SCRYPT_COST);
+
+const DEFAULT_SCRYPT_COST = clampCost(env.PASSWORD_SALT_ROUNDS);
+
+const getScryptOptions = (cost: number) => ({ N: 2 ** cost, r: 8, p: 1 } as const);
+
+const runScrypt = (password: string, salt: string, cost = DEFAULT_SCRYPT_COST) =>
   new Promise<Buffer>((resolve, reject) => {
-    scryptCallback(password, salt, KEY_LENGTH, SCRYPT_OPTIONS, (error, derivedKey) => {
+    const normalizedCost = clampCost(cost);
+    scryptCallback(password, salt, KEY_LENGTH, getScryptOptions(normalizedCost), (error, derivedKey) => {
       if (error) {
         reject(error);
         return;
@@ -42,27 +50,65 @@ export interface TokenPayload {
   exp: number;
 }
 
-export const hashPassword = async (password: string) => {
+export const hashPassword = async (password: string, cost = DEFAULT_SCRYPT_COST) => {
+  const normalizedCost = clampCost(cost);
   const salt = randomBytes(SALT_LENGTH).toString('hex');
-  const derivedKey = await runScrypt(password, salt);
-  return `${salt}:${derivedKey.toString('hex')}`;
+  const derivedKey = await runScrypt(password, salt, normalizedCost);
+  return `${normalizedCost}:${salt}:${derivedKey.toString('hex')}`;
 };
 
 export const verifyPassword = async (password: string, storedHash: string) => {
-  const [salt, key] = storedHash.split(':');
+  const segments = storedHash.split(':');
 
-  if (!salt || !key) {
+  if (segments.length === 3) {
+    const [costSegment, salt, key] = segments;
+    if (!salt || !key) {
+      return false;
+    }
+    const cost = Number.parseInt(costSegment, 10);
+
+    if (!Number.isFinite(cost) || cost < MIN_SCRYPT_COST || cost > MAX_SCRYPT_COST) {
+      return false;
+    }
+
+    const derivedKey = await runScrypt(password, salt, cost);
+    const storedKey = Buffer.from(key, 'hex');
+
+    if (storedKey.length !== derivedKey.length) {
+      return false;
+    }
+
+    return timingSafeEqual(storedKey, derivedKey);
+  }
+
+  if (segments.length === 2) {
+    const [salt, key] = segments;
+    if (!salt || !key) {
+      return false;
+    }
+    const storedKey = Buffer.from(key, 'hex');
+
+    const candidateCosts = new Set<number>([DEFAULT_SCRYPT_COST]);
+    for (let cost = MIN_SCRYPT_COST; cost <= MAX_SCRYPT_COST; cost += 1) {
+      candidateCosts.add(cost);
+    }
+
+    for (const cost of candidateCosts) {
+      const derivedKey = await runScrypt(password, salt, cost);
+
+      if (storedKey.length !== derivedKey.length) {
+        continue;
+      }
+
+      if (timingSafeEqual(storedKey, derivedKey)) {
+        return true;
+      }
+    }
+
     return false;
   }
 
-  const derivedKey = await runScrypt(password, salt);
-  const storedKey = Buffer.from(key, 'hex');
-
-  if (storedKey.length !== derivedKey.length) {
-    return false;
-  }
-
-  return timingSafeEqual(storedKey, derivedKey);
+  return false;
 };
 
 export type UserWithRole = Prisma.UserGetPayload<{
