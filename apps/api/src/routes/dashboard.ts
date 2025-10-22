@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
 import { asyncHandler } from '../utils/async-handler';
 import { hasModule } from '../utils/permissions';
+import { buildInvoiceSummary } from '../utils/invoice';
 
 interface DashboardSummary {
   appointments?: {
@@ -24,6 +25,12 @@ interface DashboardSummary {
   };
   animals?: {
     total: number;
+  };
+  receivables?: {
+    openTotal: number;
+    paidTotal: number;
+    openCount: number;
+    paidCount: number;
   };
 }
 
@@ -134,6 +141,25 @@ dashboardRouter.get(
         (async () => {
           const total = await prisma.animal.count();
           summary.animals = { total };
+        })(),
+      );
+    }
+
+    if (hasModule(modules, 'cashier:access')) {
+      jobs.push(
+        (async () => {
+          const invoices = await prisma.invoice.findMany({
+            select: {
+              total: true,
+              status: {
+                select: {
+                  slug: true,
+                },
+              },
+            },
+          });
+
+          summary.receivables = buildInvoiceSummary(invoices);
         })(),
       );
     }

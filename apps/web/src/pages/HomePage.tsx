@@ -16,9 +16,11 @@ const HomePage = () => {
   const canViewOwners = hasModule('owners:read');
   const canViewAnimals = hasModule('animals:read');
   const canViewProducts = hasModule('products:read');
+  const canViewReceivables = hasModule('cashier:access');
   const canCreateServices = hasModule('services:write');
 
-  const shouldFetchSummary = canViewServices || canViewOwners || canViewAnimals || canViewProducts;
+  const shouldFetchSummary =
+    canViewServices || canViewOwners || canViewAnimals || canViewProducts || canViewReceivables;
 
   const summaryQuery = useQuery<DashboardSummaryResponse, Error>({
     queryKey: ['dashboard', 'summary'],
@@ -28,6 +30,10 @@ const HomePage = () => {
   });
 
   const formatter = useMemo(() => new Intl.NumberFormat('pt-BR'), []);
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }),
+    [],
+  );
   const summary = summaryQuery.data?.summary;
 
   const renderMetrics = <T,>(data: T | undefined, render: (value: T) => ReactNode) => {
@@ -163,6 +169,44 @@ const HomePage = () => {
             </dl>
           ))}
           <p>Garanta uma jornada de cuidado contínuo, com visão clara de próximos passos e registros completos.</p>
+        </Card>
+      ) : null}
+
+      {canViewReceivables ? (
+        <Card
+          title="Financeiro"
+          description="Visualize rapidamente a saúde das contas a receber e priorize cobranças essenciais."
+          actions={
+            <Button variant="secondary" asChild>
+              <Link to="/cashier" className="flex items-center gap-2">
+                <ArrowRightCircleIcon className="h-5 w-5" /> Acessar
+              </Link>
+            </Button>
+          }
+        >
+          {renderMetrics(summary?.receivables, (receivables) => (
+            <dl className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Em aberto</dt>
+                <dd className="text-2xl font-semibold text-brand-escuro">
+                  {currencyFormatter.format(receivables.openTotal)}
+                </dd>
+                <p className="text-xs text-brand-grafite/70">
+                  {formatter.format(receivables.openCount)} contas
+                </p>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Quitadas</dt>
+                <dd className="text-2xl font-semibold text-brand-escuro">
+                  {currencyFormatter.format(receivables.paidTotal)}
+                </dd>
+                <p className="text-xs text-brand-grafite/70">
+                  {formatter.format(receivables.paidCount)} contas
+                </p>
+              </div>
+            </dl>
+          ))}
+          <p>Antecipe fluxos financeiros, reduza inadimplências e mantenha o caixa sempre saudável.</p>
         </Card>
       ) : null}
 

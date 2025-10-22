@@ -47,6 +47,37 @@ export type InvoiceWithRelations = Prisma.InvoiceGetPayload<{
   include: typeof invoiceInclude;
 }>;
 
+export interface InvoiceSummarySource {
+  total: Prisma.Decimal;
+  status: {
+    slug: string;
+  };
+}
+
+export const buildInvoiceSummary = <T extends InvoiceSummarySource>(invoices: T[]) => {
+  let openTotal = new Prisma.Decimal(0);
+  let paidTotal = new Prisma.Decimal(0);
+  let openCount = 0;
+  let paidCount = 0;
+
+  for (const invoice of invoices) {
+    if (invoice.status.slug === 'QUITADA') {
+      paidTotal = paidTotal.add(invoice.total);
+      paidCount += 1;
+    } else {
+      openTotal = openTotal.add(invoice.total);
+      openCount += 1;
+    }
+  }
+
+  return {
+    openTotal: Number(openTotal.toFixed(2)),
+    paidTotal: Number(paidTotal.toFixed(2)),
+    openCount,
+    paidCount,
+  };
+};
+
 type ServiceForInvoice = Prisma.ServicoGetPayload<{
   include: {
     animal: { include: { owner: true } };
