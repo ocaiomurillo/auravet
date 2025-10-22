@@ -303,6 +303,7 @@ export interface DashboardSummary {
   products?: DashboardProductsSummary;
   owners?: DashboardEntitySummary;
   animals?: DashboardEntitySummary;
+  receivables?: InvoiceSummary;
 }
 
 export interface DashboardSummaryResponse {
