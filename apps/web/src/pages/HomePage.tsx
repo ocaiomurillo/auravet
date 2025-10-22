@@ -66,7 +66,7 @@ const HomePage = () => {
           canCreateServices ? (
             <Button asChild variant="primary">
               <Link to="/new-service" className="flex items-center gap-2">
-                <PlusCircleIcon className="h-5 w-5" /> Registrar atendimento
+                <PlusCircleIcon className="h-5 w-5" /> Registrar Atendimento
               </Link>
             </Button>
           ) : null

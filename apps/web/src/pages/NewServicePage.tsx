@@ -437,7 +437,7 @@ const NewServicePage = () => {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Registrar atendimento</h1>
+          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Registrar Atendimento</h1>
           <p className="text-sm text-brand-grafite/70">
             Combine serviços do catálogo e produtos utilizados para gerar um atendimento completo.
           </p>
@@ -464,7 +464,7 @@ const NewServicePage = () => {
             placeholder="Selecione um pet"
             readOnly
             helperText={tutorHelperText}
-            error={petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o serviço.' : undefined}
+            error={petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o atendimento.' : undefined}
           />
 
           <SelectField label="Tipo de serviço" required {...register('tipo')}>
@@ -801,7 +801,7 @@ const NewServicePage = () => {
               Limpar
             </Button>
             <Button type="submit" disabled={disableSubmit}>
-              {createService.isPending ? 'Registrando...' : 'Registrar atendimento'}
+              {createService.isPending ? 'Registrando Atendimento...' : 'Registrar Atendimento'}
             </Button>
           </div>
         </form>
