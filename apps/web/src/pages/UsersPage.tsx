@@ -12,11 +12,23 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Role, User } from '../types/api';
 
+const SHIFT_OPTIONS = [
+  { label: 'Manhã', value: 'MANHA' },
+  { label: 'Tarde', value: 'TARDE' },
+  { label: 'Noite', value: 'NOITE' },
+] as const;
+
+type ShiftValue = (typeof SHIFT_OPTIONS)[number]['value'];
+
 interface UserFormValues {
   nome: string;
   email: string;
   password: string;
   roleId: string;
+  especialidade: string;
+  crmv: string;
+  turnos: ShiftValue[];
+  bio: string;
 }
 
 const defaultValues: UserFormValues = {
@@ -24,7 +36,25 @@ const defaultValues: UserFormValues = {
   email: '',
   password: '',
   roleId: '',
+  especialidade: '',
+  crmv: '',
+  turnos: [],
+  bio: '',
 };
+
+const toNullable = (value: string): string | null => {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const buildProfilePayload = (
+  values: Pick<UserFormValues, 'especialidade' | 'crmv' | 'turnos' | 'bio'>,
+): { especialidade: string | null; crmv: string | null; turnos: string[]; bio: string | null } => ({
+  especialidade: toNullable(values.especialidade),
+  crmv: toNullable(values.crmv),
+  turnos: [...values.turnos],
+  bio: toNullable(values.bio),
+});
 
 const UsersPage = () => {
   const queryClient = useQueryClient();
@@ -50,10 +80,26 @@ const UsersPage = () => {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<UserFormValues>({ defaultValues });
 
   const activeRoles = useMemo(() => rolesQuery.data?.roles.filter((role) => role.isActive) ?? [], [rolesQuery.data?.roles]);
+
+  const selectedShifts = watch('turnos') ?? [];
+
+  const toggleShift = (shift: ShiftValue) => {
+    const current = new Set(selectedShifts);
+    if (current.has(shift)) {
+      current.delete(shift);
+    } else {
+      current.add(shift);
+    }
+
+    const ordered = SHIFT_OPTIONS.filter((option) => current.has(option.value)).map((option) => option.value);
+    setValue('turnos', ordered, { shouldDirty: true, shouldTouch: true });
+  };
 
   const closeModal = () => {
     setModalOpen(false);
@@ -69,16 +115,44 @@ const UsersPage = () => {
 
   const openEditModal = (user: User) => {
     setEditingUser(user);
-    reset({ nome: user.nome, email: user.email, password: '', roleId: user.role.id });
+    const collaboratorTurnos = new Set((user.collaboratorProfile?.turnos ?? []).map((turno) => turno.toUpperCase()));
+    const normalizedTurnos = SHIFT_OPTIONS.filter((option) => collaboratorTurnos.has(option.value)).map((option) => option.value);
+
+    reset({
+      nome: user.nome,
+      email: user.email,
+      password: '',
+      roleId: user.role.id,
+      especialidade: user.collaboratorProfile?.especialidade ?? '',
+      crmv: user.collaboratorProfile?.crmv ?? '',
+      turnos: normalizedTurnos,
+      bio: user.collaboratorProfile?.bio ?? '',
+    });
     setModalOpen(true);
   };
 
   const createUser = useMutation({
-    mutationFn: registerUser,
+    mutationFn: async (values: UserFormValues) => {
+      const profile = buildProfilePayload(values);
+      return registerUser({
+        nome: values.nome,
+        email: values.email,
+        password: values.password,
+        roleId: values.roleId,
+        especialidade: profile.especialidade,
+        crmv: profile.crmv,
+        turnos: profile.turnos,
+        bio: profile.bio,
+      });
+    },
     onSuccess: async (user) => {
       toast.success(`Colaborador ${user.nome} cadastrado!`);
-      await refreshUser();
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      await Promise.all([
+        refreshUser(),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['appointments', 'collaborators'] }),
+        queryClient.invalidateQueries({ queryKey: ['service-responsibles'] }),
+      ]);
       closeModal();
     },
     onError: (error: unknown) => {
@@ -87,17 +161,33 @@ const UsersPage = () => {
   });
 
   const updateUser = useMutation({
-    mutationFn: async ({ id, nome, roleId }: { id: string; nome: string; roleId: string }) => {
-      const response = await apiClient.patch<{ user: User }>(`/users/${id}`, {
+    mutationFn: async ({
+      id,
+      nome,
+      roleId,
+      profile,
+    }: {
+      id: string;
+      nome: string;
+      roleId: string;
+      profile: ReturnType<typeof buildProfilePayload>;
+    }) => {
+      await apiClient.patch<{ user: User }>(`/users/${id}`, {
         nome,
         roleId,
       });
+
+      const response = await apiClient.patch<{ user: User }>(`/users/${id}/profile`, profile);
       return response.user;
     },
     onSuccess: async (user) => {
       toast.success(`Dados de ${user.nome} atualizados.`);
-      await refreshUser();
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      await Promise.all([
+        refreshUser(),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['appointments', 'collaborators'] }),
+        queryClient.invalidateQueries({ queryKey: ['service-responsibles'] }),
+      ]);
       closeModal();
     },
     onError: (error: unknown) => {
@@ -114,8 +204,12 @@ const UsersPage = () => {
     },
     onSuccess: async (user) => {
       toast.success(`${user.nome} agora está ${user.isActive ? 'ativo' : 'inativo'}.`);
-      await refreshUser();
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      await Promise.all([
+        refreshUser(),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['appointments', 'collaborators'] }),
+        queryClient.invalidateQueries({ queryKey: ['service-responsibles'] }),
+      ]);
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Não foi possível atualizar o status.');
@@ -124,7 +218,12 @@ const UsersPage = () => {
 
   const onSubmit = handleSubmit((values) => {
     if (editingUser) {
-      updateUser.mutate({ id: editingUser.id, nome: values.nome, roleId: values.roleId });
+      updateUser.mutate({
+        id: editingUser.id,
+        nome: values.nome,
+        roleId: values.roleId,
+        profile: buildProfilePayload(values),
+      });
     } else {
       createUser.mutate(values);
     }
@@ -252,6 +351,63 @@ const UsersPage = () => {
               </option>
             ))}
           </SelectField>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-brand-escuro">Perfil clínico</p>
+            <p className="text-xs text-brand-grafite/70">
+              Preencha os dados apresentados nos formulários de agendamento e atendimento.
+            </p>
+          </div>
+          <Field
+            label="Especialidade clínica"
+            placeholder="Ex.: Clínica geral, felinos, cirurgia"
+            {...register('especialidade')}
+            helperText="Opcional"
+          />
+          <Field
+            label="CRMV"
+            placeholder="Registro profissional"
+            {...register('crmv')}
+            helperText="Opcional"
+          />
+          <label className="flex flex-col gap-1 text-sm font-medium text-brand-grafite">
+            <span className="font-semibold text-brand-escuro">Bio clínica</span>
+            <textarea
+              {...register('bio')}
+              rows={3}
+              className="w-full rounded-xl border border-brand-azul/60 bg-white/90 px-4 py-2 text-brand-grafite shadow-inner focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/50"
+              placeholder="Resumo sobre a atuação profissional do colaborador"
+            />
+            <span className="text-xs text-brand-grafite/70">Opcional</span>
+          </label>
+          <div className="space-y-3 rounded-2xl border border-brand-azul/30 bg-white/60 p-4">
+            <div>
+              <p className="text-sm font-semibold text-brand-escuro">Turnos disponíveis</p>
+              <p className="text-xs text-brand-grafite/70">Selecione os períodos em que o colaborador pode ser escalado.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {SHIFT_OPTIONS.map((option) => {
+                const checkboxId = `shift-${option.value.toLowerCase()}`;
+                const checked = selectedShifts.includes(option.value);
+                return (
+                  <label
+                    key={option.value}
+                    htmlFor={checkboxId}
+                    className="flex items-center gap-2 rounded-xl border border-brand-azul/40 bg-white/80 px-3 py-2 text-sm text-brand-escuro"
+                  >
+                    <input
+                      id={checkboxId}
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={checked}
+                      onChange={() => toggleShift(option.value)}
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-xs text-brand-grafite/70">Deixe todos desmarcados para uma agenda flexível.</p>
+          </div>
         </form>
       </Modal>
     </div>

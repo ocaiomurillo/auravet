@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { roleIdentifierSchema } from './ids';
+import { collaboratorProfileInputSchema } from './user';
 
 export const passwordSchema = z
   .string()
@@ -9,12 +10,14 @@ export const passwordSchema = z
   .regex(/[a-z]/, 'A senha deve conter ao menos uma letra minúscula.')
   .regex(/[0-9]/, 'A senha deve conter ao menos um número.');
 
-export const registerSchema = z.object({
-  nome: z.string().min(3, 'Informe ao menos 3 caracteres para o nome.'),
-  email: z.string().email('Informe um e-mail válido.'),
-  password: passwordSchema,
-  roleId: roleIdentifierSchema,
-});
+export const registerSchema = z
+  .object({
+    nome: z.string().min(3, 'Informe ao menos 3 caracteres para o nome.'),
+    email: z.string().email('Informe um e-mail válido.'),
+    password: passwordSchema,
+    roleId: roleIdentifierSchema,
+  })
+  .extend(collaboratorProfileInputSchema.shape);
 
 export const loginSchema = z.object({
   email: z.string().email('Informe um e-mail válido.'),

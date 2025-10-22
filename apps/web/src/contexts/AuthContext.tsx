@@ -7,13 +7,24 @@ import { apiClient } from '../lib/apiClient';
 import { UNAUTHORIZED_EVENT, authStorage } from '../lib/authStorage';
 import type { AuthLoginResponse, User } from '../types/api';
 
+interface RegisterUserPayload {
+  nome: string;
+  email: string;
+  password: string;
+  roleId: string;
+  especialidade: string | null;
+  crmv: string | null;
+  turnos: string[];
+  bio: string | null;
+}
+
 interface AuthContextValue {
   user: User | null;
   token: string | null;
   isLoading: boolean;
   login: (payload: { email: string; password: string }) => Promise<void>;
   logout: () => void;
-  registerUser: (payload: { nome: string; email: string; password: string; roleId: string }) => Promise<User>;
+  registerUser: (payload: RegisterUserPayload) => Promise<User>;
   hasModule: (module: string) => boolean;
   refreshUser: () => Promise<User | null>;
 }
@@ -81,7 +92,7 @@ export const AuthProvider = ({ children }: PropsWithChildren): JSX.Element => {
   }, [navigate, queryClient]);
 
   const registerUser = useCallback(
-    async (payload: { nome: string; email: string; password: string; roleId: string }) => {
+    async (payload: RegisterUserPayload) => {
       const response = await apiClient.post<{ user: User }>('/auth/register', payload);
       return response.user;
     },

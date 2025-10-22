@@ -3,9 +3,15 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
 import { requirePermission } from '../middlewares/require-permission';
-import { userIdSchema, userStatusSchema, userUpdateSchema } from '../schema/user';
+import {
+  collaboratorProfileInputSchema,
+  userIdSchema,
+  userStatusSchema,
+  userUpdateSchema,
+} from '../schema/user';
 import { isCuid } from '../schema/ids';
 import { asyncHandler } from '../utils/async-handler';
+import { normalizeCollaboratorProfileInput } from '../utils/collaborator-profile';
 import { HttpError } from '../utils/http-error';
 import { isPrismaKnownError } from '../utils/prisma-error';
 import { serializeUser } from '../utils/serializers';
@@ -96,6 +102,66 @@ usersRouter.patch(
       const user = await prisma.user.update({
         where: { id },
         data: { isActive: payload.isActive },
+        include: {
+          role: {
+            include: {
+              modules: {
+                where: { isEnabled: true, module: { isActive: true } },
+                include: { module: true },
+              },
+            },
+          },
+          collaboratorProfile: true,
+        },
+      });
+
+      res.json({ user: serializeUser(user) });
+    } catch (error) {
+      if (isPrismaKnownError(error, 'P2025')) {
+        throw new HttpError(404, 'Usuário não encontrado.');
+      }
+      throw error;
+    }
+  }),
+);
+
+usersRouter.patch(
+  '/:id/profile',
+  asyncHandler(async (req, res) => {
+    const { id } = userIdSchema.parse(req.params);
+    const payload = collaboratorProfileInputSchema.parse(req.body);
+
+    const profileInput = normalizeCollaboratorProfileInput(payload);
+
+    if (!profileInput.hasChanges) {
+      throw new HttpError(400, 'Informe ao menos um campo de perfil para atualização.');
+    }
+
+    try {
+      const user = await prisma.user.update({
+        where: { id },
+        data: {
+          collaboratorProfile: {
+            upsert: {
+              create: {
+                turnos: profileInput.turnos ?? [],
+                ...(profileInput.especialidade !== undefined
+                  ? { especialidade: profileInput.especialidade }
+                  : {}),
+                ...(profileInput.crmv !== undefined ? { crmv: profileInput.crmv } : {}),
+                ...(profileInput.bio !== undefined ? { bio: profileInput.bio } : {}),
+              },
+              update: {
+                ...(profileInput.especialidade !== undefined
+                  ? { especialidade: profileInput.especialidade }
+                  : {}),
+                ...(profileInput.crmv !== undefined ? { crmv: profileInput.crmv } : {}),
+                ...(profileInput.bio !== undefined ? { bio: profileInput.bio } : {}),
+                ...(profileInput.turnos !== undefined ? { turnos: { set: profileInput.turnos } } : {}),
+              },
+            },
+          },
+        },
         include: {
           role: {
             include: {
