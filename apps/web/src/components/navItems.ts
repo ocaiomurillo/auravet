@@ -29,7 +29,7 @@ export const navItems: NavItem[] = [
   { to: '/services', label: 'Serviços', module: 'services:read', icon: ClipboardDocumentCheckIcon },
   { to: '/products', label: 'Produtos', module: 'products:read', icon: ShoppingBagIcon },
   { to: '/cashier', label: 'Caixa', module: 'cashier:access', icon: BanknotesIcon },
-  { to: '/new-service', label: 'Registrar atendimento', module: 'services:write', icon: PlusCircleIcon },
+  { to: '/new-service', label: 'Atendimento', module: 'services:write', icon: PlusCircleIcon },
   { to: '/users', label: 'Usuários', module: 'users:manage', icon: UserCircleIcon },
   { to: '/roles', label: 'Funções', module: 'users:manage', icon: KeyIcon },
 ];

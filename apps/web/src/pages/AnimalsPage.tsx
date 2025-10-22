@@ -159,7 +159,7 @@ const AnimalsPage = () => {
         <div className="flex flex-wrap gap-2">
           {canRegisterServices ? (
             <Button variant="secondary" asChild>
-              <Link to="/new-service">Registrar atendimento</Link>
+              <Link to="/new-service">Registrar Atendimento</Link>
             </Button>
           ) : null}
           {canManageAnimals ? <Button onClick={openCreateModal}>Novo animal</Button> : null}
