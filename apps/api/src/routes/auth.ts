@@ -6,6 +6,7 @@ import { authenticate } from '../middlewares/authenticate';
 import { createRateLimiter } from '../middlewares/rate-limiter';
 import { requirePermission } from '../middlewares/require-permission';
 import { loginSchema, registerSchema } from '../schema/auth';
+import { normalizeCollaboratorProfileInput } from '../utils/collaborator-profile';
 import { asyncHandler } from '../utils/async-handler';
 import { hashPassword, verifyPassword, createAccessToken, buildAuthenticatedUser } from '../utils/auth';
 import { HttpError } from '../utils/http-error';
@@ -87,6 +88,13 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = registerSchema.parse(req.body);
 
+    const profileInput = normalizeCollaboratorProfileInput({
+      especialidade: payload.especialidade,
+      crmv: payload.crmv,
+      bio: payload.bio,
+      turnos: payload.turnos,
+    });
+
     const role = await prisma.role.findFirst({
       where: {
         OR: [{ id: payload.roleId }, { slug: payload.roleId }],
@@ -106,6 +114,20 @@ authRouter.post(
           email: payload.email,
           passwordHash,
           roleId: role.id,
+          ...(profileInput.hasChanges
+            ? {
+                collaboratorProfile: {
+                  create: {
+                    turnos: profileInput.turnos ?? [],
+                    ...(profileInput.especialidade !== undefined
+                      ? { especialidade: profileInput.especialidade }
+                      : {}),
+                    ...(profileInput.crmv !== undefined ? { crmv: profileInput.crmv } : {}),
+                    ...(profileInput.bio !== undefined ? { bio: profileInput.bio } : {}),
+                  },
+                },
+              }
+            : {}),
         },
         include: {
           role: {
