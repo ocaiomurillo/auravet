@@ -1,11 +1,11 @@
 import type {
   Appointment,
+  AttendanceType,
   DashboardSummaryResponse,
   Invoice,
   InvoiceListResponse,
   InvoiceStatus,
   Product,
-  Service,
   ServiceDefinition,
 } from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
@@ -123,7 +123,7 @@ export type CreateAppointmentPayload = {
   assistantId?: string;
   scheduledStart: string;
   scheduledEnd: string;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   status?: Appointment['status'];
   notes?: string;
 };
@@ -167,7 +167,7 @@ export interface CreateServiceDefinitionPayload {
   nome: string;
   descricao?: string | null;
   profissional?: string | null;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   precoSugerido: number;
 }
 

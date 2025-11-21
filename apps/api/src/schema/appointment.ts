@@ -34,7 +34,7 @@ const servicePayloadSchema = z
   .object({
     tipo: z
       .enum(tipoServicoValues, {
-        errorMap: () => ({ message: 'Tipo de serviço inválido' }),
+        errorMap: () => ({ message: 'Tipo de atendimento inválido' }),
       })
       .default('CONSULTA'),
     preco: priceInputSchema.default(0),

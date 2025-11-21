@@ -9,17 +9,17 @@ import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { serviceDefinitionsApi } from '../lib/apiClient';
-import type { Service, ServiceDefinition } from '../types/api';
+import type { AttendanceType, ServiceDefinition } from '../types/api';
 
 interface ServiceDefinitionFormValues {
   nome: string;
   descricao: string;
   profissional: string;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   precoSugerido: string;
 }
 
-const serviceLabels: Record<Service['tipo'], string> = {
+const serviceTypeLabels: Record<AttendanceType, string> = {
   CONSULTA: 'Consulta',
   EXAME: 'Exame',
   VACINACAO: 'Vacinação',
@@ -101,7 +101,7 @@ const ServicesPage = () => {
           <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
             <Field label="Nome do serviço" {...register('nome')} required />
             <SelectField label="Tipo de serviço" {...register('tipo')}>
-              {Object.entries(serviceLabels).map(([value, label]) => (
+              {Object.entries(serviceTypeLabels).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
@@ -155,7 +155,7 @@ const ServicesPage = () => {
                 <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="font-montserrat text-lg font-semibold text-brand-escuro">{definition.nome}</p>
-                    <p className="text-sm text-brand-grafite/70">{serviceLabels[definition.tipo] ?? definition.tipo}</p>
+                    <p className="text-sm text-brand-grafite/70">{serviceTypeLabels[definition.tipo] ?? definition.tipo}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-brand-escuro">

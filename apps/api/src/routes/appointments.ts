@@ -800,7 +800,7 @@ appointmentsRouter.delete(
     if (appointment.serviceId) {
       throw new HttpError(
         400,
-        'Não é possível excluir um agendamento que já está vinculado a um serviço concluído.',
+        'Não é possível excluir um agendamento que já está vinculado a um atendimento concluído.',
       );
     }
 

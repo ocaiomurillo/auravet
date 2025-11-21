@@ -54,7 +54,7 @@ const ensureAnimalExists = async (animalId: string) => {
     select: { id: true, ownerId: true },
   });
   if (!animal) {
-    throw new HttpError(404, 'Animal não encontrado para o serviço.');
+    throw new HttpError(404, 'Animal não encontrado para o atendimento.');
   }
   if (!animal.ownerId) {
     throw new HttpError(400, 'Animal selecionado não possui tutor vinculado.');
@@ -79,7 +79,7 @@ const ensureDistinctItems = (items: ServiceItemInput[]) => {
   const seen = new Set<string>();
   for (const item of items) {
     if (seen.has(item.productId)) {
-      throw new HttpError(400, 'Informe cada produto apenas uma vez na lista de itens do serviço.');
+      throw new HttpError(400, 'Informe cada produto apenas uma vez na lista de itens do atendimento.');
     }
     seen.add(item.productId);
   }
@@ -105,7 +105,7 @@ const loadProductsMap = async (tx: Prisma.TransactionClient, ids: string[]): Pro
   });
 
   if (products.length !== ids.length) {
-    throw new HttpError(404, 'Produto utilizado no serviço não foi encontrado.');
+    throw new HttpError(404, 'Produto utilizado no atendimento não foi encontrado.');
   }
 
   return new Map(products.map((product) => [product.id, product]));
@@ -168,7 +168,7 @@ const ensureResponsibleExists = async (tx: Prisma.TransactionClient, userId: str
   });
 
   if (!responsible) {
-    throw new HttpError(404, 'Responsável informado não possui acesso ao módulo de serviços.');
+    throw new HttpError(404, 'Responsável informado não possui acesso ao módulo de atendimentos.');
   }
 };
 
@@ -378,7 +378,7 @@ servicesRouter.put(
         ) {
           throw new HttpError(
             400,
-            'Não é possível alterar informações financeiras de um serviço com conta quitada.',
+            'Não é possível alterar informações financeiras de um atendimento com conta quitada.',
           );
         }
 

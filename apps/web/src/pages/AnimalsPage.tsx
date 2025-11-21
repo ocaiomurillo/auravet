@@ -38,8 +38,8 @@ const AnimalsPage = () => {
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
   const canManageAnimals = hasModule('animals:write');
-  const canRegisterServices = hasModule('services:write');
-  const canViewServices = hasModule('services:read');
+  const canRegisterAttendances = hasModule('services:write');
+  const canViewAttendances = hasModule('services:read');
 
   const { data: animals, isLoading, error } = useQuery({
     queryKey: ['animals'],
@@ -68,6 +68,7 @@ const AnimalsPage = () => {
   const selectedOwner = selectedAnimal?.owner ?? null;
   const selectedOwnerCpf = formatCpf(selectedOwner?.cpf);
   const selectedOwnerAddress = selectedOwner ? buildOwnerAddress(selectedOwner) : null;
+  const attendances = selectedAnimal?.services ?? [];
   useEffect(() => {
     const highlight = (location.state as { highlight?: string } | null)?.highlight;
     if (highlight) {
@@ -153,11 +154,11 @@ const AnimalsPage = () => {
         <div>
           <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Animais</h1>
           <p className="text-sm text-brand-grafite/70">
-            Cada pet carrega uma história. Visualize tutores, espécie e histórico de serviços em um só lugar.
+            Cada pet carrega uma história. Visualize tutores, espécie e histórico de atendimentos em um só lugar.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canRegisterServices ? (
+          {canRegisterAttendances ? (
             <Button variant="secondary" asChild>
               <Link to="/new-service">Registrar Atendimento</Link>
             </Button>
@@ -221,7 +222,7 @@ const AnimalsPage = () => {
           ) : null}
         </Card>
 
-        <Card title="Histórico do pet" description="Serviços realizados com datas e valores.">
+        <Card title="Histórico do pet" description="Atendimentos realizados com datas e valores.">
           {selectedAnimal ? (
             <div className="space-y-3">
               <div className="rounded-2xl bg-brand-azul/40 p-4">
@@ -246,30 +247,30 @@ const AnimalsPage = () => {
                   </div>
                 ) : null}
               </div>
-              {canViewServices ? (
-                selectedAnimal.services?.length ? (
+              {canViewAttendances ? (
+                attendances.length ? (
                   <ul className="space-y-3">
-                    {selectedAnimal.services.map((service) => (
-                      <li key={service.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
-                        <p className="font-semibold text-brand-escuro">{service.tipo}</p>
+                    {attendances.map((attendance) => (
+                      <li key={attendance.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
+                        <p className="font-semibold text-brand-escuro">{attendance.tipo}</p>
                         <p className="text-sm text-brand-grafite/70">
-                          {new Date(service.data).toLocaleDateString('pt-BR')} • R$ {service.preco.toFixed(2)}
+                          {new Date(attendance.data).toLocaleDateString('pt-BR')} • R$ {attendance.preco.toFixed(2)}
                         </p>
-                        {service.responsavel ? (
-                          <p className="text-sm text-brand-grafite/70">Responsável: {service.responsavel.nome}</p>
+                        {attendance.responsavel ? (
+                          <p className="text-sm text-brand-grafite/70">Responsável: {attendance.responsavel.nome}</p>
                         ) : null}
-                        {service.assistant ? (
-                          <p className="text-sm text-brand-grafite/70">Assistente: {service.assistant.nome}</p>
+                        {attendance.assistant ? (
+                          <p className="text-sm text-brand-grafite/70">Assistente: {attendance.assistant.nome}</p>
                         ) : null}
-                        {service.observacoes ? (
-                          <p className="text-sm text-brand-grafite/80">{service.observacoes}</p>
+                        {attendance.observacoes ? (
+                          <p className="text-sm text-brand-grafite/80">{attendance.observacoes}</p>
                         ) : null}
                       </li>
                     ))}
                   </ul>
                 ) : (
                   <p className="text-sm text-brand-grafite/70">
-                    Nenhum serviço registrado ainda. Que tal registrar o primeiro cuidado?
+                    Nenhum atendimento registrado ainda. Que tal registrar o primeiro cuidado?
                   </p>
                 )
               ) : (

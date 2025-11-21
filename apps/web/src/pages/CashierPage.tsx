@@ -10,12 +10,12 @@ import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
 import type {
   Appointment,
+  AttendanceType,
   Invoice,
   InvoiceItem,
   InvoiceListResponse,
   OwnerSummary,
   Product,
-  Service,
 } from '../types/api';
 import { apiClient, appointmentsApi, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
@@ -301,7 +301,7 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL',
 });
 
-const serviceLabels: Record<Service['tipo'], string> = {
+const attendanceTypeLabels: Record<AttendanceType, string> = {
   CONSULTA: 'Consulta',
   EXAME: 'Exame',
   VACINACAO: 'Vacinação',
@@ -1005,7 +1005,7 @@ const CashierPage = () => {
 
               return (
                 <option key={appointment.id} value={appointment.id}>
-                  {serviceLabels[appointment.tipo] ?? appointment.tipo} — {appointment.animal?.nome ?? 'Pet'} •{' '}
+                  {attendanceTypeLabels[appointment.tipo] ?? appointment.tipo} — {appointment.animal?.nome ?? 'Pet'} •{' '}
                   {referenceDate ? new Date(referenceDate).toLocaleDateString('pt-BR') : 'Data não informada'}
                 </option>
               );
@@ -1223,7 +1223,7 @@ const CashierPage = () => {
                         placeholder={
                           extraItemMode === 'product'
                             ? 'Ex.: Produto avulso: Coleira antipulgas'
-                            : 'Descreva o item ou serviço cobrado'
+                            : 'Descreva o item ou atendimento cobrado'
                         }
                       />
 
