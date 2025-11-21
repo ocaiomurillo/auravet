@@ -92,7 +92,7 @@ const ServicesPage = () => {
       <div className="space-y-1">
         <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Catálogo de serviços</h1>
         <p className="text-sm text-brand-grafite/70">
-          Cadastre serviços padrão com valores sugeridos e responsável/função para reutilizar nos atendimentos e no caixa.
+          Cadastre os serviços que serão utilizados nos atendimentos, incluindo valores sugeridos e profissional/função.
         </p>
       </div>
 
@@ -100,7 +100,7 @@ const ServicesPage = () => {
         <Card title="Novo serviço" description="Organize seu catálogo para agilizar futuros atendimentos.">
           <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
             <Field label="Nome do serviço" {...register('nome')} required />
-            <SelectField label="Tipo" {...register('tipo')}>
+            <SelectField label="Tipo de serviço" {...register('tipo')}>
               {Object.entries(serviceLabels).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}

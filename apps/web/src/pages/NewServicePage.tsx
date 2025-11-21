@@ -12,27 +12,27 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiClient, serviceDefinitionsApi } from '../lib/apiClient';
 import type { Animal, Product, Service, ServiceResponsible } from '../types/api';
 
-interface ServiceItemFormValue {
+interface AttendanceProductItemFormValue {
   productId: string;
   quantidade: string;
   precoUnitario: string;
 }
 
-interface CatalogItemFormValue {
+interface AttendanceCatalogItemFormValue {
   serviceDefinitionId: string;
   quantidade: string;
   precoUnitario: string;
   observacoes?: string;
 }
 
-interface ServiceFormValues {
+interface AttendanceFormValues {
   animalId: string;
   tipo: Service['tipo'];
   data: string;
   observacoes?: string;
   responsavelId: string;
-  catalogItems: CatalogItemFormValue[];
-  items: ServiceItemFormValue[];
+  catalogItems: AttendanceCatalogItemFormValue[];
+  items: AttendanceProductItemFormValue[];
 }
 
 const serviceLabels: Record<Service['tipo'], string> = {
@@ -43,28 +43,28 @@ const serviceLabels: Record<Service['tipo'], string> = {
   OUTROS: 'Outros cuidados',
 };
 
-type ServiceItemPayload = {
+type AttendanceProductItemPayload = {
   productId: string;
   quantidade: number;
   precoUnitario: number;
 };
 
-type ServiceCatalogItemPayload = {
+type AttendanceCatalogItemPayload = {
   serviceDefinitionId: string;
   quantidade: number;
   precoUnitario: number;
   observacoes?: string;
 };
 
-type CreateServicePayload = {
+type CreateAttendancePayload = {
   animalId: string;
   tipo: Service['tipo'];
   data: string;
   preco?: number;
   observacoes?: string;
   responsavelId?: string;
-  catalogItems: ServiceCatalogItemPayload[];
-  items: ServiceItemPayload[];
+  catalogItems: AttendanceCatalogItemPayload[];
+  items: AttendanceProductItemPayload[];
 };
 
 const NewServicePage = () => {
@@ -72,7 +72,7 @@ const NewServicePage = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const { register, handleSubmit, watch, reset, setValue, control } = useForm<ServiceFormValues>({
+  const { register, handleSubmit, watch, reset, setValue, control } = useForm<AttendanceFormValues>({
     defaultValues: {
       animalId: '',
       tipo: 'CONSULTA',
@@ -88,6 +88,7 @@ const NewServicePage = () => {
   const catalogItems = watch('catalogItems');
   const animalId = watch('animalId');
   const responsavelId = watch('responsavelId');
+  const tipoAtendimento = watch('tipo');
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -136,11 +137,36 @@ const NewServicePage = () => {
     [responsibles],
   );
 
+  const serviceTypeOptions = useMemo(() => {
+    const typesFromCatalog = new Map<Service['tipo'], string>();
+
+    for (const definition of availableDefinitions) {
+      typesFromCatalog.set(definition.tipo, serviceLabels[definition.tipo] ?? definition.tipo);
+    }
+
+    const entries = typesFromCatalog.size
+      ? Array.from(typesFromCatalog.entries())
+      : Object.entries(serviceLabels);
+
+    return entries
+      .map(([value, label]) => ({ value: value as Service['tipo'], label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [availableDefinitions]);
+
   useEffect(() => {
     if (user?.id && !responsavelId) {
       setValue('responsavelId', user.id);
     }
   }, [responsavelId, setValue, user?.id]);
+
+  useEffect(() => {
+    if (!serviceTypeOptions.length) return;
+
+    const hasSelectedType = serviceTypeOptions.some((option) => option.value === tipoAtendimento);
+    if (!hasSelectedType) {
+      setValue('tipo', serviceTypeOptions[0].value);
+    }
+  }, [serviceTypeOptions, setValue, tipoAtendimento]);
 
   const tutorHelperText = selectedAnimal
     ? selectedAnimal.owner?.nome
@@ -277,8 +303,8 @@ const NewServicePage = () => {
     });
   }, [availableDefinitions, catalogItems, setValue]);
 
-  const createService = useMutation({
-    mutationFn: (payload: CreateServicePayload) => apiClient.post<Service>('/services', payload),
+  const createAttendance = useMutation({
+    mutationFn: (payload: CreateAttendancePayload) => apiClient.post<Service>('/services', payload),
     onSuccess: (service) => {
       toast.success('Atendimento registrado com sucesso.');
       queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -300,7 +326,7 @@ const NewServicePage = () => {
   });
 
   const disableSubmit =
-    createService.isPending ||
+    createAttendance.isPending ||
     insufficientStock ||
     hasDuplicateItems ||
     hasDuplicateCatalogItems ||
@@ -322,7 +348,7 @@ const NewServicePage = () => {
       return;
     }
 
-    const sanitizedCatalogItems: ServiceCatalogItemPayload[] = [];
+    const sanitizedCatalogItems: AttendanceCatalogItemPayload[] = [];
 
     for (const item of formCatalogItems ?? []) {
       if (!item.serviceDefinitionId) {
@@ -361,7 +387,7 @@ const NewServicePage = () => {
       return;
     }
 
-    const sanitizedItems: ServiceItemPayload[] = [];
+    const sanitizedItems: AttendanceProductItemPayload[] = [];
 
     for (const item of formItems ?? []) {
       if (!item.productId) {
@@ -410,7 +436,7 @@ const NewServicePage = () => {
       0,
     );
 
-    const payload: CreateServicePayload = {
+    const payload: CreateAttendancePayload = {
       animalId: values.animalId,
       tipo: values.tipo,
       data: values.data,
@@ -421,7 +447,7 @@ const NewServicePage = () => {
       items: sanitizedItems,
     };
 
-    createService.mutate(payload);
+    createAttendance.mutate(payload);
   });
 
   return (
@@ -434,7 +460,7 @@ const NewServicePage = () => {
           </p>
         </div>
         <Button variant="secondary" asChild>
-          <Link to="/services">Voltar para atendimentos</Link>
+          <Link to="/services">Abrir catálogo de atendimentos</Link>
         </Button>
       </div>
 
@@ -458,10 +484,10 @@ const NewServicePage = () => {
             error={petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o atendimento.' : undefined}
           />
 
-          <SelectField label="Tipo de serviço" required {...register('tipo')}>
-            {Object.entries(serviceLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+          <SelectField label="Tipo de atendimento" required {...register('tipo')}>
+            {serviceTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </SelectField>
@@ -792,7 +818,7 @@ const NewServicePage = () => {
               Limpar
             </Button>
             <Button type="submit" disabled={disableSubmit}>
-              {createService.isPending ? 'Registrando Atendimento...' : 'Registrar Atendimento'}
+              {createAttendance.isPending ? 'Registrando Atendimento...' : 'Registrar Atendimento'}
             </Button>
           </div>
         </form>
