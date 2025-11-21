@@ -21,6 +21,7 @@ const serviceInclude = {
       owner: true,
     },
   },
+  appointment: true,
   items: {
     include: {
       product: true,
@@ -326,6 +327,25 @@ servicesRouter.post(
     });
 
     res.status(201).json(serializeService(service, { includeAnimal: true }));
+  }),
+);
+
+servicesRouter.get(
+  '/:id',
+  requirePermission('services:read'),
+  asyncHandler(async (req, res) => {
+    const { id } = serviceIdSchema.parse(req.params);
+
+    const service = await prisma.servico.findUnique({
+      where: { id },
+      include: serviceInclude,
+    });
+
+    if (!service) {
+      throw new HttpError(404, 'Serviço não encontrado.');
+    }
+
+    res.json(serializeService(service, { includeAnimal: true }));
   }),
 );
 

@@ -73,6 +73,7 @@ export interface Attendance {
   observacoes?: string | null;
   createdAt: string;
   appointmentId: string | null;
+  appointment?: { scheduledStart: string; scheduledEnd: string } | null;
   assistantId: string | null;
   animal?: Animal;
   catalogItems: ServiceCatalogItem[];

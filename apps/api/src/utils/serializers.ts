@@ -159,6 +159,7 @@ export type SerializedService = {
   observacoes: string | null;
   createdAt: string;
   appointmentId: string | null;
+  appointment?: { scheduledStart: string; scheduledEnd: string } | null;
   animal?: SerializedAnimal;
   catalogItems: SerializedServiceCatalogItem[];
   items: SerializedServiceItem[];
@@ -393,6 +394,12 @@ export const serializeService = (
     observacoes: service.observacoes ?? null,
     createdAt: service.createdAt.toISOString(),
     appointmentId: service.appointment?.id ?? null,
+    appointment: service.appointment
+      ? {
+          scheduledStart: service.appointment.scheduledStart.toISOString(),
+          scheduledEnd: service.appointment.scheduledEnd.toISOString(),
+        }
+      : null,
     catalogItems:
       service.catalogItems?.map((item) => ({
         id: item.id,
