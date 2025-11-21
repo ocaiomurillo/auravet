@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -58,12 +58,10 @@ type AttendanceCatalogItemPayload = {
 type CreateAttendancePayload = {
   animalId: string;
   data: string;
-  fim?: string;
   preco?: number;
   observacoes?: string;
   responsavelId?: string;
   tipo: Attendance['tipo'];
-  assistantId?: string;
   catalogItems: AttendanceCatalogItemPayload[];
   items: AttendanceProductItemPayload[];
 };
@@ -73,6 +71,8 @@ const NewServicePage = () => {
   const queryClient = useQueryClient();
   const { user, hasModule } = useAuth();
   const canOverrideProductPrice = hasModule('products:write');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [lastPayload, setLastPayload] = useState<CreateAttendancePayload | null>(null);
 
   const { register, handleSubmit, watch, reset, setValue, control } = useForm<AttendanceFormValues>({
     defaultValues: {
@@ -318,6 +318,9 @@ const NewServicePage = () => {
     onSuccess: async (service, payload) => {
       toast.success('Atendimento registrado com sucesso.');
 
+      setSubmitError(null);
+      setLastPayload(null);
+
       if (payload?.items?.length) {
         try {
           await Promise.all(
@@ -351,7 +354,9 @@ const NewServicePage = () => {
       navigate(`/animals`, { state: { highlight: service.animalId } });
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : 'Não foi possível registrar o atendimento.');
+      const message = err instanceof Error ? err.message : 'Não foi possível registrar o atendimento.';
+      setSubmitError(message);
+      toast.error(message);
     },
   });
 
@@ -409,6 +414,7 @@ const NewServicePage = () => {
     }
 
     const sanitizedCatalogItems: AttendanceCatalogItemPayload[] = [];
+    let resolvedServiceType: Attendance['tipo'] | null = null;
 
     for (const item of formCatalogItems ?? []) {
       if (!item.serviceDefinitionId) {
@@ -432,6 +438,10 @@ const NewServicePage = () => {
       const resolvedUnitPrice = Number.isFinite(unitPriceValue) && unitPriceValue >= 0
         ? Number(unitPriceValue.toFixed(2))
         : Number(definition.precoSugerido.toFixed(2));
+
+      if (!resolvedServiceType) {
+        resolvedServiceType = definition.tipo;
+      }
 
       sanitizedCatalogItems.push({
         serviceDefinitionId: item.serviceDefinitionId,
@@ -505,16 +515,16 @@ const NewServicePage = () => {
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
       data: start.toISOString(),
-      fim: end.toISOString(),
       preco: Number(servicesTotalValue.toFixed(2)),
       observacoes: values.observacoes?.trim() ? values.observacoes : undefined,
       responsavelId: values.responsavelId,
-      tipo: 'CONSULTA',
-      assistantId: values.assistantId || undefined,
+      tipo: resolvedServiceType ?? 'CONSULTA',
       catalogItems: sanitizedCatalogItems,
       items: sanitizedItems,
     };
 
+    setSubmitError(null);
+    setLastPayload(payload);
     createAttendance.mutate(payload);
   });
 
@@ -883,6 +893,22 @@ const NewServicePage = () => {
               <span className="font-semibold text-brand-escuro">Total geral: R$ {overallTotal.toFixed(2)}</span>
             </div>
           </div>
+
+          {submitError ? (
+            <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <span className="font-semibold">{submitError}</span>
+              {lastPayload ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={createAttendance.isPending}
+                  onClick={() => createAttendance.mutate(lastPayload)}
+                >
+                  {createAttendance.isPending ? 'Tentando novamente...' : 'Tentar novamente'}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="md:col-span-2 flex justify-end gap-3">
             <Button
