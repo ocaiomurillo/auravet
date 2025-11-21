@@ -92,6 +92,7 @@ export interface ServiceItem {
     id: string;
     nome: string;
     precoVenda: number;
+    precoBaseCatalogo: number;
     estoqueAtual: number;
     estoqueMinimo: number;
   };
@@ -199,6 +200,7 @@ export interface Product {
   descricao: string | null;
   custo: number;
   precoVenda: number;
+  precoBaseCatalogo: number;
   estoqueAtual: number;
   estoqueMinimo: number;
   isActive: boolean;

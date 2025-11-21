@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -71,7 +71,8 @@ type CreateAttendancePayload = {
 const NewServicePage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasModule } = useAuth();
+  const canOverrideProductPrice = hasModule('products:write');
 
   const { register, handleSubmit, watch, reset, setValue, control } = useForm<AttendanceFormValues>({
     defaultValues: {
@@ -176,6 +177,11 @@ const NewServicePage = () => {
     [products],
   );
 
+  const resolveProductBasePrice = useCallback(
+    (product?: Product) => product?.precoBaseCatalogo ?? product?.precoVenda ?? 0,
+    [],
+  );
+
   const duplicateProductIds = useMemo(() => {
     const seen = new Set<string>();
     const duplicates = new Set<string>();
@@ -240,7 +246,9 @@ const NewServicePage = () => {
       const normalizedQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
       const unitPriceRaw = typeof item.precoUnitario === 'string' ? item.precoUnitario : String(item.precoUnitario ?? '');
       const unitPriceValue = Number(unitPriceRaw.replace(',', '.'));
-      const unitPrice = Number.isFinite(unitPriceValue) && unitPriceValue >= 0 ? unitPriceValue : 0;
+      const unitPrice = Number.isFinite(unitPriceValue) && unitPriceValue >= 0
+        ? unitPriceValue
+        : resolveProductBasePrice(product);
       const subtotal = normalizedQuantity * unitPrice;
       const remainingStock = product ? product.estoqueAtual - normalizedQuantity : undefined;
       const hasInsufficient = Boolean(product && normalizedQuantity > product.estoqueAtual);
@@ -258,7 +266,7 @@ const NewServicePage = () => {
         isLowStock,
       };
     });
-  }, [availableProducts, items]);
+  }, [availableProducts, items, resolveProductBasePrice]);
 
   const insufficientStock = itemDetails.some((detail) => detail.hasInsufficient);
   const hasDuplicateItems = duplicateProductIds.size > 0;
@@ -270,14 +278,26 @@ const NewServicePage = () => {
   useEffect(() => {
     (items ?? []).forEach((item, index) => {
       if (!item?.productId) return;
-      if (item.precoUnitario) return;
 
       const product = availableProducts.find((candidate) => candidate.id === item.productId);
-      if (product) {
-        setValue(`items.${index}.precoUnitario`, product.precoVenda.toFixed(2));
+      if (!product) return;
+
+      const basePrice = resolveProductBasePrice(product);
+      const formattedBasePrice = basePrice.toFixed(2);
+      const rawUnitPrice = typeof item.precoUnitario === 'string' ? item.precoUnitario : String(item.precoUnitario ?? '');
+      const normalizedUnitPrice = rawUnitPrice.replace(',', '.');
+      const parsedUnitPrice = Number(normalizedUnitPrice);
+      const hasCustomPrice = Number.isFinite(parsedUnitPrice)
+        ? Number(parsedUnitPrice.toFixed(2)) !== Number(basePrice.toFixed(2))
+        : false;
+
+      if (!canOverrideProductPrice || rawUnitPrice.trim() === '' || !Number.isFinite(parsedUnitPrice)) {
+        if (!rawUnitPrice || rawUnitPrice !== formattedBasePrice || hasCustomPrice) {
+          setValue(`items.${index}.precoUnitario`, formattedBasePrice);
+        }
       }
     });
-  }, [availableProducts, items, setValue]);
+  }, [availableProducts, canOverrideProductPrice, items, resolveProductBasePrice, setValue]);
 
   useEffect(() => {
     (catalogItems ?? []).forEach((item, index) => {
@@ -447,8 +467,14 @@ const NewServicePage = () => {
         return;
       }
 
+      const basePrice = resolveProductBasePrice(product);
       const unitPriceValue = Number(String(item.precoUnitario ?? '').replace(',', '.'));
-      if (Number.isNaN(unitPriceValue) || unitPriceValue < 0) {
+      const resolvedUnitPrice =
+        Number.isFinite(unitPriceValue) && unitPriceValue >= 0
+          ? unitPriceValue
+          : basePrice;
+
+      if (resolvedUnitPrice < 0 || Number.isNaN(resolvedUnitPrice)) {
         toast.error('Informe um preço unitário válido para os itens.');
         return;
       }
@@ -461,7 +487,7 @@ const NewServicePage = () => {
       sanitizedItems.push({
         productId: item.productId,
         quantidade: quantity,
-        precoUnitario: Number(unitPriceValue.toFixed(2)),
+        precoUnitario: Number(resolvedUnitPrice.toFixed(2)),
       });
     }
 
@@ -759,6 +785,12 @@ const NewServicePage = () => {
                         min="0"
                         step="0.01"
                         required
+                        readOnly={!canOverrideProductPrice}
+                        helperText={
+                          canOverrideProductPrice
+                            ? undefined
+                            : 'Preço definido automaticamente a partir do catálogo de produtos.'
+                        }
                         {...register(`items.${index}.precoUnitario` as const)}
                       />
                     </div>

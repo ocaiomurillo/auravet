@@ -373,6 +373,7 @@ export type SerializedProduct = {
   descricao: string | null;
   custo: number;
   precoVenda: number;
+  precoBaseCatalogo: number;
   estoqueAtual: number;
   estoqueMinimo: number;
   isActive: boolean;
@@ -428,6 +429,7 @@ export const serializeService = (
           id: item.product.id,
           nome: item.product.nome,
           precoVenda: Number(item.product.precoVenda),
+          precoBaseCatalogo: Number(item.product.precoVenda),
           estoqueAtual: item.product.estoqueAtual,
           estoqueMinimo: item.product.estoqueMinimo,
         },
@@ -558,6 +560,7 @@ export const serializeProduct = (product: Product): SerializedProduct => ({
   descricao: product.descricao ?? null,
   custo: Number(product.custo),
   precoVenda: Number(product.precoVenda),
+  precoBaseCatalogo: Number(product.precoVenda),
   estoqueAtual: product.estoqueAtual,
   estoqueMinimo: product.estoqueMinimo,
   isActive: product.isActive,
