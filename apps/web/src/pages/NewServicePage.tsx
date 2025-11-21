@@ -34,6 +34,7 @@ interface AttendanceCatalogItemFormValue {
 interface AttendanceFormValues {
   animalId: string;
   data: string;
+  fim?: string;
   observacoes?: string;
   responsavelId: string;
   assistantId?: string;
@@ -57,9 +58,11 @@ type AttendanceCatalogItemPayload = {
 type CreateAttendancePayload = {
   animalId: string;
   data: string;
+  fim?: string;
   preco?: number;
   observacoes?: string;
   responsavelId?: string;
+  tipo: Attendance['tipo'];
   assistantId?: string;
   catalogItems: AttendanceCatalogItemPayload[];
   items: AttendanceProductItemPayload[];
@@ -74,6 +77,7 @@ const NewServicePage = () => {
     defaultValues: {
       animalId: '',
       data: '',
+      fim: '',
       observacoes: '',
       responsavelId: '',
       assistantId: '',
@@ -86,6 +90,8 @@ const NewServicePage = () => {
   const catalogItems = watch('catalogItems');
   const animalId = watch('animalId');
   const responsavelId = watch('responsavelId');
+  const startDateTime = watch('data');
+  const endDateTime = watch('fim');
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -120,7 +126,7 @@ const NewServicePage = () => {
   });
 
   const { data: collaborators = [] } = useQuery({
-    queryKey: ['service-assistants'],
+    queryKey: ['appointments', 'collaborators'],
     queryFn: () =>
       apiClient
         .get<{ collaborators: CollaboratorSummary[] }>('/appointments/collaborators')
@@ -315,6 +321,7 @@ const NewServicePage = () => {
       reset({
         animalId: '',
         data: '',
+        fim: '',
         observacoes: '',
         responsavelId: user?.id ?? '',
         assistantId: '',
@@ -328,12 +335,24 @@ const NewServicePage = () => {
     },
   });
 
+  const hasInvalidSchedule = useMemo(() => {
+    if (!startDateTime || !endDateTime) return true;
+
+    const start = new Date(startDateTime);
+    const end = new Date(endDateTime);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return true;
+
+    return end <= start;
+  }, [endDateTime, startDateTime]);
+
   const disableSubmit =
     createAttendance.isPending ||
     insufficientStock ||
     hasDuplicateItems ||
     hasDuplicateCatalogItems ||
-    petWithoutTutor;
+    petWithoutTutor ||
+    hasInvalidSchedule;
 
   const onSubmit = handleSubmit(({ items: formItems, catalogItems: formCatalogItems, ...values }) => {
     if (!values.animalId) {
@@ -348,6 +367,24 @@ const NewServicePage = () => {
 
     if (!values.responsavelId) {
       toast.error('Selecione um responsável pelo atendimento.');
+      return;
+    }
+
+    const start = new Date(values.data);
+    const end = values.fim ? new Date(values.fim) : null;
+
+    if (Number.isNaN(start.getTime())) {
+      toast.error('Informe a data e hora de início do atendimento.');
+      return;
+    }
+
+    if (!end || Number.isNaN(end.getTime())) {
+      toast.error('Informe a data e hora de término do atendimento.');
+      return;
+    }
+
+    if (end <= start) {
+      toast.error('A data de término precisa ser posterior ao início.');
       return;
     }
 
@@ -441,10 +478,12 @@ const NewServicePage = () => {
 
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
-      data: values.data,
+      data: start.toISOString(),
+      fim: end.toISOString(),
       preco: Number(servicesTotalValue.toFixed(2)),
       observacoes: values.observacoes?.trim() ? values.observacoes : undefined,
       responsavelId: values.responsavelId,
+      tipo: 'CONSULTA',
       assistantId: values.assistantId || undefined,
       catalogItems: sanitizedCatalogItems,
       items: sanitizedItems,
@@ -490,7 +529,14 @@ const NewServicePage = () => {
             error={petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o atendimento.' : undefined}
           />
 
-          <Field label="Data" type="date" required {...register('data')} />
+          <Field
+            label="Início do atendimento"
+            type="datetime-local"
+            required
+            {...register('data')}
+          />
+
+          <Field label="Término do atendimento" type="datetime-local" required {...register('fim')} />
 
           <SelectField
             label="Responsável pelo atendimento"
@@ -814,6 +860,7 @@ const NewServicePage = () => {
                 reset({
                   animalId: '',
                   data: '',
+                  fim: '',
                   observacoes: '',
                   responsavelId: user?.id ?? '',
                   assistantId: '',
