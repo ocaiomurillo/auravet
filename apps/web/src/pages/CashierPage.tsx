@@ -8,8 +8,8 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
-import type { Invoice, InvoiceListResponse, OwnerSummary, Product, Service } from '../types/api';
-import { apiClient, invoicesApi, productsApi } from '../lib/apiClient';
+import type { Appointment, Invoice, InvoiceListResponse, OwnerSummary, Product, Service } from '../types/api';
+import { apiClient, appointmentsApi, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -37,7 +37,7 @@ const CashierPage = () => {
   const [filters, setFilters] = useState<InvoiceFiltersState>({ ownerId: '', status: '', from: '', to: '' });
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [ownerForModal, setOwnerForModal] = useState('');
-  const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const selectedInvoiceOwnerCpf = selectedInvoice ? formatCpf(selectedInvoice.owner.cpf) : null;
@@ -77,9 +77,9 @@ const CashierPage = () => {
     queryFn: () => apiClient.get<InvoiceListResponse>(`/invoices${queryString}`),
   });
 
-  const candidateServicesQuery = useQuery<Service[]>({
-    queryKey: ['invoice-candidates', ownerForModal],
-    queryFn: () => invoicesApi.candidates(ownerForModal || undefined),
+  const billableAppointmentsQuery = useQuery<Appointment[]>({
+    queryKey: ['billable-appointments', ownerForModal],
+    queryFn: () => appointmentsApi.billable(ownerForModal || undefined),
     enabled: isGenerateModalOpen,
   });
 
@@ -90,13 +90,14 @@ const CashierPage = () => {
   });
 
   const generateMutation = useMutation({
-    mutationFn: (payload: { serviceId: string; dueDate?: string }) => invoicesApi.generateFromService(payload),
+    mutationFn: (payload: { appointmentId: string; dueDate?: string }) =>
+      invoicesApi.generateFromAppointment(payload),
     onSuccess: (invoice) => {
       toast.success('Conta emitida com carinho.');
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoice-candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['billable-appointments'] });
       setIsGenerateModalOpen(false);
-      setSelectedServiceId('');
+      setSelectedAppointmentId('');
       setOwnerForModal('');
       setDueDate('');
       setSelectedInvoice(invoice);
@@ -163,7 +164,7 @@ const CashierPage = () => {
   const summary = invoicesResponse?.summary;
 
   const availableProducts = useMemo(
-    () => (productsQuery.data ?? []).filter((product) => product.isActive && product.isSellable),
+    () => (productsQuery.data ?? []).filter((product) => product.isSellable && product.isActive),
     [productsQuery.data],
   );
 
@@ -176,28 +177,35 @@ const CashierPage = () => {
     return quantity > 0 && unitPrice >= 0 ? quantity * unitPrice : 0;
   }, [extraItemQuantity, extraItemUnitPrice]);
 
-  const selectedService = candidateServicesQuery.data?.find((service) => service.id === selectedServiceId);
+  const selectedAppointment = billableAppointmentsQuery.data?.find(
+    (appointment) => appointment.id === selectedAppointmentId,
+  );
 
   useEffect(() => {
-    if (selectedService) {
-      const baseDate = new Date(selectedService.data);
-      baseDate.setDate(baseDate.getDate() + 7);
-      setDueDate(baseDate.toISOString().slice(0, 10));
-    } else {
-      setDueDate('');
+    if (selectedAppointment) {
+      const baseDateString = selectedAppointment.service?.data ?? selectedAppointment.scheduledStart;
+
+      if (baseDateString) {
+        const baseDate = new Date(baseDateString);
+        baseDate.setDate(baseDate.getDate() + 7);
+        setDueDate(baseDate.toISOString().slice(0, 10));
+        return;
+      }
     }
-  }, [selectedService]);
+
+    setDueDate('');
+  }, [selectedAppointment]);
 
   useEffect(() => {
     if (!isGenerateModalOpen) {
-      setSelectedServiceId('');
+      setSelectedAppointmentId('');
       setOwnerForModal('');
       setDueDate('');
     }
   }, [isGenerateModalOpen]);
 
   useEffect(() => {
-    setSelectedServiceId('');
+    setSelectedAppointmentId('');
   }, [ownerForModal]);
 
   useEffect(() => {
@@ -246,13 +254,13 @@ const CashierPage = () => {
   const handleGenerateInvoice = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!selectedServiceId) {
-      toast.error('Selecione um serviço para gerar a conta.');
+    if (!selectedAppointmentId) {
+      toast.error('Selecione um atendimento para gerar a conta.');
       return;
     }
 
     generateMutation.mutate({
-      serviceId: selectedServiceId,
+      appointmentId: selectedAppointmentId,
       dueDate: dueDate || undefined,
     });
   };
@@ -349,6 +357,19 @@ const CashierPage = () => {
         toast.error('Selecione um produto para adicionar.');
         return;
       }
+
+      const selectedProduct = productsQuery.data?.find((product) => product.id === extraItemProductId);
+
+      if (!selectedProduct) {
+        toast.error('Produto não encontrado. Atualize a lista e tente novamente.');
+        return;
+      }
+
+      if (!selectedProduct.isSellable) {
+        toast.error('Este produto é de uso interno e não pode ser vendido.');
+        return;
+      }
+
       payload.productId = extraItemProductId;
     }
 
@@ -595,7 +616,7 @@ const CashierPage = () => {
         open={isGenerateModalOpen}
         onClose={() => setIsGenerateModalOpen(false)}
         title="Emitir nova conta"
-        description="Selecione o serviço realizado e personalize o vencimento da conta."
+        description="Selecione o atendimento concluído e personalize o vencimento da conta."
         actions={
           <>
             <Button variant="ghost" onClick={() => setIsGenerateModalOpen(false)}>
@@ -622,24 +643,28 @@ const CashierPage = () => {
           </SelectField>
 
           <SelectField
-            label="Serviço"
-            value={selectedServiceId}
-            onChange={(event) => setSelectedServiceId(event.target.value)}
+            label="Atendimento"
+            value={selectedAppointmentId}
+            onChange={(event) => setSelectedAppointmentId(event.target.value)}
           >
-            <option value="">Selecione o serviço realizado</option>
-            {candidateServicesQuery.data?.map((service) => (
-              <option key={service.id} value={service.id}>
-                {serviceLabels[service.tipo] ?? service.tipo} — {service.animal?.nome ?? 'Pet'} •
-                {` ${new Date(service.data).toLocaleDateString('pt-BR')}`}
-              </option>
-            ))}
+            <option value="">Selecione o atendimento já realizado</option>
+            {billableAppointmentsQuery.data?.map((appointment) => {
+              const referenceDate = appointment.service?.data ?? appointment.scheduledStart;
+
+              return (
+                <option key={appointment.id} value={appointment.id}>
+                  {serviceLabels[appointment.tipo] ?? appointment.tipo} — {appointment.animal?.nome ?? 'Pet'} •{' '}
+                  {referenceDate ? new Date(referenceDate).toLocaleDateString('pt-BR') : 'Data não informada'}
+                </option>
+              );
+            })}
           </SelectField>
-          {candidateServicesQuery.isLoading ? (
-            <p className="text-xs text-brand-grafite/60">Buscando serviços disponíveis...</p>
+          {billableAppointmentsQuery.isLoading ? (
+            <p className="text-xs text-brand-grafite/60">Buscando atendimentos disponíveis...</p>
           ) : null}
-          {!candidateServicesQuery.isLoading && candidateServicesQuery.data?.length === 0 ? (
+          {!billableAppointmentsQuery.isLoading && billableAppointmentsQuery.data?.length === 0 ? (
             <p className="text-xs text-brand-grafite/60">
-              Nenhum serviço elegível encontrado para os filtros atuais.
+              Nenhum atendimento elegível encontrado para os filtros atuais.
             </p>
           ) : null}
 

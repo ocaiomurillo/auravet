@@ -131,6 +131,10 @@ export type CreateAppointmentPayload = {
 export const appointmentsApi = {
   create: (payload: CreateAppointmentPayload) =>
     apiClient.post<{ appointment: Appointment }>('/appointments', payload),
+  billable: (ownerId?: string) => {
+    const query = ownerId ? `?ownerId=${ownerId}` : '';
+    return apiClient.get<Appointment[]>(`/appointments/billable${query}`);
+  },
 };
 
 export interface CreateProductPayload {
@@ -198,11 +202,7 @@ export const invoicesApi = {
   list: (filters: InvoiceFilters = {}) => apiClient.get<InvoiceListResponse>(`/invoices${buildInvoiceQuery(filters)}`),
   statuses: () => apiClient.get<InvoiceStatus[]>('/invoices/statuses'),
   getById: (id: string) => apiClient.get<Invoice>(`/invoices/${id}`),
-  candidates: (ownerId?: string) => {
-    const query = ownerId ? `?ownerId=${ownerId}` : '';
-    return apiClient.get<Service[]>(`/invoices/candidates${query}`);
-  },
-  generateFromService: (payload: { serviceId: string; dueDate?: string }) =>
+  generateFromAppointment: (payload: { appointmentId: string; dueDate?: string }) =>
     apiClient.post<Invoice>('/invoices', payload),
   markAsPaid: (id: string, payload: { paidAt?: string; paymentNotes?: string }) =>
     apiClient.post<Invoice>(`/invoices/${id}/pay`, payload),
