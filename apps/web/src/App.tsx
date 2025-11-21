@@ -16,6 +16,7 @@ import ProductsPage from './pages/ProductsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import CalendarPage from './pages/CalendarPage';
 import CashierPage from './pages/CashierPage';
+import AccountingPage from './pages/AccountingPage';
 
 const App = () => {
   return (
@@ -41,6 +42,9 @@ const App = () => {
           </Route>
           <Route element={<RequireModules modules={['products:read']} />}>
             <Route path="products" element={<ProductsPage />} />
+          </Route>
+          <Route element={<RequireModules modules={['cashier:access']} />}>
+            <Route path="accounting" element={<AccountingPage />} />
           </Route>
           <Route element={<RequireModules modules={['cashier:access']} />}>
             <Route path="cashier" element={<CashierPage />} />
