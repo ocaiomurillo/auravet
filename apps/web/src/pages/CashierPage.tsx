@@ -12,6 +12,282 @@ import type { Appointment, Invoice, InvoiceListResponse, OwnerSummary, Product, 
 import { apiClient, appointmentsApi, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
+declare global {
+  interface Window {
+    jspdf?: {
+      jsPDF: JsPDFConstructor;
+    };
+  }
+}
+
+type JsPDFInstance = {
+  setFontSize: (size: number) => void;
+  setTextColor: (r: number, g?: number, b?: number) => void;
+  setLineWidth: (width: number) => void;
+  line: (x1: number, y1: number, x2: number, y2: number) => void;
+  text: (text: string | string[], x: number, y: number, options?: unknown) => void;
+  splitTextToSize: (text: string, maxWidth: number) => string[];
+  addImage: (
+    imageData: string | HTMLImageElement,
+    format: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => void;
+  addPage: () => void;
+  output: (type?: string) => string;
+  save: (fileName?: string) => void;
+};
+
+type JsPDFConstructor = new () => JsPDFInstance;
+
+let cachedLogoDataUrl: string | null = null;
+let cachedJsPdf: JsPDFConstructor | null = null;
+
+const loadJsPdf = async (): Promise<JsPDFConstructor> => {
+  if (cachedJsPdf) {
+    return cachedJsPdf;
+  }
+
+  if (typeof window !== 'undefined' && window.jspdf?.jsPDF) {
+    cachedJsPdf = window.jspdf.jsPDF;
+    return cachedJsPdf;
+  }
+
+  const module = (await import(
+    // @ts-expect-error -- carregamento dinâmico via CDN para evitar dependência adicional
+    /* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'
+  )) as { jsPDF?: unknown; default?: { jsPDF?: unknown } };
+  const constructor = module.jsPDF ?? module.default?.jsPDF;
+
+  if (!constructor) {
+    throw new Error('Biblioteca de PDF indisponível no momento. Tente novamente.');
+  }
+
+  if (typeof window !== 'undefined') {
+    window.jspdf = { jsPDF: constructor as JsPDFConstructor };
+  }
+
+  cachedJsPdf = constructor as JsPDFConstructor;
+  return cachedJsPdf;
+};
+
+const generateFallbackLogo = (): string => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 80;
+  const context = canvas.getContext('2d');
+
+  if (context) {
+    context.fillStyle = '#0f172a';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#f8fafc';
+    context.font = 'bold 28px Montserrat, Arial, sans-serif';
+    context.fillText('Auravet', 24, 48);
+  }
+
+  return canvas.toDataURL('image/png');
+};
+
+const loadLogoDataUrl = async (): Promise<string> => {
+  if (cachedLogoDataUrl) {
+    return cachedLogoDataUrl;
+  }
+
+  try {
+    const response = await fetch('/favicon.svg');
+    const svgContent = await response.text();
+    const svgBase64 = window.btoa(unescape(encodeURIComponent(svgContent)));
+    const svgDataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+    await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.src = svgDataUrl;
+      image.onload = () => resolve(true);
+      image.onerror = reject;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 80;
+    const context = canvas.getContext('2d');
+
+    if (context) {
+      const image = new Image();
+      image.src = svgDataUrl;
+      await new Promise((resolve, reject) => {
+        image.onload = () => resolve(true);
+        image.onerror = reject;
+      });
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      cachedLogoDataUrl = canvas.toDataURL('image/png');
+      return cachedLogoDataUrl;
+    }
+  } catch (err) {
+    void err;
+  }
+
+  cachedLogoDataUrl = generateFallbackLogo();
+  return cachedLogoDataUrl;
+};
+
+const addSectionTitle = (doc: JsPDFInstance, title: string, y: number) => {
+  doc.setFontSize(11);
+  doc.setTextColor(30, 41, 59);
+  doc.text(title, 15, y);
+  doc.setLineWidth(0.4);
+  doc.line(15, y + 2, 195, y + 2);
+};
+
+const ensureSpace = (doc: JsPDFInstance, currentY: number, extraSpace = 12) => {
+  if (currentY + extraSpace < 280) {
+    return currentY;
+  }
+
+  doc.addPage();
+  return 20;
+};
+
+const appendKeyValue = (
+  doc: JsPDFInstance,
+  label: string,
+  value: string,
+  y: number,
+  color: [number, number, number] = [30, 41, 59],
+) => {
+  doc.setFontSize(10);
+  doc.setTextColor(...color);
+  doc.text(`${label}: ${value}`, 15, y);
+};
+
+const buildInvoicePdf = async (invoice: Invoice) => {
+  const JsPdf = await loadJsPdf();
+  const doc = new JsPdf();
+  const logo = await loadLogoDataUrl();
+
+  let currentY = 22;
+
+  if (logo) {
+    doc.addImage(logo, 'PNG', 15, 10, 32, 16);
+  }
+
+  doc.setFontSize(16);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Auravet', 52, 20);
+  doc.setFontSize(12);
+  doc.setTextColor(71, 85, 105);
+  doc.text('Fatura detalhada', 52, 28);
+
+  currentY = 34;
+  doc.setFontSize(10);
+  doc.setTextColor(30, 41, 59);
+  doc.text(`Fatura nº ${invoice.id}`, 15, currentY);
+  currentY += 6;
+  doc.text(`Emitida em: ${new Date(invoice.createdAt).toLocaleDateString('pt-BR')}`, 15, currentY);
+  currentY += 6;
+  doc.text(`Vencimento: ${new Date(invoice.dueDate).toLocaleDateString('pt-BR')}`, 15, currentY);
+  currentY += 6;
+  doc.text(`Status: ${invoice.status.name}`, 15, currentY);
+
+  currentY += 12;
+  addSectionTitle(doc, 'Tutor', currentY);
+  currentY += 8;
+  appendKeyValue(doc, 'Nome', invoice.owner.nome, currentY);
+  currentY += 6;
+  if (invoice.owner.email) {
+    appendKeyValue(doc, 'E-mail', invoice.owner.email, currentY);
+    currentY += 6;
+  }
+  if (invoice.owner.telefone) {
+    appendKeyValue(doc, 'Telefone', invoice.owner.telefone, currentY);
+    currentY += 6;
+  }
+  const ownerCpf = formatCpf(invoice.owner.cpf);
+  if (ownerCpf) {
+    appendKeyValue(doc, 'CPF', ownerCpf, currentY);
+    currentY += 6;
+  }
+  const ownerAddress = buildOwnerAddress(invoice.owner);
+  if (ownerAddress) {
+    const wrappedAddress = doc.splitTextToSize(ownerAddress, 175);
+    doc.text(`Endereço: ${wrappedAddress.shift() ?? ''}`, 15, currentY);
+    if (wrappedAddress.length > 0) {
+      doc.text(wrappedAddress, 30, currentY + 6);
+      currentY += wrappedAddress.length * 6;
+    }
+    currentY += 6;
+  }
+
+  currentY += 4;
+  addSectionTitle(doc, 'Itens faturados', currentY);
+  currentY += 8;
+  doc.setFontSize(10);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Descrição', 15, currentY);
+  doc.text('Qtd.', 120, currentY, { align: 'right' as const });
+  doc.text('Unitário', 150, currentY, { align: 'right' as const });
+  doc.text('Total', 190, currentY, { align: 'right' as const });
+  currentY += 4;
+  doc.setLineWidth(0.2);
+  doc.line(15, currentY, 195, currentY);
+  currentY += 6;
+
+  invoice.items.forEach((item) => {
+    currentY = ensureSpace(doc, currentY, 18);
+    const descriptionLines = doc.splitTextToSize(item.description, 90);
+
+    doc.setTextColor(30, 41, 59);
+    doc.text(descriptionLines, 15, currentY);
+    doc.text(String(item.quantity), 120, currentY, { align: 'right' as const });
+    doc.text(currencyFormatter.format(item.unitPrice), 150, currentY, { align: 'right' as const });
+    doc.text(currencyFormatter.format(item.total), 190, currentY, { align: 'right' as const });
+
+    currentY += descriptionLines.length * 6;
+
+    const subInfo: string[] = [];
+    if (item.service?.data) {
+      subInfo.push(`Serviço em ${new Date(item.service.data).toLocaleDateString('pt-BR')}`);
+    }
+    if (item.service?.animal?.nome) {
+      subInfo.push(`Pet: ${item.service.animal.nome}`);
+    }
+    if (!item.servicoId && item.product?.nome) {
+      subInfo.push(`Produto: ${item.product.nome}`);
+    }
+    if (!item.servicoId) {
+      subInfo.push('Item extra');
+    }
+
+    if (subInfo.length > 0) {
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(subInfo.join(' • '), 15, currentY + 4);
+      currentY += 8;
+    }
+  });
+
+  currentY = ensureSpace(doc, currentY, 16);
+  addSectionTitle(doc, 'Totais', currentY);
+  currentY += 10;
+  const subtotal = invoice.items.reduce((acc, item) => acc + item.total, 0);
+  appendKeyValue(doc, 'Subtotal', currencyFormatter.format(subtotal), currentY);
+  currentY += 6;
+  appendKeyValue(doc, 'Total da fatura', currencyFormatter.format(invoice.total), currentY, [22, 101, 52]);
+  currentY += 12;
+
+  currentY = ensureSpace(doc, currentY, 20);
+  addSectionTitle(doc, 'Notas de pagamento', currentY);
+  currentY += 8;
+  const notes = invoice.paymentNotes?.trim() || 'Nenhuma observação registrada.';
+  const wrappedNotes = doc.splitTextToSize(notes, 175);
+  doc.setFontSize(10);
+  doc.setTextColor(30, 41, 59);
+  doc.text(wrappedNotes, 15, currentY);
+
+  return doc;
+};
+
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
@@ -49,7 +325,7 @@ const CashierPage = () => {
   const [extraItemDescription, setExtraItemDescription] = useState('');
   const [extraItemQuantity, setExtraItemQuantity] = useState('1');
   const [extraItemUnitPrice, setExtraItemUnitPrice] = useState('');
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
 
   const { data: owners } = useQuery({
@@ -394,23 +670,20 @@ const CashierPage = () => {
     if (!selectedInvoice) return;
 
     try {
-      setIsPrinting(true);
-      const html = await invoicesApi.print(selectedInvoice.id);
-      const printWindow = window.open('', '_blank');
+      setIsGeneratingPdf(true);
+      const doc = await buildInvoicePdf(selectedInvoice);
+      const fileName = `auravet-fatura-${selectedInvoice.id}.pdf`;
+      const blobUrl = doc.output('bloburl');
 
-      if (!printWindow) {
-        throw new Error('Não foi possível abrir a janela de impressão.');
-      }
-
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      doc.save(fileName);
+      toast.success('PDF da fatura gerado. Você pode visualizar ou imprimir.');
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Não foi possível preparar a impressão desta conta.',
+        err instanceof Error ? err.message : 'Não foi possível gerar o PDF desta conta.',
       );
     } finally {
-      setIsPrinting(false);
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -687,8 +960,8 @@ const CashierPage = () => {
             <Button variant="ghost" onClick={handleCloseInvoice}>
               Fechar
             </Button>
-            <Button variant="ghost" onClick={handlePrintInvoice} disabled={isPrinting}>
-              {isPrinting ? 'Preparando...' : 'Imprimir'}
+            <Button variant="ghost" onClick={handlePrintInvoice} disabled={isGeneratingPdf}>
+              {isGeneratingPdf ? 'Gerando PDF...' : 'Imprimir fatura'}
             </Button>
             {selectedInvoice?.status.slug !== 'QUITADA' ? (
               <Button onClick={handleMarkAsPaid} disabled={markPaidMutation.isPending}>
