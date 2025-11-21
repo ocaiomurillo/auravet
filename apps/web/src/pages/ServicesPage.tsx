@@ -9,12 +9,14 @@ import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { serviceDefinitionsApi } from '../lib/apiClient';
-import type { AttendanceType, ServiceDefinition } from '../types/api';
+import type { AttendanceType, ServiceDefinition, ServiceProfessional } from '../types/api';
+
+type ProfessionalOptionValue = ServiceProfessional | '';
 
 interface ServiceDefinitionFormValues {
   nome: string;
   descricao: string;
-  profissional: string;
+  profissional: ProfessionalOptionValue;
   tipo: AttendanceType;
   precoSugerido: string;
 }
@@ -35,6 +37,17 @@ const defaultFormValues: ServiceDefinitionFormValues = {
   precoSugerido: '',
 };
 
+const professionalOptions: { value: ServiceProfessional; label: string }[] = [
+  { value: 'MEDICO', label: 'Médico' },
+  { value: 'ENFERMEIRO', label: 'Enfermeiro' },
+  { value: 'AMBOS', label: 'Ambos' },
+];
+
+const professionalLabels = professionalOptions.reduce<Record<ServiceProfessional, string>>((labels, option) => {
+  labels[option.value] = option.label;
+  return labels;
+}, {} as Record<ServiceProfessional, string>);
+
 const ServicesPage = () => {
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
@@ -49,7 +62,7 @@ const ServicesPage = () => {
     register,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<ServiceDefinitionFormValues>({
     defaultValues: defaultFormValues,
   });
@@ -66,22 +79,35 @@ const ServicesPage = () => {
     },
   });
 
-  const onSubmit = handleSubmit((values) => {
-    const preco = Number(values.precoSugerido.replace(',', '.'));
+  const onSubmit = handleSubmit(
+    (values) => {
+      const preco = Number(values.precoSugerido.replace(',', '.'));
 
-    if (Number.isNaN(preco) || preco < 0) {
-      toast.error('Informe um valor sugerido válido para o serviço.');
-      return;
-    }
+      if (Number.isNaN(preco) || preco < 0) {
+        toast.error('Informe um valor sugerido válido para o serviço.');
+        return;
+      }
 
-    createDefinition.mutate({
-      nome: values.nome.trim(),
-      descricao: values.descricao.trim().length ? values.descricao.trim() : null,
-      profissional: values.profissional.trim().length ? values.profissional.trim() : null,
-      tipo: values.tipo,
-      precoSugerido: Number(preco.toFixed(2)),
-    });
-  });
+      if (!values.profissional) {
+        toast.error('Selecione o profissional responsável pelo serviço.');
+        return;
+      }
+
+      createDefinition.mutate({
+        nome: values.nome.trim(),
+        descricao: values.descricao.trim().length ? values.descricao.trim() : null,
+        profissional: values.profissional,
+        tipo: values.tipo,
+        precoSugerido: Number(preco.toFixed(2)),
+      });
+    },
+    (formErrors) => {
+      const firstError = Object.values(formErrors)[0];
+      if (firstError?.message) {
+        toast.error(firstError.message as string);
+      }
+    },
+  );
 
   const sortedDefinitions = useMemo(() => {
     return (definitions ?? []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
@@ -99,7 +125,15 @@ const ServicesPage = () => {
       {canCreateDefinitions ? (
         <Card title="Novo serviço" description="Organize seu catálogo para agilizar futuros atendimentos.">
           <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
-            <Field label="Nome do serviço" {...register('nome')} required />
+            <Field
+              label="Nome do serviço"
+              {...register('nome', {
+                required: 'Informe o nome do serviço.',
+                minLength: { value: 2, message: 'O nome do serviço deve ter ao menos 2 caracteres.' },
+              })}
+              error={errors.nome?.message}
+              required
+            />
             <SelectField label="Tipo de serviço" {...register('tipo')}>
               {Object.entries(serviceTypeLabels).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -107,12 +141,26 @@ const ServicesPage = () => {
                 </option>
               ))}
             </SelectField>
-            <Field label="Profissional ou função" {...register('profissional')} placeholder="Veterinário, auxiliar..." />
+            <SelectField
+              label="Profissional ou função"
+              {...register('profissional', { required: 'Selecione o profissional responsável pelo serviço.' })}
+              error={errors.profissional?.message}
+            >
+              <option value="">Selecione uma opção</option>
+              {professionalOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </SelectField>
             <Field
               label="Valor sugerido"
-              {...register('precoSugerido')}
+              {...register('precoSugerido', {
+                required: 'Informe um valor sugerido para o serviço.',
+              })}
               placeholder="0,00"
               inputMode="decimal"
+              error={errors.precoSugerido?.message}
             />
             <Field
               label="Descrição"
@@ -166,7 +214,9 @@ const ServicesPage = () => {
                 </div>
 
                 {definition.profissional ? (
-                  <p className="text-sm text-brand-grafite/80">Profissional/Função: {definition.profissional}</p>
+                  <p className="text-sm text-brand-grafite/80">
+                    Profissional/Função: {professionalLabels[definition.profissional] ?? definition.profissional}
+                  </p>
                 ) : null}
                 {definition.descricao ? (
                   <p className="text-sm text-brand-grafite/80">{definition.descricao}</p>

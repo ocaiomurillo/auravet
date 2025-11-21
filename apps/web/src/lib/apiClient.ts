@@ -6,6 +6,7 @@ import type {
   InvoiceListResponse,
   InvoiceStatus,
   Product,
+  ServiceProfessional,
   ServiceDefinition,
 } from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
@@ -166,7 +167,7 @@ export const productsApi = {
 export interface CreateServiceDefinitionPayload {
   nome: string;
   descricao?: string | null;
-  profissional?: string | null;
+  profissional?: ServiceProfessional | null;
   tipo: AttendanceType;
   precoSugerido: number;
 }

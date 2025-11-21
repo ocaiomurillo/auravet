@@ -62,6 +62,8 @@ export interface Animal {
 
 export type AttendanceType = 'CONSULTA' | 'EXAME' | 'VACINACAO' | 'CIRURGIA' | 'OUTROS';
 
+export type ServiceProfessional = 'MEDICO' | 'ENFERMEIRO' | 'AMBOS';
+
 export interface Attendance {
   id: string;
   animalId: string;
@@ -98,7 +100,7 @@ export interface ServiceDefinition {
   id: string;
   nome: string;
   descricao: string | null;
-  profissional: string | null;
+  profissional: ServiceProfessional | null;
   tipo: AttendanceType;
   precoSugerido: number;
   createdAt: string;
