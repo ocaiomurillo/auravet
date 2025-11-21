@@ -43,6 +43,24 @@ auravet/
 
 ---
 
+## ⚡ Instalação expressa (scripts prontos)
+Quer começar com um único comando? Use os scripts na pasta `scripts/`:
+
+- **Local (Node + PostgreSQL já disponíveis):**
+  ```bash
+  bash scripts/setup-local.sh
+  npm run dev
+  ```
+  O script copia `.env.example` para `.env` se o arquivo não existir, instala dependências e roda `prisma generate/migrate/seed`.
+
+- **Docker (subir tudo com Compose):**
+  ```bash
+  bash scripts/setup-docker.sh
+  ```
+  Ele executa o build + `docker compose up -d` e aplica migrações/seed dentro do container da API.
+
+Se preferir um passo a passo manual, use as seções abaixo.
+
 ## 🖥️ Instalação local (sem Docker)
 1. **Clonar o repositório**
    ```bash
