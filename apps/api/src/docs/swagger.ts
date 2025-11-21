@@ -86,10 +86,11 @@ export const swaggerDocument = {
           id: { type: 'string', format: 'cuid' },
           nome: { type: 'string' },
           precoVenda: { type: 'number', format: 'double' },
+          precoBaseCatalogo: { type: 'number', format: 'double' },
           estoqueAtual: { type: 'integer' },
           estoqueMinimo: { type: 'integer' },
         },
-        required: ['id', 'nome', 'precoVenda', 'estoqueAtual', 'estoqueMinimo'],
+        required: ['id', 'nome', 'precoVenda', 'precoBaseCatalogo', 'estoqueAtual', 'estoqueMinimo'],
       },
       ServiceItem: {
         type: 'object',
