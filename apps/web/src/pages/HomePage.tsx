@@ -60,7 +60,7 @@ const HomePage = () => {
     <div className="grid gap-8 md:grid-cols-2">
       <Card
         title={welcomeTitle}
-        description="Na Auravet, seu pet é cuidado com ciência e carinho. Centralize cadastros, históricos e serviços em um fluxo leve e sustentável."
+        description="Na Auravet, seu pet é cuidado com ciência e carinho. Centralize cadastros, históricos e atendimentos em um fluxo leve e sustentável."
         className="md:col-span-2"
         actions={
           canCreateServices ? (
@@ -72,10 +72,10 @@ const HomePage = () => {
           ) : null
         }
       >
-        <p>
-          Acompanhe tutores, pets e serviços em tempo real. Cada registro fortalece o vínculo entre conhecimento técnico e
-          afeto — a essência do nosso cuidado.
-        </p>
+          <p>
+            Acompanhe tutores, pets e atendimentos em tempo real. Cada registro fortalece o vínculo entre conhecimento técnico
+            e afeto — a essência do nosso cuidado.
+          </p>
       </Card>
 
       {canViewOwners ? (
@@ -128,12 +128,12 @@ const HomePage = () => {
 
       {canViewServices ? (
         <Card
-          title="Serviços"
+          title="Atendimentos"
           description="Monitore consultas, exames, vacinas e cirurgias com filtros inteligentes."
           actions={
             <Button variant="secondary" asChild>
               <Link to="/services" className="flex items-center gap-2">
-                <ArrowRightCircleIcon className="h-5 w-5" /> Acessar
+                <ArrowRightCircleIcon className="h-5 w-5" /> Catálogo de serviços
               </Link>
             </Button>
           }
