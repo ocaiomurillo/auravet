@@ -10,7 +10,7 @@ import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient, serviceDefinitionsApi } from '../lib/apiClient';
-import type { Animal, Product, Service, ServiceResponsible } from '../types/api';
+import type { Animal, CollaboratorSummary, Product, Service, ServiceResponsible } from '../types/api';
 
 interface AttendanceProductItemFormValue {
   productId: string;
@@ -31,6 +31,7 @@ interface AttendanceFormValues {
   data: string;
   observacoes?: string;
   responsavelId: string;
+  assistantId?: string;
   catalogItems: AttendanceCatalogItemFormValue[];
   items: AttendanceProductItemFormValue[];
 }
@@ -63,6 +64,7 @@ type CreateAttendancePayload = {
   preco?: number;
   observacoes?: string;
   responsavelId?: string;
+  assistantId?: string;
   catalogItems: AttendanceCatalogItemPayload[];
   items: AttendanceProductItemPayload[];
 };
@@ -79,6 +81,7 @@ const NewServicePage = () => {
       data: '',
       observacoes: '',
       responsavelId: '',
+      assistantId: '',
       catalogItems: [],
       items: [],
     },
@@ -122,6 +125,14 @@ const NewServicePage = () => {
         .then((response) => response.responsibles),
   });
 
+  const { data: collaborators } = useQuery({
+    queryKey: ['service-assistants'],
+    queryFn: () =>
+      apiClient
+        .get<{ collaborators: CollaboratorSummary[] }>('/appointments/collaborators')
+        .then((response) => response.collaborators),
+  });
+
   const selectedAnimal = useMemo(
     () => animals?.find((animal) => animal.id === animalId) ?? null,
     [animalId, animals],
@@ -136,6 +147,10 @@ const NewServicePage = () => {
     () => responsibles ?? [],
     [responsibles],
   );
+
+  const availableAssistants = useMemo(() => {
+    return (collaborators ?? []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [collaborators]);
 
   const serviceTypeOptions = useMemo(() => {
     const typesFromCatalog = new Map<Service['tipo'], string>();
@@ -315,6 +330,7 @@ const NewServicePage = () => {
         data: '',
         observacoes: '',
         responsavelId: user?.id ?? '',
+        assistantId: '',
         catalogItems: [],
         items: [],
       });
@@ -443,6 +459,7 @@ const NewServicePage = () => {
       preco: Number(servicesTotalValue.toFixed(2)),
       observacoes: values.observacoes?.trim() ? values.observacoes : undefined,
       responsavelId: values.responsavelId,
+      assistantId: values.assistantId || undefined,
       catalogItems: sanitizedCatalogItems,
       items: sanitizedItems,
     };
@@ -503,6 +520,15 @@ const NewServicePage = () => {
             {availableResponsibles.map((responsible) => (
               <option key={responsible.id} value={responsible.id}>
                 {responsible.nome} — {responsible.email}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField label="Assistente (opcional)" {...register('assistantId')}>
+            <option value="">Sem assistente</option>
+            {availableAssistants.map((assistant) => (
+              <option key={assistant.id} value={assistant.id}>
+                {assistant.nome} — {assistant.email}
               </option>
             ))}
           </SelectField>
@@ -810,6 +836,7 @@ const NewServicePage = () => {
                   data: '',
                   observacoes: '',
                   responsavelId: user?.id ?? '',
+                  assistantId: '',
                   catalogItems: [],
                   items: [],
                 })

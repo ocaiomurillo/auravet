@@ -255,6 +255,12 @@ const AnimalsPage = () => {
                         <p className="text-sm text-brand-grafite/70">
                           {new Date(service.data).toLocaleDateString('pt-BR')} • R$ {service.preco.toFixed(2)}
                         </p>
+                        {service.responsavel ? (
+                          <p className="text-sm text-brand-grafite/70">Responsável: {service.responsavel.nome}</p>
+                        ) : null}
+                        {service.assistant ? (
+                          <p className="text-sm text-brand-grafite/70">Assistente: {service.assistant.nome}</p>
+                        ) : null}
                         {service.observacoes ? (
                           <p className="text-sm text-brand-grafite/80">{service.observacoes}</p>
                         ) : null}
