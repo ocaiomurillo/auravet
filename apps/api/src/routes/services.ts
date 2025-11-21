@@ -32,6 +32,18 @@ const serviceInclude = {
       definition: true,
     },
   },
+  notes: {
+    include: {
+      author: {
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  },
   responsavel: {
     select: {
       id: true,
@@ -265,6 +277,15 @@ servicesRouter.post(
 
     await ensureAnimalExists(payload.animalId);
 
+    const authorId = req.user?.id ?? null;
+    const noteEntries = (payload.notes ?? [])
+      .map((note) => note.conteudo.trim())
+      .filter(Boolean);
+
+    if (noteEntries.length && !authorId) {
+      throw new HttpError(401, 'Usuário não autorizado a registrar entradas no prontuário.');
+    }
+
     const items: ServiceItemInput[] = payload.items ?? [];
     ensureDistinctItems(items);
 
@@ -323,6 +344,20 @@ servicesRouter.post(
 
       await syncInvoiceForService(tx, created.id, { responsibleId: created.responsavelId ?? responsibleId });
 
+      if (noteEntries.length && authorId) {
+        await tx.serviceNote.createMany({
+          data: noteEntries.map((conteudo) => ({
+            conteudo,
+            servicoId: created.id,
+            authorId,
+          })),
+        });
+      }
+
+      if (noteEntries.length) {
+        return tx.servico.findUniqueOrThrow({ where: { id: created.id }, include: serviceInclude });
+      }
+
       return created;
     });
 
@@ -355,6 +390,15 @@ servicesRouter.put(
   asyncHandler(async (req, res) => {
     const { id } = serviceIdSchema.parse(req.params);
     const payload = serviceUpdateSchema.parse(req.body);
+
+    const authorId = req.user?.id ?? null;
+    const noteEntries = (payload.notes ?? [])
+      .map((note) => note.conteudo.trim())
+      .filter(Boolean);
+
+    if (noteEntries.length && !authorId) {
+      throw new HttpError(401, 'Usuário não autorizado a registrar entradas no prontuário.');
+    }
 
     if (payload.animalId) {
       await ensureAnimalExists(payload.animalId);
@@ -512,6 +556,16 @@ servicesRouter.put(
 
         if (resolvedPrice !== undefined) {
           updateData.preco = toDecimal(Number(resolvedPrice.toFixed(2)));
+        }
+
+        if (noteEntries.length && authorId) {
+          await tx.serviceNote.createMany({
+            data: noteEntries.map((conteudo) => ({
+              conteudo,
+              servicoId: id,
+              authorId,
+            })),
+          });
         }
 
         const updated = await tx.servico.update({

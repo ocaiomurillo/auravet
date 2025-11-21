@@ -246,9 +246,24 @@ const buildAttendancePdf = async (service: Attendance, appointment?: Appointment
   currentY += 6;
   appendPdfKeyValue(doc, 'Total geral', formatCurrency(overallTotal), currentY, [15, 23, 42]);
 
-  if (service.observacoes) {
+  if (service.notes?.length) {
     currentY += 12;
-    addPdfSectionTitle(doc, 'Observações', currentY);
+    addPdfSectionTitle(doc, 'Prontuário do atendimento', currentY);
+    currentY += 8;
+
+    service.notes.forEach((note) => {
+      currentY = ensurePdfSpace(doc, currentY, 18);
+      const header = `${note.author.nome} — ${new Date(note.createdAt).toLocaleString('pt-BR')}`;
+      doc.setFontSize(10);
+      doc.text(header, 15, currentY);
+      currentY += 6;
+      const wrapped = doc.splitTextToSize(note.conteudo, 180);
+      doc.text(wrapped, 15, currentY);
+      currentY += wrapped.length * 6 + 4;
+    });
+  } else if (service.observacoes) {
+    currentY += 12;
+    addPdfSectionTitle(doc, 'Prontuário do atendimento', currentY);
     currentY += 8;
     const wrapped = doc.splitTextToSize(service.observacoes, 180);
     doc.text(wrapped, 15, currentY);

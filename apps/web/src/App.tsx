@@ -53,6 +53,7 @@ const App = () => {
             element={<RequireModules modules={['services:write', 'animals:read', 'products:read']} />}
           >
             <Route path="new-service" element={<NewServicePage />} />
+            <Route path="services/:id/edit" element={<NewServicePage />} />
           </Route>
           <Route element={<RequireModules modules={['users:manage']} />}>
             <Route path="users" element={<UsersPage />} />

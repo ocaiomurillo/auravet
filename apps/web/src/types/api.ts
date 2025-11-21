@@ -80,6 +80,14 @@ export interface Attendance {
   items: ServiceItem[];
   responsavel: ServiceResponsible | null;
   assistant: CollaboratorSummary | null;
+  notes: AttendanceNote[];
+}
+
+export interface AttendanceNote {
+  id: string;
+  conteudo: string;
+  createdAt: string;
+  author: { id: string; nome: string; email: string };
 }
 
 export interface ServiceItem {

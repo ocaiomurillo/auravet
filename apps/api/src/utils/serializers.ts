@@ -9,6 +9,7 @@ import type {
   Role,
   ServiceCatalogUsage,
   ServiceDefinition,
+  ServiceNote,
   ServiceProductUsage,
   Servico,
   User,
@@ -19,6 +20,7 @@ import { buildAuthenticatedUser } from './auth';
 
 type ServiceItemWithProduct = ServiceProductUsage & { product: Product };
 type ServiceCatalogUsageWithDefinition = ServiceCatalogUsage & { definition: ServiceDefinition };
+type ServiceNoteWithAuthor = ServiceNote & { author: { id: string; nome: string; email: string } };
 
 type InvoiceItemWithRelations = Prisma.InvoiceItemGetPayload<{
   include: {
@@ -63,6 +65,7 @@ type ServiceWithOptionalRelations = Servico & {
   catalogItems?: ServiceCatalogUsageWithDefinition[];
   appointment?: Appointment | null;
   responsavel?: { id: string; nome: string; email: string } | null;
+  notes?: ServiceNoteWithAuthor[];
 };
 
 type AnimalWithOptionalRelations = Animal & {
@@ -164,6 +167,14 @@ export type SerializedService = {
   catalogItems: SerializedServiceCatalogItem[];
   items: SerializedServiceItem[];
   responsavel: { id: string; nome: string; email: string } | null;
+  notes: SerializedServiceNote[];
+};
+
+export type SerializedServiceNote = {
+  id: string;
+  conteudo: string;
+  createdAt: string;
+  author: { id: string; nome: string; email: string };
 };
 
 export type SerializedAnimal = {
@@ -418,29 +429,40 @@ export const serializeService = (
           profissional: item.definition.profissional ?? null,
         },
       })) ?? [],
-    items:
-      service.items?.map((item) => ({
-        id: item.id,
-        productId: item.productId,
-        quantidade: item.quantidade,
+  items:
+    service.items?.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      quantidade: item.quantidade,
         valorUnitario: Number(item.valorUnitario),
         valorTotal: Number(item.valorTotal),
         product: {
           id: item.product.id,
           nome: item.product.nome,
           precoVenda: Number(item.product.precoVenda),
-          precoBaseCatalogo: Number(item.product.precoVenda),
-          estoqueAtual: item.product.estoqueAtual,
-          estoqueMinimo: item.product.estoqueMinimo,
-        },
-      })) ?? [],
-    responsavel: service.responsavel
-      ? {
-          id: service.responsavel.id,
-          nome: service.responsavel.nome,
-          email: service.responsavel.email,
-        }
-      : null,
+        precoBaseCatalogo: Number(item.product.precoVenda),
+        estoqueAtual: item.product.estoqueAtual,
+        estoqueMinimo: item.product.estoqueMinimo,
+      },
+    })) ?? [],
+  responsavel: service.responsavel
+    ? {
+        id: service.responsavel.id,
+        nome: service.responsavel.nome,
+        email: service.responsavel.email,
+      }
+    : null,
+  notes:
+    service.notes?.map((note) => ({
+      id: note.id,
+      conteudo: note.conteudo,
+      createdAt: note.createdAt.toISOString(),
+      author: {
+        id: note.author.id,
+        nome: note.author.nome,
+        email: note.author.email,
+      },
+    })) ?? [],
   };
 
   if (options?.includeAnimal && service.animal) {
