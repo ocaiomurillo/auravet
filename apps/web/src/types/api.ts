@@ -244,7 +244,7 @@ export interface Appointment {
   veterinarianId: string;
   assistantId: string | null;
   serviceId: string | null;
-  status: 'AGENDADO' | 'CONFIRMADO' | 'CONCLUIDO';
+  status: 'AGENDADO' | 'CONFIRMADO' | 'CONCLUIDO' | 'CANCELADO';
   scheduledStart: string;
   scheduledEnd: string;
   confirmedAt: string | null;
@@ -254,6 +254,7 @@ export interface Appointment {
   updatedAt: string;
   durationMinutes: number;
   availability: AppointmentAvailability;
+  tipo: Service['tipo'];
   animal: Animal;
   owner: Owner;
   veterinarian: CollaboratorSummary;

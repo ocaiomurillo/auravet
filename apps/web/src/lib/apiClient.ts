@@ -122,6 +122,7 @@ export type CreateAppointmentPayload = {
   assistantId?: string;
   scheduledStart: string;
   scheduledEnd: string;
+  tipo: Service['tipo'];
   status?: Appointment['status'];
   notes?: string;
 };

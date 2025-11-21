@@ -13,6 +13,7 @@ import type {
   Appointment,
   CollaboratorSummary,
   OwnerSummary,
+  Service,
 } from '../types/api';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
@@ -20,6 +21,15 @@ const statusLabels: Record<Appointment['status'], string> = {
   AGENDADO: 'Agendado',
   CONFIRMADO: 'Confirmado',
   CONCLUIDO: 'Concluído',
+  CANCELADO: 'Cancelado',
+};
+
+const serviceLabels: Record<Service['tipo'], string> = {
+  CONSULTA: 'Consulta',
+  EXAME: 'Exame',
+  VACINACAO: 'Vacinação',
+  CIRURGIA: 'Cirurgia',
+  OUTROS: 'Outros cuidados',
 };
 
 interface AppointmentFormState {
@@ -27,6 +37,7 @@ interface AppointmentFormState {
   animalId: string;
   veterinarianId: string;
   assistantId: string;
+  tipo: Service['tipo'];
   status: Appointment['status'];
   scheduledStart: string;
   scheduledEnd: string;
@@ -82,6 +93,7 @@ const AppointmentsPage = () => {
     animalId: '',
     veterinarianId: '',
     assistantId: '',
+    tipo: 'CONSULTA',
     status: 'AGENDADO',
     scheduledStart: '',
     scheduledEnd: '',
@@ -198,6 +210,7 @@ const AppointmentsPage = () => {
       animalId: string;
       veterinarianId: string;
       assistantId?: string;
+      tipo: Service['tipo'];
       scheduledStart: string;
       scheduledEnd: string;
       status: Appointment['status'];
@@ -208,6 +221,7 @@ const AppointmentsPage = () => {
         animalId: payload.animalId,
         veterinarianId: payload.veterinarianId,
         assistantId: payload.assistantId,
+        tipo: payload.tipo,
         scheduledStart: payload.scheduledStart,
         scheduledEnd: payload.scheduledEnd,
         status: payload.status,
@@ -215,7 +229,9 @@ const AppointmentsPage = () => {
       }),
     onSuccess: (response) => {
       const { appointment } = response;
-      toast.success('Agendamento criado com sucesso.');
+      toast.success(
+        `Agendamento de ${serviceLabels[appointment.tipo] ?? appointment.tipo} criado com sucesso.`,
+      );
       if (appointment.availability.veterinarianConflict || appointment.availability.assistantConflict) {
         toast.warning(
           'Atenção: existem conflitos de agenda para este horário. Reveja a disponibilidade dos colaboradores.',
@@ -228,6 +244,7 @@ const AppointmentsPage = () => {
         animalId: '',
         veterinarianId: '',
         assistantId: '',
+        tipo: 'CONSULTA',
         status: 'AGENDADO',
         scheduledStart: '',
         scheduledEnd: '',
@@ -263,6 +280,7 @@ const AppointmentsPage = () => {
       animalId: '',
       veterinarianId: '',
       assistantId: '',
+      tipo: 'CONSULTA',
       status: 'AGENDADO',
       scheduledStart: '',
       scheduledEnd: '',
@@ -293,6 +311,11 @@ const AppointmentsPage = () => {
       return;
     }
 
+    if (!createForm.tipo) {
+      toast.error('Selecione o tipo de atendimento.');
+      return;
+    }
+
     if (!createForm.scheduledStart || !createForm.scheduledEnd) {
       toast.error('Informe o horário inicial e final do agendamento.');
       return;
@@ -316,6 +339,7 @@ const AppointmentsPage = () => {
       animalId: createForm.animalId,
       veterinarianId: createForm.veterinarianId,
       assistantId: createForm.assistantId || undefined,
+      tipo: createForm.tipo,
       scheduledStart: startDate.toISOString(),
       scheduledEnd: endDate.toISOString(),
       status: createForm.status,
@@ -450,7 +474,7 @@ const AppointmentsPage = () => {
           {appointments.map((appointment) => {
             const isRescheduling = rescheduleForm.id === appointment.id;
             const canConfirm = appointment.status === 'AGENDADO';
-            const canComplete = appointment.status !== 'CONCLUIDO';
+            const canComplete = appointment.status !== 'CONCLUIDO' && appointment.status !== 'CANCELADO';
 
             const veterinarianConflict = appointment.availability.veterinarianConflict;
             const assistantConflict = appointment.availability.assistantConflict;
@@ -467,6 +491,9 @@ const AppointmentsPage = () => {
                     <p className="text-sm text-brand-grafite/70">
                       {formatDateTime(appointment.scheduledStart)} — {formatDateTime(appointment.scheduledEnd)} • Duração:{' '}
                       {appointment.durationMinutes} min
+                    </p>
+                    <p className="text-sm text-brand-grafite/70">
+                      Tipo de atendimento: {serviceLabels[appointment.tipo] ?? appointment.tipo}
                     </p>
                     <p className="text-sm text-brand-grafite/70">
                       Tutor(a): {appointment.owner.nome} • Veterinário(a): {appointment.veterinarian.nome}
@@ -655,7 +682,7 @@ const AppointmentsPage = () => {
           </SelectField>
 
           <SelectField
-            label="Assistência (opcional)"
+            label="Profissional assistente"
             value={createForm.assistantId}
             onChange={(event) =>
               setCreateForm((prev) => ({
@@ -665,9 +692,27 @@ const AppointmentsPage = () => {
             }
           >
             <option value="">Sem assistente</option>
-            {collaborators?.collaborators.map((collaborator) => (
+            {(collaborators?.collaborators ?? []).map((collaborator) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.nome}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField
+            label="Tipo de atendimento"
+            value={createForm.tipo}
+            onChange={(event) =>
+              setCreateForm((prev) => ({
+                ...prev,
+                tipo: event.target.value as Service['tipo'],
+              }))
+            }
+            required
+          >
+            {Object.entries(serviceLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
               </option>
             ))}
           </SelectField>

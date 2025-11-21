@@ -18,6 +18,7 @@ const statusLabels: Record<Appointment['status'], string> = {
   AGENDADO: 'Agendado',
   CONFIRMADO: 'Confirmado',
   CONCLUIDO: 'Concluído',
+  CANCELADO: 'Cancelado',
 };
 
 const viewLabels: Record<AppointmentCalendarResponse['view'], string> = {
