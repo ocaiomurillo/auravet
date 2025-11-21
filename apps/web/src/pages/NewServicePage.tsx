@@ -173,7 +173,7 @@ const NewServicePage = () => {
   });
 
   const availableProducts = useMemo(
-    () => (products ?? []).filter((product) => product.isActive && product.isSellable),
+    () => (products ?? []).filter((product) => product.isActive),
     [products],
   );
 
@@ -778,6 +778,7 @@ const NewServicePage = () => {
                         {availableProducts.map((productOption) => (
                           <option key={productOption.id} value={productOption.id}>
                             {productOption.nome}
+                            {productOption.isSellable ? '' : ' (uso interno)'}
                           </option>
                         ))}
                       </SelectField>
@@ -850,7 +851,9 @@ const NewServicePage = () => {
                     return (
                       <li key={`product-summary-${product.id}-${index}`} className="flex flex-col gap-1">
                         <span>
-                          {product.nome}: {detail.quantity} un × R$ {detail.unitPrice.toFixed(2)} = R$ {detail.subtotal.toFixed(2)}
+                          {product.nome}
+                          {product.isSellable ? '' : ' (uso interno)'}: {detail.quantity} un × R${' '}
+                          {detail.unitPrice.toFixed(2)} = R$ {detail.subtotal.toFixed(2)}
                         </span>
                         {detail.hasInsufficient ? (
                           <span className="text-red-500">Estoque insuficiente. Disponível: {product.estoqueAtual}.</span>
