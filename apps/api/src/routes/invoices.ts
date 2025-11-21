@@ -16,7 +16,13 @@ import {
 } from '../schema/invoice';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
-import { fetchInvoiceCandidates, getPaidStatus, invoiceInclude, syncInvoiceForService } from '../utils/invoice';
+import {
+  buildInvoiceSummary,
+  fetchInvoiceCandidates,
+  getPaidStatus,
+  invoiceInclude,
+  syncInvoiceForService,
+} from '../utils/invoice';
 import { serializeInvoice } from '../utils/serializers';
 import { buildInvoicePrintHtml } from '../utils/invoice-print';
 
@@ -86,30 +92,6 @@ const buildInvoiceWhere = (filters: z.infer<typeof invoiceFilterSchema>): Prisma
   return where;
 };
 
-const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof invoiceInclude }>>) => {
-  let openTotal = new Prisma.Decimal(0);
-  let paidTotal = new Prisma.Decimal(0);
-  let openCount = 0;
-  let paidCount = 0;
-
-  for (const invoice of invoices) {
-    if (invoice.status.slug === 'QUITADA') {
-      paidTotal = paidTotal.add(invoice.total);
-      paidCount += 1;
-    } else {
-      openTotal = openTotal.add(invoice.total);
-      openCount += 1;
-    }
-  }
-
-  return {
-    openTotal: Number(openTotal.toFixed(2)),
-    paidTotal: Number(paidTotal.toFixed(2)),
-    openCount,
-    paidCount,
-  };
-};
-
 invoicesRouter.get(
   '/',
   requirePermission('cashier:access'),
@@ -124,7 +106,7 @@ invoicesRouter.get(
 
     res.json({
       invoices: invoices.map(serializeInvoice),
-      summary: buildSummary(invoices),
+      summary: buildInvoiceSummary(invoices),
     });
   }),
 );
