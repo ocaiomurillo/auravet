@@ -42,7 +42,7 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
     .map((item, index) => {
       const description = escapeHtml(item.description);
       const serviceDetails = item.service
-        ? `Serviço em ${formatDate(item.service.data)}${
+        ? `Atendimento em ${formatDate(item.service.data)}${
             item.service.animal?.nome
               ? ` • Pet: ${escapeHtml(item.service.animal.nome)}`
               : ''

@@ -57,13 +57,15 @@ export interface Animal {
   ownerId: string;
   createdAt: string;
   owner?: Owner;
-  services?: Service[];
+  services?: Attendance[];
 }
 
-export interface Service {
+export type AttendanceType = 'CONSULTA' | 'EXAME' | 'VACINACAO' | 'CIRURGIA' | 'OUTROS';
+
+export interface Attendance {
   id: string;
   animalId: string;
-  tipo: 'CONSULTA' | 'EXAME' | 'VACINACAO' | 'CIRURGIA' | 'OUTROS';
+  tipo: AttendanceType;
   data: string;
   preco: number;
   observacoes?: string | null;
@@ -97,7 +99,7 @@ export interface ServiceDefinition {
   nome: string;
   descricao: string | null;
   profissional: string | null;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   precoSugerido: number;
   createdAt: string;
   updatedAt: string;
@@ -119,6 +121,8 @@ export interface ServiceResponsible {
   email: string;
 }
 
+export type AttendanceResponsible = ServiceResponsible;
+
 export interface InvoiceStatus {
   id: string;
   slug: string;
@@ -132,7 +136,7 @@ export interface InvoiceItemProductSummary {
 
 export interface InvoiceItemServiceSummary {
   id: string;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   data: string;
   animal?: {
     id: string;
@@ -257,12 +261,12 @@ export interface Appointment {
   updatedAt: string;
   durationMinutes: number;
   availability: AppointmentAvailability;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   animal: Animal;
   owner: Owner;
   veterinarian: CollaboratorSummary;
   assistant: CollaboratorSummary | null;
-  service: Service | null;
+  service: Attendance | null;
 }
 
 export interface AppointmentCalendarSummary {

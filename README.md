@@ -147,7 +147,7 @@ Se preferir um passo a passo manual, use as seções abaixo.
 ## 🚀 Fluxo funcional mínimo
 1. Acesse `/login` com o administrador seed (`SEED_ADMIN_EMAIL`).
 2. Cadastre um tutor em **Tutores** e inclua os respectivos pets em **Animais**.
-3. Registre atendimentos em **Registrar serviço** (rotas protegidas por `services:write`).
+3. Registre atendimentos em **Registrar atendimento** (rotas protegidas por `services:write`).
 4. Gerencie colaboradores em **Usuários** (apenas administradores).
 
 ## 🔍 Qualidade & design system

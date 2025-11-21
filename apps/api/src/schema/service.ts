@@ -54,7 +54,7 @@ const catalogItemSchema = z.object({
 export const serviceCreateSchema = z.object({
   animalId: z.string().cuid('Animal inválido'),
   tipo: z.enum(tipoServicoValues, {
-    errorMap: () => ({ message: 'Tipo de serviço inválido' }),
+    errorMap: () => ({ message: 'Tipo de atendimento inválido' }),
   }),
   data: z
     .string()
@@ -71,7 +71,7 @@ export const serviceUpdateSchema = z.object({
   animalId: z.string().cuid('Animal inválido').optional(),
   tipo: z
     .enum(tipoServicoValues, {
-      errorMap: () => ({ message: 'Tipo de serviço inválido' }),
+      errorMap: () => ({ message: 'Tipo de atendimento inválido' }),
     })
     .optional(),
   data: z

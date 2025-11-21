@@ -10,7 +10,14 @@ import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient, productsApi, serviceDefinitionsApi } from '../lib/apiClient';
-import type { Animal, CollaboratorSummary, Product, Service, ServiceResponsible } from '../types/api';
+import type {
+  Animal,
+  Attendance,
+  AttendanceResponsible,
+  AttendanceType,
+  CollaboratorSummary,
+  Product,
+} from '../types/api';
 
 interface AttendanceProductItemFormValue {
   productId: string;
@@ -27,7 +34,7 @@ interface AttendanceCatalogItemFormValue {
 
 interface AttendanceFormValues {
   animalId: string;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   data: string;
   observacoes?: string;
   responsavelId: string;
@@ -36,7 +43,7 @@ interface AttendanceFormValues {
   items: AttendanceProductItemFormValue[];
 }
 
-const serviceLabels: Record<Service['tipo'], string> = {
+const attendanceTypeLabels: Record<AttendanceType, string> = {
   CONSULTA: 'Consulta',
   EXAME: 'Exame',
   VACINACAO: 'Vacinação',
@@ -59,7 +66,7 @@ type AttendanceCatalogItemPayload = {
 
 type CreateAttendancePayload = {
   animalId: string;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   data: string;
   preco?: number;
   observacoes?: string;
@@ -121,7 +128,7 @@ const NewServicePage = () => {
     queryKey: ['service-responsibles'],
     queryFn: () =>
       apiClient
-        .get<{ responsibles: ServiceResponsible[] }>('/services/responsibles')
+        .get<{ responsibles: AttendanceResponsible[] }>('/services/responsibles')
         .then((response) => response.responsibles),
   });
 
@@ -153,18 +160,18 @@ const NewServicePage = () => {
   }, [collaborators]);
 
   const serviceTypeOptions = useMemo(() => {
-    const typesFromCatalog = new Map<Service['tipo'], string>();
+    const typesFromCatalog = new Map<AttendanceType, string>();
 
     for (const definition of availableDefinitions) {
-      typesFromCatalog.set(definition.tipo, serviceLabels[definition.tipo] ?? definition.tipo);
+      typesFromCatalog.set(definition.tipo, attendanceTypeLabels[definition.tipo] ?? definition.tipo);
     }
 
     const entries = typesFromCatalog.size
       ? Array.from(typesFromCatalog.entries())
-      : Object.entries(serviceLabels);
+      : Object.entries(attendanceTypeLabels);
 
     return entries
-      .map(([value, label]) => ({ value: value as Service['tipo'], label }))
+      .map(([value, label]) => ({ value: value as AttendanceType, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [availableDefinitions]);
 
@@ -319,7 +326,7 @@ const NewServicePage = () => {
   }, [availableDefinitions, catalogItems, setValue]);
 
   const createAttendance = useMutation({
-    mutationFn: (payload: CreateAttendancePayload) => apiClient.post<Service>('/services', payload),
+    mutationFn: (payload: CreateAttendancePayload) => apiClient.post<Attendance>('/services', payload),
     onSuccess: async (service, payload) => {
       toast.success('Atendimento registrado com sucesso.');
 
@@ -341,7 +348,7 @@ const NewServicePage = () => {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['attendances'] });
       queryClient.invalidateQueries({ queryKey: ['animals'] });
       reset({
         animalId: '',
@@ -496,7 +503,7 @@ const NewServicePage = () => {
           </p>
         </div>
         <Button variant="secondary" asChild>
-          <Link to="/services">Abrir catálogo de atendimentos</Link>
+          <Link to="/services">Abrir catálogo de serviços</Link>
         </Button>
       </div>
 

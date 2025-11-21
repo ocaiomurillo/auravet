@@ -11,9 +11,9 @@ import { apiClient, appointmentsApi } from '../lib/apiClient';
 import type {
   Animal,
   Appointment,
+  AttendanceType,
   CollaboratorSummary,
   OwnerSummary,
-  Service,
 } from '../types/api';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
@@ -24,7 +24,7 @@ const statusLabels: Record<Appointment['status'], string> = {
   CANCELADO: 'Cancelado',
 };
 
-const serviceLabels: Record<Service['tipo'], string> = {
+const attendanceTypeLabels: Record<AttendanceType, string> = {
   CONSULTA: 'Consulta',
   EXAME: 'Exame',
   VACINACAO: 'Vacinação',
@@ -37,7 +37,7 @@ interface AppointmentFormState {
   animalId: string;
   veterinarianId: string;
   assistantId: string;
-  tipo: Service['tipo'];
+  tipo: AttendanceType;
   status: Appointment['status'];
   scheduledStart: string;
   scheduledEnd: string;
@@ -195,9 +195,9 @@ const AppointmentsPage = () => {
     mutationFn: (id: string) =>
       apiClient.patch<{ appointment: Appointment }>(`/appointments/${id}/complete`, {}),
     onSuccess: () => {
-      toast.success('Atendimento finalizado e sincronizado com serviços.');
+      toast.success('Atendimento finalizado e registrado no histórico.');
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['attendances'] });
     },
     onError: () => {
       toast.error('Não foi possível finalizar o agendamento.');
@@ -210,7 +210,7 @@ const AppointmentsPage = () => {
       animalId: string;
       veterinarianId: string;
       assistantId?: string;
-      tipo: Service['tipo'];
+      tipo: AttendanceType;
       scheduledStart: string;
       scheduledEnd: string;
       status: Appointment['status'];
@@ -230,7 +230,7 @@ const AppointmentsPage = () => {
     onSuccess: (response) => {
       const { appointment } = response;
       toast.success(
-        `Agendamento de ${serviceLabels[appointment.tipo] ?? appointment.tipo} criado com sucesso.`,
+        `Agendamento de ${attendanceTypeLabels[appointment.tipo] ?? appointment.tipo} criado com sucesso.`,
       );
       if (appointment.availability.veterinarianConflict || appointment.availability.assistantConflict) {
         toast.warning(
@@ -493,7 +493,7 @@ const AppointmentsPage = () => {
                       {appointment.durationMinutes} min
                     </p>
                     <p className="text-sm text-brand-grafite/70">
-                      Tipo de atendimento: {serviceLabels[appointment.tipo] ?? appointment.tipo}
+                      Tipo de atendimento: {attendanceTypeLabels[appointment.tipo] ?? appointment.tipo}
                     </p>
                     <p className="text-sm text-brand-grafite/70">
                       Tutor(a): {appointment.owner.nome} • Veterinário(a): {appointment.veterinarian.nome}
@@ -533,7 +533,7 @@ const AppointmentsPage = () => {
                     ) : null}
                     {appointment.service ? (
                       <p className="mt-2 text-sm text-brand-grafite/80">
-                        Serviço registrado em {new Date(appointment.service.data).toLocaleDateString('pt-BR')} •{' '}
+                        Atendimento registrado em {new Date(appointment.service.data).toLocaleDateString('pt-BR')} •{' '}
                         R$ {appointment.service.preco.toFixed(2)}
                       </p>
                     ) : null}
@@ -705,12 +705,12 @@ const AppointmentsPage = () => {
             onChange={(event) =>
               setCreateForm((prev) => ({
                 ...prev,
-                tipo: event.target.value as Service['tipo'],
+                tipo: event.target.value as AttendanceType,
               }))
             }
             required
           >
-            {Object.entries(serviceLabels).map(([value, label]) => (
+            {Object.entries(attendanceTypeLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>

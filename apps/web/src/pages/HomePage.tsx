@@ -12,14 +12,14 @@ import type { DashboardSummaryResponse } from '../types/api';
 const HomePage = () => {
   const { user, hasModule } = useAuth();
 
-  const canViewServices = hasModule('services:read');
+  const canViewAttendances = hasModule('services:read');
   const canViewOwners = hasModule('owners:read');
   const canViewAnimals = hasModule('animals:read');
   const canViewProducts = hasModule('products:read');
   const canViewAccounting = hasModule('cashier:access');
-  const canCreateServices = hasModule('services:write');
+  const canCreateAttendances = hasModule('services:write');
 
-  const shouldFetchSummary = canViewServices || canViewOwners || canViewAnimals || canViewProducts;
+  const shouldFetchSummary = canViewAttendances || canViewOwners || canViewAnimals || canViewProducts;
 
   const summaryQuery = useQuery<DashboardSummaryResponse, Error>({
     queryKey: ['dashboard', 'summary'],
@@ -64,7 +64,7 @@ const HomePage = () => {
         description="Na Auravet, seu pet é cuidado com ciência e carinho. Centralize cadastros, históricos e atendimentos em um fluxo leve e sustentável."
         className="md:col-span-2"
         actions={
-          canCreateServices ? (
+          canCreateAttendances ? (
             <Button asChild variant="primary">
               <Link to="/new-service" className="flex items-center gap-2">
                 <PlusCircleIcon className="h-5 w-5" /> Registrar Atendimento
@@ -123,18 +123,18 @@ const HomePage = () => {
               </div>
             </dl>
           ))}
-          <p>Cada pet é único. Mantenha dados completos e acione rapidamente os serviços vinculados.</p>
+          <p>Cada pet é único. Mantenha dados completos e acione rapidamente os atendimentos vinculados.</p>
         </Card>
       ) : null}
 
-      {canViewServices ? (
+      {canViewAttendances ? (
         <Card
           title="Atendimentos"
           description="Monitore atendimentos — consultas, exames, vacinas e cirurgias — com filtros inteligentes."
           actions={
             <Button variant="secondary" asChild>
-              <Link to="/services" className="flex items-center gap-2">
-                <ArrowRightCircleIcon className="h-5 w-5" /> Acessar atendimentos
+              <Link to="/appointments" className="flex items-center gap-2">
+                <ArrowRightCircleIcon className="h-5 w-5" /> Acessar agenda de atendimentos
               </Link>
             </Button>
           }

@@ -95,7 +95,7 @@ const loadServiceForInvoice = async (
   });
 
   if (!service) {
-    throw new HttpError(404, 'Serviço não encontrado para geração da conta.');
+    throw new HttpError(404, 'Atendimento não encontrado para geração da conta.');
   }
 
   return service;
@@ -105,7 +105,7 @@ const buildInvoiceItemsData = (service: ServiceForInvoice) => {
   const serviceItems = service.catalogItems.length
     ? service.catalogItems.map((item) => ({
         servicoId: service.id,
-        description: item.definition ? `Serviço: ${item.definition.nome}` : 'Serviço prestado',
+        description: item.definition ? `Serviço do catálogo: ${item.definition.nome}` : 'Atendimento prestado',
         quantity: item.quantidade,
         unitPrice: item.valorUnitario,
         total: item.valorTotal,
@@ -113,7 +113,7 @@ const buildInvoiceItemsData = (service: ServiceForInvoice) => {
     : [
         {
           servicoId: service.id,
-          description: `Serviço: ${service.tipo}`,
+          description: `Atendimento: ${service.tipo}`,
           quantity: 1,
           unitPrice: service.preco,
           total: service.preco,
@@ -166,7 +166,7 @@ export const syncInvoiceForService = async (
       include: invoiceInclude,
     });
     if (!invoice) {
-      throw new HttpError(404, 'Conta vinculada ao serviço não foi encontrada.');
+      throw new HttpError(404, 'Conta vinculada ao atendimento não foi encontrada.');
     }
     return invoice;
   }

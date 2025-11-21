@@ -1013,7 +1013,7 @@ export const swaggerDocument = {
     },
     '/animals/{id}/services': {
       get: {
-        summary: 'Lista serviços relacionados a um animal',
+        summary: 'Lista atendimentos relacionados a um animal',
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -1025,7 +1025,7 @@ export const swaggerDocument = {
         ],
         responses: {
           '200': {
-            description: 'Histórico de serviços',
+            description: 'Histórico de atendimentos',
             content: {
               'application/json': {
                 schema: {
@@ -1041,7 +1041,7 @@ export const swaggerDocument = {
     },
     '/services': {
       get: {
-        summary: 'Lista serviços com filtros por animal, tutor e período',
+        summary: 'Lista atendimentos com filtros por animal, tutor e período',
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -1067,7 +1067,7 @@ export const swaggerDocument = {
         ],
         responses: {
           '200': {
-            description: 'Serviços filtrados',
+            description: 'Atendimentos filtrados',
             content: {
               'application/json': {
                 schema: {
@@ -1080,7 +1080,7 @@ export const swaggerDocument = {
         },
       },
       post: {
-        summary: 'Registra um novo serviço',
+        summary: 'Registra um novo atendimento',
         security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
@@ -1131,7 +1131,7 @@ export const swaggerDocument = {
         },
         responses: {
           '201': {
-            description: 'Serviço criado',
+            description: 'Atendimento criado',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/Servico' },
@@ -1174,7 +1174,7 @@ export const swaggerDocument = {
     },
     '/services/responsibles': {
       get: {
-        summary: 'Lista usuários aptos a serem responsáveis por serviços',
+        summary: 'Lista usuários aptos a serem responsáveis por atendimentos',
         security: [{ BearerAuth: [] }],
         responses: {
           '200': {
@@ -1199,7 +1199,7 @@ export const swaggerDocument = {
     },
     '/services/{id}': {
       put: {
-        summary: 'Atualiza um serviço',
+        summary: 'Atualiza um atendimento',
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -1270,7 +1270,7 @@ export const swaggerDocument = {
         },
       },
       delete: {
-        summary: 'Remove um serviço',
+        summary: 'Remove um atendimento',
         security: [{ BearerAuth: [] }],
         parameters: [
           {
