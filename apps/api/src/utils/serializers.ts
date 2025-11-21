@@ -106,6 +106,7 @@ export type SerializedServiceCatalogItem = {
     tipo: Servico['tipo'];
     precoSugerido: number;
     descricao: string | null;
+    profissional: string | null;
   };
 };
 
@@ -406,6 +407,7 @@ export const serializeService = (
           tipo: item.definition.tipo,
           precoSugerido: Number(item.definition.precoSugerido),
           descricao: item.definition.descricao ?? null,
+          profissional: item.definition.profissional ?? null,
         },
       })) ?? [],
     items:

@@ -9,14 +9,8 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient } from '../lib/apiClient';
-import type {
-  Animal,
-  Product,
-  Service,
-  ServiceDefinition,
-  ServiceResponsible,
-} from '../types/api';
+import { apiClient, serviceDefinitionsApi } from '../lib/apiClient';
+import type { Animal, Product, Service, ServiceResponsible } from '../types/api';
 
 interface ServiceItemFormValue {
   productId: string;
@@ -116,10 +110,7 @@ const NewServicePage = () => {
 
   const { data: serviceDefinitions } = useQuery({
     queryKey: ['service-definitions'],
-    queryFn: () =>
-      apiClient
-        .get<{ definitions: ServiceDefinition[] }>('/services/catalog')
-        .then((response) => response.definitions),
+    queryFn: serviceDefinitionsApi.list,
   });
 
   const { data: responsibles } = useQuery({

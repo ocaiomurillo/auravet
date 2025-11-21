@@ -25,6 +25,7 @@ model ServiceDefinition {
   id            String  @id @default(cuid())
   nome          String  @unique
   descricao     String?
+  profissional  String?
   tipo          TipoServico
   precoSugerido Decimal @db.Decimal(10, 2)
   isActive      Boolean @default(true)

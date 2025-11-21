@@ -26,7 +26,7 @@ export const navItems: NavItem[] = [
   { to: '/animals', label: 'Animais', module: 'animals:read', icon: HeartIcon },
   { to: '/appointments', label: 'Agendamentos', module: 'services:read', icon: CalendarDaysIcon },
   { to: '/calendar', label: 'Agenda', module: 'services:read', icon: CalendarIcon },
-  { to: '/services', label: 'Serviços', module: 'services:read', icon: ClipboardDocumentCheckIcon },
+  { to: '/services', label: 'Catálogo de serviços', module: 'services:read', icon: ClipboardDocumentCheckIcon },
   { to: '/products', label: 'Produtos', module: 'products:read', icon: ShoppingBagIcon },
   { to: '/cashier', label: 'Caixa', module: 'cashier:access', icon: BanknotesIcon },
   { to: '/new-service', label: 'Atendimento', module: 'services:write', icon: PlusCircleIcon },

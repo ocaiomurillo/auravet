@@ -6,6 +6,7 @@ import type {
   InvoiceStatus,
   Product,
   Service,
+  ServiceDefinition,
 } from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
 
@@ -156,6 +157,20 @@ export const productsApi = {
   remove: (id: string) => apiClient.delete(`/products/${id}`),
   adjustStock: (id: string, payload: AdjustProductStockPayload) =>
     apiClient.patch<Product>(`/products/${id}/stock`, payload),
+};
+
+export interface CreateServiceDefinitionPayload {
+  nome: string;
+  descricao?: string | null;
+  profissional?: string | null;
+  tipo: Service['tipo'];
+  precoSugerido: number;
+}
+
+export const serviceDefinitionsApi = {
+  list: () => apiClient.get<ServiceDefinition[]>('/service-definitions'),
+  create: (payload: CreateServiceDefinitionPayload) =>
+    apiClient.post<ServiceDefinition>('/service-definitions', payload),
 };
 
 export const dashboardApi = {
