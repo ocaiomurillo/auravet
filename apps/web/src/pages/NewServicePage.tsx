@@ -132,12 +132,12 @@ const NewServicePage = () => {
         .then((response) => response.responsibles),
   });
 
-  const { data: collaborators } = useQuery({
+  const { data: collaborators = [] } = useQuery({
     queryKey: ['service-assistants'],
     queryFn: () =>
       apiClient
         .get<{ collaborators: CollaboratorSummary[] }>('/appointments/collaborators')
-        .then((response) => response.collaborators),
+        .then((response) => response.collaborators ?? []),
   });
 
   const selectedAnimal = useMemo(
@@ -156,7 +156,7 @@ const NewServicePage = () => {
   );
 
   const availableAssistants = useMemo(() => {
-    return (collaborators ?? []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
+    return collaborators.slice().sort((a, b) => a.nome.localeCompare(b.nome));
   }, [collaborators]);
 
   const serviceTypeOptions = useMemo(() => {

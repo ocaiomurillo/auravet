@@ -106,10 +106,12 @@ const AppointmentsPage = () => {
     notes: '',
   });
 
-  const { data: collaborators } = useQuery({
+  const { data: collaborators = [] } = useQuery({
     queryKey: ['appointments', 'collaborators'],
     queryFn: () =>
-      apiClient.get<{ collaborators: CollaboratorSummary[] }>('/appointments/collaborators'),
+      apiClient
+        .get<{ collaborators: CollaboratorSummary[] }>('/appointments/collaborators')
+        .then((response) => response.collaborators ?? []),
   });
 
   const { data: owners } = useQuery({
@@ -400,7 +402,7 @@ const AppointmentsPage = () => {
             onChange={(event) => setFilters((prev) => ({ ...prev, collaboratorId: event.target.value }))}
           >
             <option value="">Todos os profissionais</option>
-            {collaborators?.collaborators.map((collaborator) => (
+            {collaborators.map((collaborator) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.nome}
               </option>
@@ -674,7 +676,7 @@ const AppointmentsPage = () => {
             required
           >
             <option value="">Selecione um colaborador</option>
-            {collaborators?.collaborators.map((collaborator) => (
+            {collaborators.map((collaborator) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.nome}
               </option>
@@ -692,7 +694,7 @@ const AppointmentsPage = () => {
             }
           >
             <option value="">Sem assistente</option>
-            {(collaborators?.collaborators ?? []).map((collaborator) => (
+            {collaborators.map((collaborator) => (
               <option key={collaborator.id} value={collaborator.id}>
                 {collaborator.nome}
               </option>
