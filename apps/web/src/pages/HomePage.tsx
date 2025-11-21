@@ -130,11 +130,11 @@ const HomePage = () => {
       {canViewServices ? (
         <Card
           title="Atendimentos"
-          description="Monitore consultas, exames, vacinas e cirurgias com filtros inteligentes."
+          description="Monitore atendimentos — consultas, exames, vacinas e cirurgias — com filtros inteligentes."
           actions={
             <Button variant="secondary" asChild>
               <Link to="/services" className="flex items-center gap-2">
-                <ArrowRightCircleIcon className="h-5 w-5" /> Catálogo de serviços
+                <ArrowRightCircleIcon className="h-5 w-5" /> Acessar atendimentos
               </Link>
             </Button>
           }
@@ -142,19 +142,19 @@ const HomePage = () => {
           {renderMetrics(summary?.appointments, (appointments) => (
             <dl className="grid grid-cols-2 gap-4">
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Agendadas</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Atendimentos agendados</dt>
                 <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(appointments.scheduled)}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Confirmadas</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Atendimentos confirmados</dt>
                 <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(appointments.confirmed)}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Concluídas</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Atendimentos concluídos</dt>
                 <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(appointments.completed)}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Próximos 7 dias</dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Atendimentos nos próximos 7 dias</dt>
                 <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(appointments.upcomingWeek)}</dd>
               </div>
               <div className="sm:col-span-2">
@@ -163,7 +163,7 @@ const HomePage = () => {
               </div>
             </dl>
           ))}
-          <p>Garanta uma jornada de cuidado contínuo, com visão clara de próximos passos e registros completos.</p>
+          <p>Garanta uma jornada de cuidado contínuo, com visão clara dos atendimentos por status e dos próximos passos.</p>
         </Card>
       ) : null}
 
