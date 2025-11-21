@@ -9,7 +9,7 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient, serviceDefinitionsApi } from '../lib/apiClient';
+import { apiClient, productsApi, serviceDefinitionsApi } from '../lib/apiClient';
 import type { Animal, CollaboratorSummary, Product, Service, ServiceResponsible } from '../types/api';
 
 interface AttendanceProductItemFormValue {
@@ -320,8 +320,27 @@ const NewServicePage = () => {
 
   const createAttendance = useMutation({
     mutationFn: (payload: CreateAttendancePayload) => apiClient.post<Service>('/services', payload),
-    onSuccess: (service) => {
+    onSuccess: async (service, payload) => {
       toast.success('Atendimento registrado com sucesso.');
+
+      if (payload?.items?.length) {
+        try {
+          await Promise.all(
+            payload.items.map((item) =>
+              productsApi.adjustStock(item.productId, { amount: -item.quantidade }),
+            ),
+          );
+          queryClient.invalidateQueries({ queryKey: ['products'] });
+          queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
+        } catch (err) {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : 'Não foi possível atualizar o estoque dos produtos utilizados.',
+          );
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: ['animals'] });
       reset({
