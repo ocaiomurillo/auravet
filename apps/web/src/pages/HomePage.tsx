@@ -16,6 +16,7 @@ const HomePage = () => {
   const canViewOwners = hasModule('owners:read');
   const canViewAnimals = hasModule('animals:read');
   const canViewProducts = hasModule('products:read');
+  const canViewAccounting = hasModule('cashier:access');
   const canCreateServices = hasModule('services:write');
 
   const shouldFetchSummary = canViewServices || canViewOwners || canViewAnimals || canViewProducts;
@@ -203,6 +204,24 @@ const HomePage = () => {
             );
           })}
           <p>Identifique reposições com antecedência e evite rupturas em momentos críticos do cuidado.</p>
+        </Card>
+      ) : null}
+
+      {canViewAccounting ? (
+        <Card
+          title="Financeiro"
+          description="Visualize receitas já recebidas e contas próximas do vencimento."
+          actions={
+            <Button variant="secondary" asChild>
+              <Link to="/accounting" className="flex items-center gap-2">
+                <ArrowRightCircleIcon className="h-5 w-5" /> Acessar
+              </Link>
+            </Button>
+          }
+        >
+          <p>
+            Centralize o acompanhamento de faturas emitidas, acompanhe pagamentos e mantenha o fluxo de caixa previsível.
+          </p>
         </Card>
       ) : null}
     </div>
