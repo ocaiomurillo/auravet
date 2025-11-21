@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import Button from '../components/Button';
@@ -9,7 +9,7 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient, productsApi, serviceDefinitionsApi } from '../lib/apiClient';
+import { apiClient, productsApi, serviceDefinitionsApi, servicesApi } from '../lib/apiClient';
 import type {
   Animal,
   Attendance,
@@ -35,7 +35,6 @@ interface AttendanceFormValues {
   animalId: string;
   data: string;
   fim?: string;
-  observacoes?: string;
   responsavelId: string;
   assistantId?: string;
   catalogItems: AttendanceCatalogItemFormValue[];
@@ -59,27 +58,43 @@ type CreateAttendancePayload = {
   animalId: string;
   data: string;
   preco?: number;
-  observacoes?: string;
   responsavelId?: string;
   tipo: Attendance['tipo'];
   catalogItems: AttendanceCatalogItemPayload[];
   items: AttendanceProductItemPayload[];
+  notes?: { conteudo: string }[];
+};
+
+type UpdateAttendancePayload = Partial<CreateAttendancePayload> & { notes?: { conteudo: string }[] };
+
+const toDateTimeLocal = (iso: string) => {
+  const date = new Date(iso);
+  const pad = (value: number) => value.toString().padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
 };
 
 const NewServicePage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { id: serviceId } = useParams();
   const { user, hasModule } = useAuth();
   const canOverrideProductPrice = hasModule('products:write');
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [lastPayload, setLastPayload] = useState<CreateAttendancePayload | null>(null);
+  const [lastPayload, setLastPayload] = useState<
+    CreateAttendancePayload | UpdateAttendancePayload | null
+  >(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [pendingNotes, setPendingNotes] = useState<{ conteudo: string; createdAt: string }[]>([]);
+
+  const isEditing = Boolean(serviceId);
 
   const { register, handleSubmit, watch, reset, setValue, control } = useForm<AttendanceFormValues>({
     defaultValues: {
       animalId: '',
       data: '',
       fim: '',
-      observacoes: '',
       responsavelId: '',
       assistantId: '',
       catalogItems: [],
@@ -134,6 +149,12 @@ const NewServicePage = () => {
         .then((response) => response.collaborators ?? []),
   });
 
+  const { data: attendance, isFetching: isLoadingAttendance } = useQuery({
+    queryKey: ['attendance', serviceId],
+    queryFn: () => servicesApi.getById(serviceId ?? ''),
+    enabled: isEditing && Boolean(serviceId),
+  });
+
   const selectedAnimal = useMemo(
     () => animals?.find((animal) => animal.id === animalId) ?? null,
     [animalId, animals],
@@ -152,6 +173,32 @@ const NewServicePage = () => {
   const availableAssistants = useMemo(() => {
     return collaborators.slice().sort((a, b) => a.nome.localeCompare(b.nome));
   }, [collaborators]);
+
+  useEffect(() => {
+    if (!attendance) return;
+
+    reset({
+      animalId: attendance.animalId,
+      data: toDateTimeLocal(attendance.data),
+      fim: attendance.appointment?.scheduledEnd ? toDateTimeLocal(attendance.appointment.scheduledEnd) : '',
+      responsavelId: attendance.responsavel?.id ?? '',
+      assistantId: attendance.assistant?.id ?? '',
+      catalogItems: attendance.catalogItems.map((item) => ({
+        serviceDefinitionId: item.serviceDefinitionId,
+        quantidade: String(item.quantidade),
+        precoUnitario: item.valorUnitario.toFixed(2),
+        observacoes: item.observacoes ?? undefined,
+      })),
+      items: attendance.items.map((item) => ({
+        productId: item.productId,
+        quantidade: String(item.quantidade),
+        precoUnitario: item.valorUnitario.toFixed(2),
+      })),
+    });
+
+    setPendingNotes([]);
+    setNoteDraft('');
+  }, [attendance, reset]);
 
   useEffect(() => {
     if (user?.id && !responsavelId) {
@@ -176,6 +223,54 @@ const NewServicePage = () => {
     () => (products ?? []).filter((product) => product.isActive),
     [products],
   );
+
+  const handleAddNote = () => {
+    const content = noteDraft.trim();
+    if (!content) {
+      toast.error('Digite um texto para adicionar ao prontuário.');
+      return;
+    }
+
+    setPendingNotes((prev) => [...prev, { conteudo: content, createdAt: new Date().toISOString() }]);
+    setNoteDraft('');
+  };
+
+  const legacyNotes = useMemo(() => {
+    if (!attendance?.observacoes) return [] as Attendance['notes'];
+
+    return [
+      {
+        id: 'legacy-observacao',
+        conteudo: attendance.observacoes,
+        createdAt: attendance.createdAt ?? attendance.data,
+        author:
+          attendance.responsavel ??
+          ({ id: 'responsavel-desconhecido', nome: 'Registro anterior', email: '' } as const),
+      },
+    ];
+  }, [attendance?.createdAt, attendance?.data, attendance?.observacoes, attendance?.responsavel]);
+
+  const existingNotes = useMemo(
+    () => (attendance?.notes?.length ? attendance.notes : legacyNotes),
+    [attendance?.notes, legacyNotes],
+  );
+
+  const noteHistory = useMemo(() => {
+    const author = user
+      ? { id: user.id, nome: user.nome, email: user.email }
+      : { id: 'usuario-atual', nome: 'Usuário atual', email: '' };
+
+    const pending = pendingNotes.map((note, index) => ({
+      id: `pending-${index}`,
+      conteudo: note.conteudo,
+      createdAt: note.createdAt,
+      author,
+    }));
+
+    return [...existingNotes, ...pending].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+  }, [existingNotes, pendingNotes, user]);
 
   const resolveProductBasePrice = useCallback(
     (product?: Product) => product?.precoBaseCatalogo ?? product?.precoVenda ?? 0,
@@ -345,16 +440,38 @@ const NewServicePage = () => {
         animalId: '',
         data: '',
         fim: '',
-        observacoes: '',
         responsavelId: user?.id ?? '',
         assistantId: '',
         catalogItems: [],
         items: [],
       });
+      setPendingNotes([]);
+      setNoteDraft('');
       navigate(`/animals`, { state: { highlight: service.animalId } });
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : 'Não foi possível registrar o atendimento.';
+      setSubmitError(message);
+      toast.error(message);
+    },
+  });
+
+  const updateAttendance = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateAttendancePayload }) =>
+      servicesApi.update(id, payload),
+    onSuccess: () => {
+      toast.success('Atendimento atualizado com sucesso.');
+      setSubmitError(null);
+      setLastPayload(null);
+      setPendingNotes([]);
+      setNoteDraft('');
+      queryClient.invalidateQueries({ queryKey: ['attendance', serviceId] });
+      queryClient.invalidateQueries({ queryKey: ['attendances'] });
+      queryClient.invalidateQueries({ queryKey: ['animals'] });
+      queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Não foi possível atualizar o atendimento.';
       setSubmitError(message);
       toast.error(message);
     },
@@ -373,6 +490,8 @@ const NewServicePage = () => {
 
   const disableSubmit =
     createAttendance.isPending ||
+    updateAttendance.isPending ||
+    (isEditing && isLoadingAttendance) ||
     insufficientStock ||
     hasDuplicateItems ||
     hasDuplicateCatalogItems ||
@@ -414,7 +533,7 @@ const NewServicePage = () => {
     }
 
     const sanitizedCatalogItems: AttendanceCatalogItemPayload[] = [];
-    let resolvedServiceType: Attendance['tipo'] | null = null;
+    let resolvedServiceType: Attendance['tipo'] | null = attendance?.tipo ?? null;
 
     for (const item of formCatalogItems ?? []) {
       if (!item.serviceDefinitionId) {
@@ -512,30 +631,40 @@ const NewServicePage = () => {
       0,
     );
 
+    const notePayload = pendingNotes.map((note) => ({ conteudo: note.conteudo }));
+
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
       data: start.toISOString(),
       preco: Number(servicesTotalValue.toFixed(2)),
-      observacoes: values.observacoes?.trim() ? values.observacoes : undefined,
       responsavelId: values.responsavelId,
       tipo: resolvedServiceType ?? 'CONSULTA',
       catalogItems: sanitizedCatalogItems,
       items: sanitizedItems,
+      notes: notePayload,
     };
 
     setSubmitError(null);
     setLastPayload(payload);
-    createAttendance.mutate(payload);
+
+    if (isEditing && serviceId) {
+      updateAttendance.mutate({ id: serviceId, payload });
+    } else {
+      createAttendance.mutate(payload);
+    }
   });
+
+  const pageTitle = isEditing ? 'Editar atendimento' : 'Registrar Atendimento';
+  const pageDescription = isEditing
+    ? 'Atualize serviços, insumos e entradas do prontuário mantendo o histórico organizado.'
+    : 'Combine múltiplos serviços do catálogo e produtos utilizados para gerar um atendimento completo.';
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Registrar Atendimento</h1>
-          <p className="text-sm text-brand-grafite/70">
-            Combine múltiplos serviços do catálogo e produtos utilizados para gerar um atendimento completo.
-          </p>
+          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">{pageTitle}</h1>
+          <p className="text-sm text-brand-grafite/70">{pageDescription}</p>
         </div>
         <Button variant="secondary" asChild>
           <Link to="/services">Abrir catálogo de serviços</Link>
@@ -878,15 +1007,50 @@ const NewServicePage = () => {
             ) : null}
           </div>
 
-          <label className="md:col-span-2">
-            <span className="font-semibold text-brand-escuro">Observações</span>
-            <textarea
-              {...register('observacoes')}
-              className="mt-1 w-full rounded-xl border border-brand-azul/60 bg-white/90 px-4 py-3 text-sm text-brand-grafite focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/50"
-              rows={4}
-              placeholder="Detalhes que ajudam a equipe a manter o cuidado alinhado."
-            />
-          </label>
+          <div className="md:col-span-2 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-semibold text-brand-escuro">Prontuário do atendimento</span>
+              <span className="text-xs text-brand-grafite/70">Entradas ficam registradas com autor e horário.</span>
+            </div>
+            <div className="space-y-3 rounded-2xl border border-brand-azul/40 bg-white/80 p-4">
+              <label className="block text-sm text-brand-escuro">
+                Nova entrada
+                <textarea
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-brand-azul/60 bg-white/90 px-4 py-3 text-sm text-brand-grafite focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/50"
+                  rows={3}
+                  placeholder="Descreva evolução clínica, condutas e orientações."
+                />
+              </label>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={handleAddNote}
+                  disabled={noteDraft.trim().length === 0 || createAttendance.isPending || updateAttendance.isPending}
+                >
+                  Registrar entrada
+                </Button>
+              </div>
+            </div>
+            {noteHistory.length ? (
+              <ul className="space-y-3">
+                {noteHistory.map((note) => (
+                  <li key={note.id} className="rounded-2xl border border-brand-azul/30 bg-white/70 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-grafite/70">
+                      <span className="font-semibold text-brand-escuro">{note.author.nome}</span>
+                      <span>{new Date(note.createdAt).toLocaleString('pt-BR')}</span>
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-brand-grafite">{note.conteudo}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-brand-grafite/70">
+                Nenhum registro clínico ainda. Adicione a primeira entrada para montar o prontuário.
+              </p>
+            )}
+          </div>
 
           <div className="md:col-span-2 rounded-2xl border border-brand-azul/30 bg-white/70 p-4 text-sm text-brand-grafite/80">
             <h3 className="font-semibold text-brand-escuro">Totais do atendimento</h3>
@@ -904,10 +1068,18 @@ const NewServicePage = () => {
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={createAttendance.isPending}
-                  onClick={() => createAttendance.mutate(lastPayload)}
+                  disabled={createAttendance.isPending || updateAttendance.isPending}
+                  onClick={() => {
+                    if (isEditing && serviceId) {
+                      updateAttendance.mutate({ id: serviceId, payload: lastPayload });
+                    } else {
+                      createAttendance.mutate(lastPayload as CreateAttendancePayload);
+                    }
+                  }}
                 >
-                  {createAttendance.isPending ? 'Tentando novamente...' : 'Tentar novamente'}
+                  {createAttendance.isPending || updateAttendance.isPending
+                    ? 'Tentando novamente...'
+                    : 'Tentar novamente'}
                 </Button>
               ) : null}
             </div>
@@ -917,23 +1089,28 @@ const NewServicePage = () => {
             <Button
               type="button"
               variant="ghost"
-              onClick={() =>
+              onClick={() => {
                 reset({
                   animalId: '',
                   data: '',
                   fim: '',
-                  observacoes: '',
                   responsavelId: user?.id ?? '',
                   assistantId: '',
                   catalogItems: [],
                   items: [],
-                })
-              }
+                });
+                setPendingNotes([]);
+                setNoteDraft('');
+              }}
             >
               Limpar
             </Button>
             <Button type="submit" disabled={disableSubmit}>
-              {createAttendance.isPending ? 'Registrando Atendimento...' : 'Registrar Atendimento'}
+              {createAttendance.isPending || updateAttendance.isPending
+                ? 'Salvando atendimento...'
+                : isEditing
+                  ? 'Salvar atendimento'
+                  : 'Registrar Atendimento'}
             </Button>
           </div>
         </form>

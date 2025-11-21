@@ -51,6 +51,13 @@ const catalogItemSchema = z.object({
   observacoes: z.string().optional(),
 });
 
+const serviceNoteSchema = z.object({
+  conteudo: z
+    .string()
+    .trim()
+    .min(1, { message: 'Informe um texto para registrar no prontuário' }),
+});
+
 export const serviceCreateSchema = z.object({
   animalId: z.string().cuid('Animal inválido'),
   tipo: z.enum(tipoServicoValues, {
@@ -65,6 +72,7 @@ export const serviceCreateSchema = z.object({
   items: z.array(serviceItemSchema).default([]),
   catalogItems: z.array(catalogItemSchema).default([]),
   responsavelId: z.string().cuid('Responsável inválido').optional(),
+  notes: z.array(serviceNoteSchema).default([]),
 });
 
 export const serviceUpdateSchema = z.object({
@@ -84,6 +92,7 @@ export const serviceUpdateSchema = z.object({
   items: z.array(serviceItemSchema).optional(),
   catalogItems: z.array(catalogItemSchema).optional(),
   responsavelId: z.string().cuid('Responsável inválido').optional(),
+  notes: z.array(serviceNoteSchema).optional(),
 });
 
 export const serviceIdSchema = z.object({

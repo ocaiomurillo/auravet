@@ -252,17 +252,38 @@ const AnimalsPage = () => {
                   <ul className="space-y-3">
                     {attendances.map((attendance) => (
                       <li key={attendance.id} className="rounded-2xl border border-brand-azul/30 bg-white/80 p-4">
-                        <p className="font-semibold text-brand-escuro">{attendance.tipo}</p>
-                        <p className="text-sm text-brand-grafite/70">
-                          {new Date(attendance.data).toLocaleDateString('pt-BR')} • R$ {attendance.preco.toFixed(2)}
-                        </p>
-                        {attendance.responsavel ? (
-                          <p className="text-sm text-brand-grafite/70">Responsável: {attendance.responsavel.nome}</p>
-                        ) : null}
-                        {attendance.assistant ? (
-                          <p className="text-sm text-brand-grafite/70">Assistente: {attendance.assistant.nome}</p>
-                        ) : null}
-                        {attendance.observacoes ? (
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-brand-escuro">{attendance.tipo}</p>
+                            <p className="text-sm text-brand-grafite/70">
+                              {new Date(attendance.data).toLocaleDateString('pt-BR')} • R$ {attendance.preco.toFixed(2)}
+                            </p>
+                            {attendance.responsavel ? (
+                              <p className="text-sm text-brand-grafite/70">Responsável: {attendance.responsavel.nome}</p>
+                            ) : null}
+                            {attendance.assistant ? (
+                              <p className="text-sm text-brand-grafite/70">Assistente: {attendance.assistant.nome}</p>
+                            ) : null}
+                          </div>
+                          {canRegisterAttendances ? (
+                            <Button variant="ghost" className="text-sm" asChild>
+                              <Link to={`/services/${attendance.id}/edit`}>Editar</Link>
+                            </Button>
+                          ) : null}
+                        </div>
+                        {(attendance.notes?.length ?? 0) > 0 ? (
+                          <ul className="mt-3 space-y-2 text-sm text-brand-grafite/80">
+                            {attendance.notes.map((note) => (
+                              <li key={note.id} className="rounded-xl bg-brand-azul/10 p-2">
+                                <p className="font-semibold text-brand-escuro">{note.author.nome}</p>
+                                <p className="text-xs text-brand-grafite/60">
+                                  {new Date(note.createdAt).toLocaleString('pt-BR')}
+                                </p>
+                                <p className="mt-1 leading-snug text-brand-grafite">{note.conteudo}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : attendance.observacoes ? (
                           <p className="text-sm text-brand-grafite/80">{attendance.observacoes}</p>
                         ) : null}
                       </li>

@@ -85,6 +85,7 @@ model Servico {
   responsavelId String?
   items        ServiceProductUsage[]
   catalogItems ServiceCatalogUsage[]
+  notes        ServiceNote[]
   appointment  Appointment? @relation("AppointmentService")
   invoiceItems InvoiceItem[]
   responsavel  User?        @relation("ServiceResponsavel", fields: [responsavelId], references: [id])
@@ -141,6 +142,19 @@ model User {
   appointmentsAsAssistant    Appointment[] @relation("AssistantAppointments")
   invoicesResponsible         Invoice[]     @relation("InvoiceResponsible")
   servicesResponsavel         Servico[]     @relation("ServiceResponsavel")
+  serviceNotes                ServiceNote[]
+}
+
+model ServiceNote {
+  id        String   @id @default(cuid())
+  servicoId String
+  authorId  String
+  conteudo  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  servico Servico @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id])
 }
 
 model CollaboratorProfile {

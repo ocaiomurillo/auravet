@@ -185,6 +185,7 @@ export const dashboardApi = {
 
 export const servicesApi = {
   getById: (id: string) => apiClient.get<Attendance>(`/services/${id}`),
+  update: (id: string, payload: unknown) => apiClient.put<Attendance>(`/services/${id}`, payload),
 };
 
 export interface InvoiceFilters {

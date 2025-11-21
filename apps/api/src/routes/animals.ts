@@ -154,6 +154,14 @@ animalsRouter.get(
             definition: true,
           },
         },
+        notes: {
+          include: {
+            author: {
+              select: { id: true, nome: true, email: true },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         responsavel: {
           select: {
             id: true,
@@ -201,16 +209,24 @@ animalsRouter.put(
                   product: true,
                 },
               },
-              catalogItems: {
-                include: {
-                  definition: true,
+            catalogItems: {
+              include: {
+                definition: true,
+              },
+            },
+            notes: {
+              include: {
+                author: {
+                  select: { id: true, nome: true, email: true },
                 },
               },
-              responsavel: {
-                select: {
-                  id: true,
-                  nome: true,
-                  email: true,
+              orderBy: { createdAt: 'asc' },
+            },
+            responsavel: {
+              select: {
+                id: true,
+                nome: true,
+                email: true,
                 },
               },
             },
