@@ -218,6 +218,7 @@ servicesRouter.get(
         id: definition.id,
         nome: definition.nome,
         descricao: definition.descricao ?? null,
+        profissional: definition.profissional ?? null,
         tipo: definition.tipo,
         precoSugerido: Number(definition.precoSugerido),
         createdAt: definition.createdAt.toISOString(),

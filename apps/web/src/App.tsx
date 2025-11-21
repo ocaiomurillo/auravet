@@ -30,7 +30,7 @@ const App = () => {
           <Route element={<RequireModules modules={['animals:read', 'owners:read']} />}>
             <Route path="animals" element={<AnimalsPage />} />
           </Route>
-          <Route element={<RequireModules modules={['services:read', 'owners:read', 'animals:read']} />}>
+          <Route element={<RequireModules modules={['services:read']} />}>
             <Route path="services" element={<ServicesPage />} />
           </Route>
           <Route element={<RequireModules modules={['services:read', 'owners:read', 'animals:read']} />}>

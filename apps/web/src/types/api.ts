@@ -94,6 +94,7 @@ export interface ServiceDefinition {
   id: string;
   nome: string;
   descricao: string | null;
+  profissional: string | null;
   tipo: Service['tipo'];
   precoSugerido: number;
   createdAt: string;

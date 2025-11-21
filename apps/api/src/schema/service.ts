@@ -22,7 +22,7 @@ const toNumber = (
   return numeric;
 };
 
-const precoSchema = z.union([z.number(), z.string()]).transform((value, ctx) => {
+export const precoSchema = z.union([z.number(), z.string()]).transform((value, ctx) => {
   const numeric = toNumber(value, ctx);
   if (numeric === undefined) return z.NEVER;
   return Number(numeric.toFixed(2));
