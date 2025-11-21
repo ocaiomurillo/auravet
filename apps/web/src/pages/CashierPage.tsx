@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -8,7 +8,15 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
-import type { Appointment, Invoice, InvoiceListResponse, OwnerSummary, Product, Service } from '../types/api';
+import type {
+  Appointment,
+  Invoice,
+  InvoiceItem,
+  InvoiceListResponse,
+  OwnerSummary,
+  Product,
+  Service,
+} from '../types/api';
 import { apiClient, appointmentsApi, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
@@ -327,6 +335,7 @@ const CashierPage = () => {
   const [extraItemUnitPrice, setExtraItemUnitPrice] = useState('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+  const adjustedInvoiceItemIdsRef = useRef<Set<string>>(new Set());
 
   const { data: owners } = useQuery({
     queryKey: ['owners', 'basic'],
@@ -387,8 +396,9 @@ const CashierPage = () => {
   const markPaidMutation = useMutation({
     mutationFn: (payload: { id: string; paidAt?: string; paymentNotes?: string }) =>
       invoicesApi.markAsPaid(payload.id, { paidAt: payload.paidAt, paymentNotes: payload.paymentNotes }),
-    onSuccess: (invoice) => {
+    onSuccess: async (invoice) => {
       toast.success('Pagamento registrado com sucesso.');
+      await adjustStockForItems(invoice.items);
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       setSelectedInvoice(invoice);
       setPaymentNotes(invoice.paymentNotes ?? '');
@@ -403,8 +413,9 @@ const CashierPage = () => {
       invoiceId: string;
       payload: { description: string; quantity: number; unitPrice: number; productId?: string };
     }) => invoicesApi.addManualItem(params.invoiceId, params.payload),
-    onSuccess: (invoice) => {
+    onSuccess: async (invoice) => {
       toast.success('Item extra adicionado à conta.');
+      await adjustStockForItems(invoice.items);
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
       setSelectedInvoice(invoice);
@@ -444,6 +455,12 @@ const CashierPage = () => {
     [productsQuery.data],
   );
 
+  const productMap = useMemo(() => {
+    const map = new Map<string, Product>();
+    (productsQuery.data ?? []).forEach((product) => map.set(product.id, product));
+    return map;
+  }, [productsQuery.data]);
+
   const extraItemTotal = useMemo(() => {
     const quantity = Number(extraItemQuantity);
     const unitPrice = Number(extraItemUnitPrice);
@@ -452,6 +469,43 @@ const CashierPage = () => {
     }
     return quantity > 0 && unitPrice >= 0 ? quantity * unitPrice : 0;
   }, [extraItemQuantity, extraItemUnitPrice]);
+
+  const adjustStockForItems = async (items: InvoiceItem[]) => {
+    const adjustments: InvoiceItem[] = [];
+
+    items.forEach((item) => {
+      if (!item.productId) return;
+      if (adjustedInvoiceItemIdsRef.current.has(item.id)) return;
+
+      const product = productMap.get(item.productId);
+      if (!product || !product.isSellable) return;
+
+      if (item.quantity > product.estoqueAtual) {
+        toast.error(`Estoque insuficiente para ${product.nome}. Disponível: ${product.estoqueAtual}.`);
+        return;
+      }
+
+      adjustments.push(item);
+    });
+
+    if (!adjustments.length) return;
+
+    try {
+      await Promise.all(
+        adjustments.map((item) => productsApi.adjustStock(item.productId!, { amount: -item.quantity })),
+      );
+
+      adjustments.forEach((item) => adjustedInvoiceItemIdsRef.current.add(item.id));
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível atualizar o estoque dos produtos vendidos.',
+      );
+    }
+  };
 
   const selectedAppointment = billableAppointmentsQuery.data?.find(
     (appointment) => appointment.id === selectedAppointmentId,
@@ -497,6 +551,24 @@ const CashierPage = () => {
     setExtraItemDescription('');
     setExtraItemQuantity('1');
     setExtraItemUnitPrice('');
+  }, [selectedInvoice]);
+
+  useEffect(() => {
+    const alreadyAdjusted = new Set<string>();
+
+    if (selectedInvoice) {
+      const previousAdjustments = adjustedInvoiceItemIdsRef.current;
+      const assumeAdjusted = selectedInvoice.status.slug === 'QUITADA';
+
+      selectedInvoice.items.forEach((item) => {
+        if (!item.productId) return;
+        if (assumeAdjusted || item.service || previousAdjustments.has(item.id)) {
+          alreadyAdjusted.add(item.id);
+        }
+      });
+    }
+
+    adjustedInvoiceItemIdsRef.current = alreadyAdjusted;
   }, [selectedInvoice]);
 
   useEffect(() => {
@@ -643,6 +715,13 @@ const CashierPage = () => {
 
       if (!selectedProduct.isSellable) {
         toast.error('Este produto é de uso interno e não pode ser vendido.');
+        return;
+      }
+
+      if (quantity > selectedProduct.estoqueAtual) {
+        toast.error(
+          `Estoque insuficiente para ${selectedProduct.nome}. Disponível: ${selectedProduct.estoqueAtual}.`,
+        );
         return;
       }
 
