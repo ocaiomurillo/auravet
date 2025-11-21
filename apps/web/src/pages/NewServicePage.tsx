@@ -14,7 +14,6 @@ import type {
   Animal,
   Attendance,
   AttendanceResponsible,
-  AttendanceType,
   CollaboratorSummary,
   Product,
 } from '../types/api';
@@ -34,7 +33,6 @@ interface AttendanceCatalogItemFormValue {
 
 interface AttendanceFormValues {
   animalId: string;
-  tipo: AttendanceType;
   data: string;
   observacoes?: string;
   responsavelId: string;
@@ -42,14 +40,6 @@ interface AttendanceFormValues {
   catalogItems: AttendanceCatalogItemFormValue[];
   items: AttendanceProductItemFormValue[];
 }
-
-const attendanceTypeLabels: Record<AttendanceType, string> = {
-  CONSULTA: 'Consulta',
-  EXAME: 'Exame',
-  VACINACAO: 'Vacinação',
-  CIRURGIA: 'Cirurgia',
-  OUTROS: 'Outros cuidados',
-};
 
 type AttendanceProductItemPayload = {
   productId: string;
@@ -66,7 +56,6 @@ type AttendanceCatalogItemPayload = {
 
 type CreateAttendancePayload = {
   animalId: string;
-  tipo: AttendanceType;
   data: string;
   preco?: number;
   observacoes?: string;
@@ -84,7 +73,6 @@ const NewServicePage = () => {
   const { register, handleSubmit, watch, reset, setValue, control } = useForm<AttendanceFormValues>({
     defaultValues: {
       animalId: '',
-      tipo: 'CONSULTA',
       data: '',
       observacoes: '',
       responsavelId: '',
@@ -98,7 +86,6 @@ const NewServicePage = () => {
   const catalogItems = watch('catalogItems');
   const animalId = watch('animalId');
   const responsavelId = watch('responsavelId');
-  const tipoAtendimento = watch('tipo');
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -159,36 +146,11 @@ const NewServicePage = () => {
     return collaborators.slice().sort((a, b) => a.nome.localeCompare(b.nome));
   }, [collaborators]);
 
-  const serviceTypeOptions = useMemo(() => {
-    const typesFromCatalog = new Map<AttendanceType, string>();
-
-    for (const definition of availableDefinitions) {
-      typesFromCatalog.set(definition.tipo, attendanceTypeLabels[definition.tipo] ?? definition.tipo);
-    }
-
-    const entries = typesFromCatalog.size
-      ? Array.from(typesFromCatalog.entries())
-      : Object.entries(attendanceTypeLabels);
-
-    return entries
-      .map(([value, label]) => ({ value: value as AttendanceType, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [availableDefinitions]);
-
   useEffect(() => {
     if (user?.id && !responsavelId) {
       setValue('responsavelId', user.id);
     }
   }, [responsavelId, setValue, user?.id]);
-
-  useEffect(() => {
-    if (!serviceTypeOptions.length) return;
-
-    const hasSelectedType = serviceTypeOptions.some((option) => option.value === tipoAtendimento);
-    if (!hasSelectedType) {
-      setValue('tipo', serviceTypeOptions[0].value);
-    }
-  }, [serviceTypeOptions, setValue, tipoAtendimento]);
 
   const tutorHelperText = selectedAnimal
     ? selectedAnimal.owner?.nome
@@ -352,7 +314,6 @@ const NewServicePage = () => {
       queryClient.invalidateQueries({ queryKey: ['animals'] });
       reset({
         animalId: '',
-        tipo: 'CONSULTA',
         data: '',
         observacoes: '',
         responsavelId: user?.id ?? '',
@@ -480,7 +441,6 @@ const NewServicePage = () => {
 
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
-      tipo: values.tipo,
       data: values.data,
       preco: Number(servicesTotalValue.toFixed(2)),
       observacoes: values.observacoes?.trim() ? values.observacoes : undefined,
@@ -499,7 +459,7 @@ const NewServicePage = () => {
         <div>
           <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Registrar Atendimento</h1>
           <p className="text-sm text-brand-grafite/70">
-            Combine serviços do catálogo e produtos utilizados para gerar um atendimento completo.
+            Combine múltiplos serviços do catálogo e produtos utilizados para gerar um atendimento completo.
           </p>
         </div>
         <Button variant="secondary" asChild>
@@ -507,7 +467,10 @@ const NewServicePage = () => {
         </Button>
       </div>
 
-      <Card title="Dados do atendimento" description="Preencha com atenção para manter o histórico impecável.">
+      <Card
+        title="Dados do atendimento"
+        description="Preencha com atenção para manter o histórico impecável e inclua quantos serviços forem necessários no mesmo atendimento."
+      >
         <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
           <SelectField label="Pet" required {...register('animalId')}>
             <option value="">Selecione um pet</option>
@@ -526,14 +489,6 @@ const NewServicePage = () => {
             helperText={tutorHelperText}
             error={petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o atendimento.' : undefined}
           />
-
-          <SelectField label="Tipo de atendimento" required {...register('tipo')}>
-            {serviceTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </SelectField>
 
           <Field label="Data" type="date" required {...register('data')} />
 
@@ -858,7 +813,6 @@ const NewServicePage = () => {
               onClick={() =>
                 reset({
                   animalId: '',
-                  tipo: 'CONSULTA',
                   data: '',
                   observacoes: '',
                   responsavelId: user?.id ?? '',
