@@ -311,11 +311,12 @@ const UsersPage = () => {
           </>
         }
       >
-        <form id="user-form" className="space-y-4" onSubmit={onSubmit}>
+        <form id="user-form" className="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={onSubmit}>
           <Field
             label="Nome completo"
             placeholder="Nome e sobrenome"
             required
+            className="py-2.5 text-sm md:text-base"
             {...register('nome', { required: 'Informe o nome do colaborador.' })}
             helperText={errors.nome?.message}
           />
@@ -325,6 +326,7 @@ const UsersPage = () => {
             placeholder="colaborador@auravet.com"
             required
             disabled={Boolean(editingUser)}
+            className="py-2.5 text-sm md:text-base"
             {...register('email', { required: 'Informe o e-mail corporativo.' })}
             helperText={errors.email?.message}
           />
@@ -334,6 +336,7 @@ const UsersPage = () => {
               type="password"
               placeholder="Senha inicial"
               required
+              className="py-2.5 text-sm md:text-base"
               {...register('password', {
                 required: 'Informe uma senha provisória.',
                 minLength: { value: 8, message: 'A senha deve ter pelo menos 8 caracteres.' },
@@ -341,7 +344,12 @@ const UsersPage = () => {
               helperText={errors.password?.message}
             />
           ) : null}
-          <SelectField label="Função" required {...register('roleId', { required: 'Selecione uma função.' })}>
+          <SelectField
+            label="Função"
+            required
+            className="py-2.5 text-sm md:text-base"
+            {...register('roleId', { required: 'Selecione uma função.' })}
+          >
             <option value="" disabled>
               {rolesQuery.isLoading ? 'Carregando funções...' : 'Selecione uma função'}
             </option>
@@ -351,7 +359,7 @@ const UsersPage = () => {
               </option>
             ))}
           </SelectField>
-          <div className="space-y-1">
+          <div className="space-y-1 md:col-span-2">
             <p className="text-sm font-semibold text-brand-escuro">Perfil clínico</p>
             <p className="text-xs text-brand-grafite/70">
               Preencha os dados apresentados nos formulários de agendamento e atendimento.
@@ -360,26 +368,28 @@ const UsersPage = () => {
           <Field
             label="Especialidade clínica"
             placeholder="Ex.: Clínica geral, felinos, cirurgia"
+            className="py-2.5 text-sm md:text-base"
             {...register('especialidade')}
             helperText="Opcional"
           />
           <Field
             label="CRMV"
             placeholder="Registro profissional"
+            className="py-2.5 text-sm md:text-base"
             {...register('crmv')}
             helperText="Opcional"
           />
-          <label className="flex flex-col gap-1 text-sm font-medium text-brand-grafite">
+          <label className="flex flex-col gap-1 text-sm font-medium text-brand-grafite md:col-span-2">
             <span className="font-semibold text-brand-escuro">Bio clínica</span>
             <textarea
               {...register('bio')}
               rows={3}
-              className="w-full rounded-xl border border-brand-azul/60 bg-white/90 px-4 py-2 text-brand-grafite shadow-inner focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/50"
+              className="w-full rounded-xl border border-brand-azul/60 bg-white/90 px-4 py-2.5 text-sm text-brand-grafite shadow-inner focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/50"
               placeholder="Resumo sobre a atuação profissional do colaborador"
             />
             <span className="text-xs text-brand-grafite/70">Opcional</span>
           </label>
-          <div className="space-y-3 rounded-2xl border border-brand-azul/30 bg-white/60 p-4">
+          <div className="space-y-3 rounded-2xl border border-brand-azul/30 bg-white/60 p-4 md:col-span-2">
             <div>
               <p className="text-sm font-semibold text-brand-escuro">Turnos disponíveis</p>
               <p className="text-xs text-brand-grafite/70">Selecione os períodos em que o colaborador pode ser escalado.</p>
@@ -397,7 +407,7 @@ const UsersPage = () => {
                     <input
                       id={checkboxId}
                       type="checkbox"
-                      className="h-4 w-4"
+                      className="h-4 w-4 accent-brand-escuro"
                       checked={checked}
                       onChange={() => toggleShift(option.value)}
                     />
