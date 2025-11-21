@@ -2,6 +2,7 @@ import type {
   Appointment,
   AttendanceType,
   DashboardSummaryResponse,
+  Attendance,
   Invoice,
   InvoiceListResponse,
   InvoiceStatus,
@@ -180,6 +181,10 @@ export const serviceDefinitionsApi = {
 
 export const dashboardApi = {
   summary: () => apiClient.get<DashboardSummaryResponse>('/dashboard/summary'),
+};
+
+export const servicesApi = {
+  getById: (id: string) => apiClient.get<Attendance>(`/services/${id}`),
 };
 
 export interface InvoiceFilters {
