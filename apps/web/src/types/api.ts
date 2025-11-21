@@ -69,10 +69,12 @@ export interface Service {
   observacoes?: string | null;
   createdAt: string;
   appointmentId: string | null;
+  assistantId: string | null;
   animal?: Animal;
   catalogItems: ServiceCatalogItem[];
   items: ServiceItem[];
   responsavel: ServiceResponsible | null;
+  assistant: CollaboratorSummary | null;
 }
 
 export interface ServiceItem {
