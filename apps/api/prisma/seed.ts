@@ -935,6 +935,7 @@ const DEFAULT_SERVICE_DEFINITIONS: Array<{
   },
 ];
 
+console.log('>> Iniciando seed Auravet...');
 
 async function main() {
   const modules = await Promise.all(
@@ -1244,6 +1245,8 @@ await Promise.all(
     }
   }
 }
+
+console.log('>> Admin seed finalizado com sucesso!');
 
 main()
   .catch((error) => {
