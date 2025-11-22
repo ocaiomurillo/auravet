@@ -21,11 +21,19 @@ import { apiClient, appointmentsApi, invoicesApi, productsApi } from '../lib/api
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 import { JsPDFInstance, loadJsPdf, loadLogoDataUrl } from '../utils/pdf';
 
+const brandColors = {
+  primary: [61, 102, 85] as [number, number, number],
+  text: [15, 23, 42] as [number, number, number],
+  muted: [71, 85, 105] as [number, number, number],
+  subtle: [100, 116, 139] as [number, number, number],
+};
+
 const addSectionTitle = (doc: JsPDFInstance, title: string, y: number) => {
   doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
+  doc.setTextColor(...brandColors.text);
   doc.text(title, 15, y);
-  doc.setLineWidth(0.4);
+  doc.setDrawColor(...brandColors.primary);
+  doc.setLineWidth(0.6);
   doc.line(15, y + 2, 195, y + 2);
 };
 
@@ -43,43 +51,69 @@ const appendKeyValue = (
   label: string,
   value: string,
   y: number,
-  color: [number, number, number] = [30, 41, 59],
+  color: [number, number, number] = brandColors.text,
 ) => {
   doc.setFontSize(10);
   doc.setTextColor(...color);
   doc.text(`${label}: ${value}`, 15, y);
 };
 
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 const buildInvoicePdf = async (invoice: Invoice) => {
   const JsPdf = await loadJsPdf();
   const doc = new JsPdf();
   const logo = await loadLogoDataUrl();
+  const dueDate = new Date(invoice.dueDate);
+  const createdAt = new Date(invoice.createdAt);
+  const primaryPet = invoice.items.find((item) => item.service?.animal?.nome)?.service?.animal?.nome;
+  const primaryServiceDate = invoice.items.find((item) => item.service?.data)?.service?.data;
+  const referenceDate = primaryServiceDate ? new Date(primaryServiceDate) : null;
 
-  let currentY = 22;
+  doc.setFillColor(...brandColors.primary);
+  doc.rect(0, 0, 210, 36, 'F');
 
   if (logo) {
-    doc.addImage(logo, 'PNG', 15, 10, 32, 16);
+    doc.addImage(logo, 'PNG', 15, 6, 32, 20);
   }
 
+  doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Auravet', 52, 20);
-  doc.setFontSize(12);
-  doc.setTextColor(71, 85, 105);
-  doc.text('Fatura detalhada', 52, 28);
+  doc.text('Auravet', 52, 16);
+  doc.setFontSize(11);
+  doc.text('Detalhamento da cobrança', 52, 24);
 
-  currentY = 34;
+  const invoiceHeadline = `Conta para ${invoice.owner.nome}${primaryPet ? ` • Pet ${primaryPet}` : ''}`;
+  const billingSummary = `Vencimento: ${dueDate.toLocaleDateString('pt-BR')} • Emitida em: ${createdAt.toLocaleDateString('pt-BR')}`;
+  const referenceSummary = referenceDate
+    ? `Referente a atendimento em ${referenceDate.toLocaleDateString('pt-BR')}`
+    : null;
+  const statusLine = `Status: ${invoice.status.name}`;
+
+  doc.setFillColor(248, 250, 249);
+  doc.roundedRect(15, 40, 180, 28, 3, 3, 'F');
+  doc.setTextColor(...brandColors.text);
+  doc.setFontSize(11);
+  doc.text(invoiceHeadline, 22, 54);
+  doc.setTextColor(...brandColors.muted);
   doc.setFontSize(10);
-  doc.setTextColor(30, 41, 59);
-  doc.text(`Fatura nº ${invoice.id}`, 15, currentY);
-  currentY += 6;
-  doc.text(`Emitida em: ${new Date(invoice.createdAt).toLocaleDateString('pt-BR')}`, 15, currentY);
-  currentY += 6;
-  doc.text(`Vencimento: ${new Date(invoice.dueDate).toLocaleDateString('pt-BR')}`, 15, currentY);
-  currentY += 6;
-  doc.text(`Status: ${invoice.status.name}`, 15, currentY);
+  doc.text(billingSummary, 22, 62);
+  if (referenceSummary) {
+    doc.text(referenceSummary, 22, 70);
+  }
+  doc.setFontSize(9);
+  doc.setTextColor(...brandColors.text);
+  const statusY = referenceSummary ? 78 : 70;
+  doc.text(statusLine, 22, statusY);
 
-  currentY += 12;
+  let currentY = referenceSummary ? 90 : 82;
+
   addSectionTitle(doc, 'Tutor', currentY);
   currentY += 8;
   appendKeyValue(doc, 'Nome', invoice.owner.nome, currentY);
@@ -112,7 +146,7 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   addSectionTitle(doc, 'Itens faturados', currentY);
   currentY += 8;
   doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(...brandColors.text);
   doc.text('Descrição', 15, currentY);
   doc.text('Qtd.', 120, currentY, { align: 'right' as const });
   doc.text('Unitário', 150, currentY, { align: 'right' as const });
@@ -162,7 +196,7 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   const subtotal = invoice.items.reduce((acc, item) => acc + item.total, 0);
   appendKeyValue(doc, 'Subtotal', currencyFormatter.format(subtotal), currentY);
   currentY += 6;
-  appendKeyValue(doc, 'Total da fatura', currencyFormatter.format(invoice.total), currentY, [22, 101, 52]);
+  appendKeyValue(doc, 'Total da fatura', currencyFormatter.format(invoice.total), currentY, brandColors.primary);
   currentY += 12;
 
   currentY = ensureSpace(doc, currentY, 20);
@@ -632,7 +666,9 @@ const CashierPage = () => {
     try {
       setIsGeneratingPdf(true);
       const doc = await buildInvoicePdf(selectedInvoice);
-      const fileName = `auravet-fatura-${selectedInvoice.id}.pdf`;
+      const ownerSlug = slugify(selectedInvoice.owner.nome || 'tutor');
+      const fileDate = new Date(selectedInvoice.dueDate).toISOString().split('T')[0];
+      const fileName = `auravet-fatura-${ownerSlug || 'tutor'}-${fileDate}.pdf`;
       const blobUrl = doc.output('bloburl');
 
       const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');

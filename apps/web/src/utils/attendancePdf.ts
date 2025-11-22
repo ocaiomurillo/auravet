@@ -19,11 +19,19 @@ const formatDateTime = (iso: string) =>
     minute: '2-digit',
   });
 
+const brandColors = {
+  primary: [61, 102, 85] as [number, number, number],
+  text: [15, 23, 42] as [number, number, number],
+  muted: [71, 85, 105] as [number, number, number],
+  subtle: [100, 116, 139] as [number, number, number],
+};
+
 const addPdfSectionTitle = (doc: JsPDFInstance, title: string, y: number) => {
   doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
+  doc.setTextColor(...brandColors.text);
   doc.text(title, 15, y);
-  doc.setLineWidth(0.4);
+  doc.setDrawColor(...brandColors.primary);
+  doc.setLineWidth(0.6);
   doc.line(15, y + 2, 195, y + 2);
 };
 
@@ -41,7 +49,7 @@ const appendPdfKeyValue = (
   label: string,
   value: string,
   y: number,
-  color: [number, number, number] = [30, 41, 59],
+  color: [number, number, number] = brandColors.text,
 ) => {
   doc.setFontSize(10);
   doc.setTextColor(...color);
@@ -60,28 +68,39 @@ export const buildAttendancePdf = async (service: Attendance, appointment?: Appo
   const pet = service.animal;
   const scheduleStart = appointment?.scheduledStart ?? service.appointment?.scheduledStart ?? service.data;
   const scheduleEnd = appointment?.scheduledEnd ?? service.appointment?.scheduledEnd ?? service.data;
+  const visitDate = new Date(service.data);
+  const humanizedDate = visitDate.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+  const attendanceHeadline = `Atendimento de ${pet?.nome ?? 'pet'} em ${humanizedDate}`;
 
-  let currentY = 22;
+  doc.setFillColor(...brandColors.primary);
+  doc.rect(0, 0, 210, 36, 'F');
 
   if (logo) {
-    doc.addImage(logo, 'PNG', 15, 10, 32, 16);
+    doc.addImage(logo, 'PNG', 15, 6, 32, 20);
   }
 
+  doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Auravet', 52, 20);
-  doc.setFontSize(12);
-  doc.setTextColor(71, 85, 105);
-  doc.text('Ficha de atendimento', 52, 28);
+  doc.text('Auravet', 52, 16);
+  doc.setFontSize(11);
+  doc.text('Ficha de atendimento', 52, 24);
 
-  currentY = 34;
+  doc.setFillColor(248, 250, 249);
+  doc.roundedRect(15, 40, 180, 22, 3, 3, 'F');
+  doc.setTextColor(...brandColors.text);
+  doc.setFontSize(11);
+  doc.text(attendanceHeadline, 22, 54);
+
+  let currentY = 70;
   doc.setFontSize(10);
-  doc.setTextColor(30, 41, 59);
-  doc.text(`Atendimento nº ${service.id}`, 15, currentY);
+  doc.setTextColor(...brandColors.muted);
+  doc.text(`Tipo de atendimento: ${attendanceTypeLabels[service.tipo] ?? service.tipo}`, 15, currentY);
   currentY += 6;
-  doc.text(`Tipo: ${attendanceTypeLabels[service.tipo] ?? service.tipo}`, 15, currentY);
-  currentY += 6;
-  doc.text(`Data do atendimento: ${new Date(service.data).toLocaleString('pt-BR')}`, 15, currentY);
+  doc.text(`Data do atendimento: ${visitDate.toLocaleString('pt-BR')}`, 15, currentY);
 
   currentY += 12;
   addPdfSectionTitle(doc, 'Tutor', currentY);
@@ -133,17 +152,17 @@ export const buildAttendancePdf = async (service: Attendance, appointment?: Appo
   currentY += 8;
 
   if (service.catalogItems.length === 0) {
-    appendPdfKeyValue(doc, 'Itens', 'Nenhum serviço cadastrado', currentY, [100, 116, 139]);
+    appendPdfKeyValue(doc, 'Itens', 'Nenhum serviço cadastrado', currentY, brandColors.subtle);
     currentY += 10;
   }
 
   service.catalogItems.forEach((item, index) => {
     currentY = ensurePdfSpace(doc, currentY, 18);
-    appendPdfKeyValue(doc, `#${index + 1} ${item.definition.nome}`, '', currentY);
+    appendPdfKeyValue(doc, `${index + 1}. ${item.definition.nome}`, '', currentY);
     currentY += 6;
-    appendPdfKeyValue(doc, 'Quantidade', String(item.quantidade), currentY, [71, 85, 105]);
+    appendPdfKeyValue(doc, 'Quantidade', String(item.quantidade), currentY, brandColors.muted);
     currentY += 6;
-    appendPdfKeyValue(doc, 'Subtotal', formatCurrency(item.valorTotal), currentY, [71, 85, 105]);
+    appendPdfKeyValue(doc, 'Subtotal', formatCurrency(item.valorTotal), currentY, brandColors.muted);
     if (item.observacoes) {
       currentY += 6;
       const wrapped = doc.splitTextToSize(item.observacoes, 180);
@@ -158,17 +177,17 @@ export const buildAttendancePdf = async (service: Attendance, appointment?: Appo
   currentY += 8;
 
   if (service.items.length === 0) {
-    appendPdfKeyValue(doc, 'Itens', 'Nenhum produto aplicado', currentY, [100, 116, 139]);
+    appendPdfKeyValue(doc, 'Itens', 'Nenhum produto aplicado', currentY, brandColors.subtle);
     currentY += 10;
   }
 
   service.items.forEach((item, index) => {
     currentY = ensurePdfSpace(doc, currentY, 18);
-    appendPdfKeyValue(doc, `#${index + 1} ${item.product.nome}`, '', currentY);
+    appendPdfKeyValue(doc, `${index + 1}. ${item.product.nome}`, '', currentY);
     currentY += 6;
-    appendPdfKeyValue(doc, 'Quantidade', String(item.quantidade), currentY, [71, 85, 105]);
+    appendPdfKeyValue(doc, 'Quantidade', String(item.quantidade), currentY, brandColors.muted);
     currentY += 6;
-    appendPdfKeyValue(doc, 'Subtotal', formatCurrency(item.valorTotal), currentY, [71, 85, 105]);
+    appendPdfKeyValue(doc, 'Subtotal', formatCurrency(item.valorTotal), currentY, brandColors.muted);
     currentY += 4;
   });
 
@@ -184,7 +203,7 @@ export const buildAttendancePdf = async (service: Attendance, appointment?: Appo
   currentY += 6;
   appendPdfKeyValue(doc, 'Produtos', formatCurrency(productsTotal), currentY);
   currentY += 6;
-  appendPdfKeyValue(doc, 'Total geral', formatCurrency(overallTotal), currentY, [15, 23, 42]);
+  appendPdfKeyValue(doc, 'Total geral', formatCurrency(overallTotal), currentY, brandColors.text);
 
   if (service.notes?.length) {
     currentY += 12;
