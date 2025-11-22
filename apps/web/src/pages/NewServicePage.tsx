@@ -18,7 +18,7 @@ import type {
   CollaboratorSummary,
   Product,
 } from '../types/api';
-import { formatApiErrorMessage } from '../utils/apiErrors';
+import { formatApiErrorMessage, type ApiErrorLike } from '../utils/apiErrors';
 
 interface AttendanceProductItemFormValue {
   productId: string;
@@ -512,6 +512,15 @@ const NewServicePage = () => {
       const message = formatErrorMessage(err, 'Não foi possível registrar o atendimento.');
       setSubmitError(message);
       toast.error(message);
+
+      const serviceId =
+        err instanceof Error && 'details' in err && err.details && typeof err.details === 'object'
+          ? (err as ApiErrorLike & { details?: { serviceId?: string } }).details?.serviceId
+          : undefined;
+
+      if (serviceId) {
+        navigate(`/services/${serviceId}/edit`);
+      }
     },
   });
 
