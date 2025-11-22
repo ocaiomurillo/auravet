@@ -8,16 +8,8 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
-import type {
-  Appointment,
-  AttendanceType,
-  Invoice,
-  InvoiceItem,
-  InvoiceListResponse,
-  OwnerSummary,
-  Product,
-} from '../types/api';
-import { apiClient, appointmentsApi, invoicesApi, productsApi } from '../lib/apiClient';
+import type { Invoice, InvoiceItem, InvoiceListResponse, OwnerSummary, Product } from '../types/api';
+import { apiClient, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 import { JsPDFInstance, loadJsPdf, loadLogoDataUrl } from '../utils/pdf';
 
@@ -216,14 +208,6 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL',
 });
 
-const attendanceTypeLabels: Record<AttendanceType, string> = {
-  CONSULTA: 'Consulta',
-  EXAME: 'Exame',
-  VACINACAO: 'Vacinação',
-  CIRURGIA: 'Cirurgia',
-  OUTROS: 'Outros cuidados',
-};
-
 type InvoiceFiltersState = {
   ownerId: string;
   status: string;
@@ -234,10 +218,6 @@ type InvoiceFiltersState = {
 const CashierPage = () => {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<InvoiceFiltersState>({ ownerId: '', status: '', from: '', to: '' });
-  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
-  const [ownerForModal, setOwnerForModal] = useState('');
-  const [selectedAppointmentId, setSelectedAppointmentId] = useState('');
-  const [dueDate, setDueDate] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const selectedInvoiceOwnerCpf = selectedInvoice ? formatCpf(selectedInvoice.owner.cpf) : null;
   const selectedInvoiceOwnerAddress = selectedInvoice ? buildOwnerAddress(selectedInvoice.owner) : null;
@@ -277,35 +257,10 @@ const CashierPage = () => {
     queryFn: () => apiClient.get<InvoiceListResponse>(`/invoices${queryString}`),
   });
 
-  const billableAppointmentsQuery = useQuery<Appointment[]>({
-    queryKey: ['billable-appointments', ownerForModal],
-    queryFn: () => appointmentsApi.billable(ownerForModal || undefined),
-    enabled: isGenerateModalOpen,
-  });
-
   const productsQuery = useQuery<Product[]>({
     queryKey: ['sellable-products'],
     queryFn: () => productsApi.list(),
     enabled: Boolean(selectedInvoice),
-  });
-
-  const generateMutation = useMutation({
-    mutationFn: (payload: { appointmentId: string; dueDate?: string }) =>
-      invoicesApi.generateFromAppointment(payload),
-    onSuccess: (invoice) => {
-      toast.success('Conta emitida com carinho.');
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['billable-appointments'] });
-      setIsGenerateModalOpen(false);
-      setSelectedAppointmentId('');
-      setOwnerForModal('');
-      setDueDate('');
-      setSelectedInvoice(invoice);
-      setPaymentNotes(invoice.paymentNotes ?? '');
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : 'Não foi possível gerar a conta.');
-    },
   });
 
   const markPaidMutation = useMutation({
@@ -422,37 +377,6 @@ const CashierPage = () => {
     }
   };
 
-  const selectedAppointment = billableAppointmentsQuery.data?.find(
-    (appointment) => appointment.id === selectedAppointmentId,
-  );
-
-  useEffect(() => {
-    if (selectedAppointment) {
-      const baseDateString = selectedAppointment.service?.data ?? selectedAppointment.scheduledStart;
-
-      if (baseDateString) {
-        const baseDate = new Date(baseDateString);
-        baseDate.setDate(baseDate.getDate() + 7);
-        setDueDate(baseDate.toISOString().slice(0, 10));
-        return;
-      }
-    }
-
-    setDueDate('');
-  }, [selectedAppointment]);
-
-  useEffect(() => {
-    if (!isGenerateModalOpen) {
-      setSelectedAppointmentId('');
-      setOwnerForModal('');
-      setDueDate('');
-    }
-  }, [isGenerateModalOpen]);
-
-  useEffect(() => {
-    setSelectedAppointmentId('');
-  }, [ownerForModal]);
-
   useEffect(() => {
     if (selectedInvoice) {
       setPaymentNotes(selectedInvoice.paymentNotes ?? '');
@@ -512,43 +436,6 @@ const CashierPage = () => {
 
   const handleFiltersReset = () => {
     setFilters({ ownerId: '', status: '', from: '', to: '' });
-  };
-
-  const handleGenerateInvoice = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!selectedAppointmentId) {
-      toast.error('Selecione um atendimento para gerar a conta.');
-      return;
-    }
-
-    generateMutation.mutate({
-      appointmentId: selectedAppointmentId,
-      dueDate: dueDate || undefined,
-    });
-  };
-
-  const handleExportCsv = async () => {
-    try {
-      const csv = await invoicesApi.exportCsv({
-        ownerId: filters.ownerId || undefined,
-        status: filters.status || undefined,
-        from: filters.from || undefined,
-        to: filters.to || undefined,
-      });
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `auravet-contas-${Date.now()}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success('Exportação em CSV preparada com sucesso.');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Não foi possível exportar as contas.');
-    }
   };
 
   const handleOpenInvoice = (invoice: Invoice) => {
@@ -696,14 +583,6 @@ const CashierPage = () => {
           <p className="text-sm text-brand-grafite/70">
             Acompanhe contas a receber, veja detalhes dos itens faturados e registre pagamentos com transparência.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button variant="secondary" onClick={() => setIsGenerateModalOpen(true)}>
-            Emitir nova conta
-          </Button>
-          <Button variant="ghost" onClick={handleExportCsv}>
-            Exportar CSV
-          </Button>
         </div>
       </div>
 
@@ -886,70 +765,8 @@ const CashierPage = () => {
         ) : null}
       </Card>
 
-      <Modal
-        open={isGenerateModalOpen}
-        onClose={() => setIsGenerateModalOpen(false)}
-        title="Emitir nova conta"
-        description="Selecione o atendimento concluído e personalize o vencimento da conta."
-        actions={
-          <>
-            <Button variant="ghost" onClick={() => setIsGenerateModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="generate-invoice" disabled={generateMutation.isPending}>
-              {generateMutation.isPending ? 'Gerando...' : 'Emitir conta'}
-            </Button>
-          </>
-        }
-      >
-        <form id="generate-invoice" className="space-y-4" onSubmit={handleGenerateInvoice}>
-          <SelectField
-            label="Tutor"
-            value={ownerForModal}
-            onChange={(event) => setOwnerForModal(event.target.value)}
-          >
-            <option value="">Todos os tutores</option>
-            {owners?.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.nome}
-              </option>
-            ))}
-          </SelectField>
+      
 
-          <SelectField
-            label="Atendimento"
-            value={selectedAppointmentId}
-            onChange={(event) => setSelectedAppointmentId(event.target.value)}
-          >
-            <option value="">Selecione o atendimento já realizado</option>
-            {billableAppointmentsQuery.data?.map((appointment) => {
-              const referenceDate = appointment.service?.data ?? appointment.scheduledStart;
-
-              return (
-                <option key={appointment.id} value={appointment.id}>
-                  {attendanceTypeLabels[appointment.tipo] ?? appointment.tipo} — {appointment.animal?.nome ?? 'Pet'} •{' '}
-                  {referenceDate ? new Date(referenceDate).toLocaleDateString('pt-BR') : 'Data não informada'}
-                </option>
-              );
-            })}
-          </SelectField>
-          {billableAppointmentsQuery.isLoading ? (
-            <p className="text-xs text-brand-grafite/60">Buscando atendimentos disponíveis...</p>
-          ) : null}
-          {!billableAppointmentsQuery.isLoading && billableAppointmentsQuery.data?.length === 0 ? (
-            <p className="text-xs text-brand-grafite/60">
-              Nenhum atendimento elegível encontrado para os filtros atuais.
-            </p>
-          ) : null}
-
-          <Field
-            label="Vencimento"
-            type="date"
-            value={dueDate}
-            onChange={(event) => setDueDate(event.target.value)}
-          />
-        </form>
-      </Modal>
 
       <Modal
         open={Boolean(selectedInvoice)}
