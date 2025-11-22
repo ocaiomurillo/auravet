@@ -1,4 +1,5 @@
 import type {
+  Animal,
   Appointment,
   AttendanceType,
   DashboardSummaryResponse,
@@ -137,6 +138,11 @@ export const appointmentsApi = {
     const query = ownerId ? `?ownerId=${ownerId}` : '';
     return apiClient.get<Appointment[]>(`/appointments/billable${query}`);
   },
+};
+
+export const animalsApi = {
+  getById: (id: string) => apiClient.get<Animal>(`/animals/${id}`),
+  services: (id: string) => apiClient.get<Attendance[]>(`/animals/${id}/services`),
 };
 
 export interface CreateProductPayload {

@@ -247,6 +247,14 @@ const AnimalsPage = () => {
                   </div>
                 ) : null}
               </div>
+                {canViewAttendances ? (
+                  <div className="flex justify-end">
+                    <Button variant="ghost" className="px-3 py-2 text-sm" asChild>
+                      <Link to={`/animals/${selectedAnimalId}/attendances`}>Abrir histórico completo</Link>
+                    </Button>
+                  </div>
+                ) : null}
+
               {canViewAttendances ? (
                 attendances.length ? (
                   <ul className="space-y-3">
