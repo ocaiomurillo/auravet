@@ -1,10 +1,10 @@
 <svg
   xmlns="http://www.w3.org/2000/svg"
   viewBox="0 0 120 120"
-  aria-labelledby="auravetFaviconTitle"
+  aria-labelledby="auravetLogoTitle"
   role="img"
 >
-  <title id="auravetFaviconTitle">Logo Auravet</title>
+  <title id="auravetLogoTitle">Logo Auravet</title>
   <defs>
     <linearGradient id="auravetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#A7C7A0" />
