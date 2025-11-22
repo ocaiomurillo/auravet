@@ -81,6 +81,9 @@ async function request<T>(
 
     const error = new Error(errorBody?.error ?? 'Não foi possível concluir a solicitação.');
     (error as Error & { status?: number }).status = response.status;
+    if (errorBody?.details !== undefined) {
+      (error as Error & { details?: unknown }).details = errorBody.details;
+    }
     throw error;
   }
 

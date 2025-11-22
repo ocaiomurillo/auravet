@@ -20,7 +20,7 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_MAX: z.coerce.number().min(1).default(10),
   SERVICE_NOTES_ENABLED: z
     .enum(['true', 'false'])
-    .default('false')
+    .default('true')
     .transform((value) => value === 'true'),
 });
 

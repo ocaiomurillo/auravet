@@ -1,5 +1,6 @@
 export interface ApiErrorLike extends Error {
   status?: number;
+  details?: unknown;
 }
 
 export const formatApiErrorMessage = (

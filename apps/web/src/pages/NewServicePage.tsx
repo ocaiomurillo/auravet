@@ -18,7 +18,7 @@ import type {
   CollaboratorSummary,
   Product,
 } from '../types/api';
-import { formatApiErrorMessage } from '../utils/apiErrors';
+import { formatApiErrorMessage, type ApiErrorLike } from '../utils/apiErrors';
 
 interface AttendanceProductItemFormValue {
   productId: string;
@@ -512,6 +512,15 @@ const NewServicePage = () => {
       const message = formatErrorMessage(err, 'Não foi possível registrar o atendimento.');
       setSubmitError(message);
       toast.error(message);
+
+      const serviceId =
+        err instanceof Error && 'details' in err && err.details && typeof err.details === 'object'
+          ? (err as ApiErrorLike & { details?: { serviceId?: string } }).details?.serviceId
+          : undefined;
+
+      if (serviceId) {
+        navigate(`/services/${serviceId}/edit`);
+      }
     },
   });
 
@@ -704,9 +713,11 @@ const NewServicePage = () => {
 
     const notePayload = pendingNotes.map((note) => ({ conteudo: note.conteudo }));
 
+    const resolvedAppointmentId = selectedAppointmentId || attendance?.appointmentId || undefined;
+
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
-      appointmentId: selectedAppointmentId || undefined,
+      appointmentId: resolvedAppointmentId,
       data: start.toISOString(),
       preco: Number(overallTotalValue.toFixed(2)),
       responsavelId: values.responsavelId,
