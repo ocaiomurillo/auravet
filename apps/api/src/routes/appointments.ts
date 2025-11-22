@@ -9,6 +9,7 @@ import {
   appointmentCompleteSchema,
   appointmentConfirmSchema,
   appointmentCreateSchema,
+  appointmentBillableQuerySchema,
   appointmentFilterSchema,
   appointmentIdSchema,
   appointmentRescheduleSchema,
@@ -332,6 +333,39 @@ appointmentsRouter.get(
     const appointments = await fetchAppointmentsWithAvailability(where, { scheduledStart: 'asc' });
 
     res.json({ appointments });
+  }),
+);
+
+appointmentsRouter.get(
+  '/billable',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const filters = appointmentBillableQuerySchema.parse(req.query);
+
+    const where: Prisma.AppointmentWhereInput = {
+      status: AppointmentStatusMap.CONCLUIDO,
+      ownerId: filters.ownerId,
+      serviceId: { not: null },
+      service: { invoiceItems: { none: {} } },
+    };
+
+    const dateFilter: Prisma.DateTimeFilter = {};
+
+    if (filters.from) {
+      dateFilter.gte = toStartOfDayUTC(toDate(`${filters.from}T00:00:00Z`));
+    }
+
+    if (filters.to) {
+      dateFilter.lte = toEndOfDayUTC(toDate(`${filters.to}T00:00:00Z`));
+    }
+
+    if (Object.keys(dateFilter).length > 0) {
+      where.scheduledStart = dateFilter;
+    }
+
+    const appointments = await fetchAppointmentsWithAvailability(where, { scheduledStart: 'desc' });
+
+    res.json(appointments);
   }),
 );
 
