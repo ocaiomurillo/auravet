@@ -10,6 +10,8 @@ import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { serviceDefinitionsApi } from '../lib/apiClient';
 import type { AttendanceType, ServiceDefinition, ServiceProfessional } from '../types/api';
+import { serviceDefinitionCreateSchema } from '../schema/serviceDefinition';
+import { formatApiErrorMessage } from '../utils/apiErrors';
 
 type ProfessionalOptionValue = ServiceProfessional | '';
 
@@ -53,6 +55,8 @@ const ServicesPage = () => {
   const { hasModule } = useAuth();
   const canCreateDefinitions = hasModule('services:write');
 
+  const formatError = (err: unknown, fallback: string) => formatApiErrorMessage(err, fallback);
+
   const { data: definitions, isLoading, error } = useQuery<ServiceDefinition[], Error>({
     queryKey: ['service-definitions'],
     queryFn: serviceDefinitionsApi.list,
@@ -75,31 +79,27 @@ const ServicesPage = () => {
       reset(defaultFormValues);
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : 'Não foi possível salvar o serviço.');
+      toast.error(formatError(err, 'Não foi possível salvar o serviço.'));
     },
   });
 
   const onSubmit = handleSubmit(
     (values) => {
-      const preco = Number(values.precoSugerido.replace(',', '.'));
-
-      if (Number.isNaN(preco) || preco < 0) {
-        toast.error('Informe um valor sugerido válido para o serviço.');
-        return;
-      }
-
-      if (!values.profissional) {
-        toast.error('Selecione o profissional responsável pelo serviço.');
-        return;
-      }
-
-      createDefinition.mutate({
-        nome: values.nome.trim(),
-        descricao: values.descricao.trim().length ? values.descricao.trim() : null,
-        profissional: values.profissional,
+      const parsed = serviceDefinitionCreateSchema.safeParse({
+        nome: values.nome,
+        descricao: values.descricao,
+        profissional: values.profissional || undefined,
         tipo: values.tipo,
-        precoSugerido: Number(preco.toFixed(2)),
+        precoSugerido: values.precoSugerido,
       });
+
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0];
+        toast.error(firstIssue?.message ?? 'Dados inválidos.');
+        return;
+      }
+
+      createDefinition.mutate(parsed.data);
     },
     (formErrors) => {
       const firstError = Object.values(formErrors)[0];
@@ -112,6 +112,10 @@ const ServicesPage = () => {
   const sortedDefinitions = useMemo(() => {
     return (definitions ?? []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
   }, [definitions]);
+
+  const loadErrorMessage = error
+    ? formatError(error, 'Não foi possível carregar o catálogo de serviços.')
+    : null;
 
   return (
     <div className="space-y-6">
@@ -143,8 +147,7 @@ const ServicesPage = () => {
             </SelectField>
             <SelectField
               label="Profissional ou função"
-              {...register('profissional', { required: 'Selecione o profissional responsável pelo serviço.' })}
-              error={errors.profissional?.message}
+              {...register('profissional')}
             >
               <option value="">Selecione uma opção</option>
               {professionalOptions.map((option) => (
@@ -188,7 +191,7 @@ const ServicesPage = () => {
 
       <Card title="Serviços cadastrados" description="Use estes serviços ao registrar novos atendimentos.">
         {isLoading ? <p>Carregando catálogo...</p> : null}
-        {error ? <p className="text-red-500">Não foi possível carregar o catálogo de serviços.</p> : null}
+        {loadErrorMessage ? <p className="text-red-500">{loadErrorMessage}</p> : null}
         {!isLoading && !sortedDefinitions.length ? (
           <p className="text-sm text-brand-grafite/70">Nenhum serviço cadastrado ainda.</p>
         ) : null}

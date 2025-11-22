@@ -18,6 +18,7 @@ import type {
   CollaboratorSummary,
   Product,
 } from '../types/api';
+import { formatApiErrorMessage } from '../utils/apiErrors';
 
 interface AttendanceProductItemFormValue {
   productId: string;
@@ -101,6 +102,10 @@ const NewServicePage = () => {
   const [pendingNotes, setPendingNotes] = useState<{ conteudo: string; createdAt: string }[]>([]);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState(
     searchParams.get('appointmentId') ?? '',
+  );
+  const formatErrorMessage = useCallback(
+    (error: unknown, fallback: string) => formatApiErrorMessage(error, fallback),
+    [],
   );
 
   const isEditing = Boolean(serviceId);
@@ -504,7 +509,7 @@ const NewServicePage = () => {
       navigate(`/animals`, { state: { highlight: service.animalId } });
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Não foi possível registrar o atendimento.';
+      const message = formatErrorMessage(err, 'Não foi possível registrar o atendimento.');
       setSubmitError(message);
       toast.error(message);
     },
@@ -526,19 +531,23 @@ const NewServicePage = () => {
       queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Não foi possível atualizar o atendimento.';
+      const message = formatErrorMessage(err, 'Não foi possível atualizar o atendimento.');
       setSubmitError(message);
       toast.error(message);
     },
   });
 
   const hasInvalidSchedule = useMemo(() => {
-    if (!startDateTime || !endDateTime) return true;
+    if (!startDateTime) return true;
 
     const start = new Date(startDateTime);
+    if (Number.isNaN(start.getTime())) return true;
+
+    if (!endDateTime) return false;
+
     const end = new Date(endDateTime);
 
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return true;
+    if (Number.isNaN(end.getTime())) return true;
 
     return end <= start;
   }, [endDateTime, startDateTime]);
@@ -577,12 +586,12 @@ const NewServicePage = () => {
       return;
     }
 
-    if (!end || Number.isNaN(end.getTime())) {
-      toast.error('Informe a data e hora de término do atendimento.');
+    if (end && Number.isNaN(end.getTime())) {
+      toast.error('Informe uma data de término válida ou deixe em branco para rascunhos.');
       return;
     }
 
-    if (end <= start) {
+    if (end && end <= start) {
       toast.error('A data de término precisa ser posterior ao início.');
       return;
     }
@@ -686,18 +695,25 @@ const NewServicePage = () => {
       0,
     );
 
+    const productsTotalValue = sanitizedItems.reduce(
+      (sum, item) => sum + item.precoUnitario * item.quantidade,
+      0,
+    );
+
+    const overallTotalValue = servicesTotalValue + productsTotalValue;
+
     const notePayload = pendingNotes.map((note) => ({ conteudo: note.conteudo }));
 
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
       appointmentId: selectedAppointmentId || undefined,
       data: start.toISOString(),
-      preco: Number(servicesTotalValue.toFixed(2)),
+      preco: Number(overallTotalValue.toFixed(2)),
       responsavelId: values.responsavelId,
       tipo: resolvedServiceType ?? 'CONSULTA',
       catalogItems: sanitizedCatalogItems,
       items: sanitizedItems,
-      notes: notePayload,
+      notes: notePayload.length ? notePayload : undefined,
     };
 
     setSubmitError(null);
@@ -770,7 +786,12 @@ const NewServicePage = () => {
             {...register('data')}
           />
 
-          <Field label="Término do atendimento" type="datetime-local" required {...register('fim')} />
+          <Field
+            label="Término do atendimento"
+            type="datetime-local"
+            helperText="Opcional: preencha ao concluir para registrar a duração."
+            {...register('fim')}
+          />
 
           <SelectField
             label="Responsável pelo atendimento"
@@ -1131,25 +1152,36 @@ const NewServicePage = () => {
           </div>
 
           {submitError ? (
-            <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="md:col-span-2 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <span className="font-semibold">{submitError}</span>
               {lastPayload ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={createAttendance.isPending || updateAttendance.isPending}
-                  onClick={() => {
-                    if (isEditing && serviceId) {
-                      updateAttendance.mutate({ id: serviceId, payload: lastPayload });
-                    } else {
-                      createAttendance.mutate(lastPayload as CreateAttendancePayload);
-                    }
-                  }}
-                >
-                  {createAttendance.isPending || updateAttendance.isPending
-                    ? 'Tentando novamente...'
-                    : 'Tentar novamente'}
-                </Button>
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>Último payload enviado registrado para depuração.</span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={createAttendance.isPending || updateAttendance.isPending}
+                      onClick={() => {
+                        if (isEditing && serviceId) {
+                          updateAttendance.mutate({ id: serviceId, payload: lastPayload });
+                        } else {
+                          createAttendance.mutate(lastPayload as CreateAttendancePayload);
+                        }
+                      }}
+                    >
+                      {createAttendance.isPending || updateAttendance.isPending
+                        ? 'Tentando novamente...'
+                        : 'Tentar novamente'}
+                    </Button>
+                  </div>
+                  <details className="rounded-xl border border-red-100 bg-white/80 p-3 text-brand-grafite">
+                    <summary className="cursor-pointer text-xs font-semibold text-red-700">Ver payload enviado</summary>
+                    <pre className="mt-2 max-h-64 overflow-auto text-xs leading-relaxed">
+                      {JSON.stringify(lastPayload, null, 2)}
+                    </pre>
+                  </details>
+                </>
               ) : null}
             </div>
           ) : null}
