@@ -210,7 +210,7 @@ const AnimalAttendancesPage = () => {
                     </div>
                     <div className="flex flex-col gap-2">
                       <Button variant="ghost" asChild>
-                        <Link to={`/services/${attendance.id}/edit`}>Visualizar</Link>
+                        <Link to={`/services/${attendance.id}/edit?mode=view`}>Visualizar</Link>
                       </Button>
                       {canEditAttendances ? (
                         <Button asChild>
