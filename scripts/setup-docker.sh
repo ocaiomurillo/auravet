@@ -17,7 +17,20 @@ echo "• Aplicando migrações (Prisma) antes de subir a API"
 docker compose --env-file "$REPO_ROOT/.env" run --rm api sh -c "npx prisma migrate deploy"
 
 echo "• Rodando seed (Prisma) dentro do container da API"
-docker compose --env-file "$REPO_ROOT/.env" run --rm api sh -c "npx prisma db seed"
+docker compose --env-file "$REPO_ROOT/.env" run --rm api sh -c "
+  npx prisma generate &&
+  npx tsc prisma/seed.ts \
+    --module commonjs \
+    --moduleResolution node \
+    --target ES2020 \
+    --outDir prisma/dist \
+    --esModuleInterop \
+    --resolveJsonModule \
+    --skipLibCheck &&
+  echo 'Arquivos em prisma/:' && ls prisma &&
+  echo 'Arquivos em prisma/dist/:' && ls prisma/dist &&
+  node prisma/dist/seed.js
+"
 
 echo "• Subindo API e Web (detach)"
 docker compose --env-file "$REPO_ROOT/.env" up -d api web

@@ -31,6 +31,9 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/prisma ./prisma
 COPY --from=builder /app/apps/api/package.json ./package.json
 
+COPY --from=builder /app/apps/api/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/tsconfig.base.json ./tsconfig.base.json
+
 ENV DATABASE_URL= \
   JWT_SECRET=
 
