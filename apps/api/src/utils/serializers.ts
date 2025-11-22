@@ -158,11 +158,12 @@ export type SerializedService = {
   animalId: string;
   tipo: Servico['tipo'];
   data: string;
+  status: Appointment['status'];
   preco: number;
   observacoes: string | null;
   createdAt: string;
   appointmentId: string | null;
-  appointment?: { scheduledStart: string; scheduledEnd: string } | null;
+  appointment?: { scheduledStart: string; scheduledEnd: string; status: Appointment['status'] } | null;
   animal?: SerializedAnimal;
   catalogItems: SerializedServiceCatalogItem[];
   items: SerializedServiceItem[];
@@ -402,6 +403,7 @@ export const serializeService = (
     animalId: service.animalId,
     tipo: service.tipo,
     data: service.data.toISOString(),
+    status: service.appointment?.status ?? 'CONCLUIDO',
     preco: Number(service.preco),
     observacoes: service.observacoes ?? null,
     createdAt: service.createdAt.toISOString(),
@@ -410,6 +412,7 @@ export const serializeService = (
       ? {
           scheduledStart: service.appointment.scheduledStart.toISOString(),
           scheduledEnd: service.appointment.scheduledEnd.toISOString(),
+          status: service.appointment.status,
         }
       : null,
     catalogItems:

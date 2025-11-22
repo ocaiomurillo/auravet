@@ -144,6 +144,7 @@ animalsRouter.get(
       where: { animalId: id },
       orderBy: { data: 'desc' },
       include: {
+        appointment: true,
         items: {
           include: {
             product: true,

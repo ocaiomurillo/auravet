@@ -17,6 +17,7 @@ import AppointmentsPage from './pages/AppointmentsPage';
 import CalendarPage from './pages/CalendarPage';
 import CashierPage from './pages/CashierPage';
 import AccountingPage from './pages/AccountingPage';
+import AnimalAttendancesPage from './pages/AnimalAttendancesPage';
 
 const App = () => {
   return (
@@ -30,6 +31,7 @@ const App = () => {
           </Route>
           <Route element={<RequireModules modules={['animals:read', 'owners:read']} />}>
             <Route path="animals" element={<AnimalsPage />} />
+            <Route path="animals/:id/attendances" element={<AnimalAttendancesPage />} />
           </Route>
           <Route element={<RequireModules modules={['services:read']} />}>
             <Route path="services" element={<ServicesPage />} />
