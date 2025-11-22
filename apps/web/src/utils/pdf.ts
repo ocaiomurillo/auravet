@@ -82,7 +82,7 @@ export const loadLogoDataUrl = async (): Promise<string> => {
   }
 
   try {
-    const response = await fetch('/favicon.svg');
+    const response = await fetch('/logo-auravet.svg');
     const svgContent = await response.text();
     const svgBase64 = window.btoa(unescape(encodeURIComponent(svgContent)));
     const svgDataUrl = `data:image/svg+xml;base64,${svgBase64}`;
