@@ -17,6 +17,7 @@ export const servicesRouter = Router();
 servicesRouter.use(authenticate);
 
 const serviceNotesEnabled = env.SERVICE_NOTES_ENABLED;
+const PAID_INVOICE_STATUS = 'QUITADA';
 
 const serviceNotesInclude = serviceNotesEnabled
   ? Prisma.validator<Prisma.ServiceNoteFindManyArgs>()({
@@ -192,6 +193,20 @@ const ensureResponsibleExists = async (tx: Prisma.TransactionClient, userId: str
   }
 };
 
+const findOngoingServiceForAnimal = async (animalId: string) =>
+  prisma.servico.findFirst({
+    where: {
+      animalId,
+      OR: [
+        { appointment: { status: { not: AppointmentStatus.CONCLUIDO } } },
+        { invoiceItems: { none: {} } },
+        { invoiceItems: { some: { invoice: { status: { slug: { not: PAID_INVOICE_STATUS } } } } } },
+      ],
+    },
+    orderBy: { data: 'desc' },
+    select: { id: true },
+  });
+
 const ensureAppointmentForService = async (
   tx: Prisma.TransactionClient,
   appointmentId: string,
@@ -326,6 +341,13 @@ servicesRouter.post(
     const payload = serviceCreateSchema.parse(req.body);
 
     await ensureAnimalExists(payload.animalId);
+
+    const ongoingService = await findOngoingServiceForAnimal(payload.animalId);
+    if (ongoingService) {
+      throw new HttpError(400, 'Já existe um atendimento em andamento para este pet.', {
+        serviceId: ongoingService.id,
+      });
+    }
 
     const serviceDate = parseDate(payload.data);
 
