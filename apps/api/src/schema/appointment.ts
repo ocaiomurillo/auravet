@@ -105,6 +105,12 @@ export const appointmentConfirmSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+export const appointmentBillableQuerySchema = z.object({
+  ownerId: cuidSchema('Tutor inválido').optional(),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
 export const appointmentRescheduleSchema = z.object({
   scheduledStart: dateTimeSchema,
   scheduledEnd: dateTimeSchema,
