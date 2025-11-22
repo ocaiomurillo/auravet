@@ -42,6 +42,11 @@ auravet/
    - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME` (opcionais)
    - `VITE_API_URL` (URL consumida pelo frontend; defina antes de gerar o build de produção)
 
+> Dica: o workspace do frontend carrega automaticamente `.env.development`, `.env.staging` e `.env.production` em `apps/web/`.
+> Esses arquivos já trazem valores padrão para `VITE_API_URL` por ambiente (dev: `http://localhost:4000`, stage: `https://api.stage.auravet.com`,
+> prod: `https://api.auravet.com`). Use `--mode <ambiente>` ao rodar `npm run build --workspace apps/web` se quiser selecionar
+> explicitamente um modo.
+
 > `PASSWORD_SALT_ROUNDS` controla o custo exponencial (`2^N`) usado pelo Scrypt ao hashear senhas.
 
 ---
@@ -112,7 +117,7 @@ Se preferir um passo a passo manual, use as seções abaixo.
 ## 🐳 Instalação com Docker
 1. **Preparar variáveis**
    - Garanta que o arquivo `.env` na raiz contenha os valores desejados.
-   - Defina `VITE_API_URL` apontando para o endpoint público da API (no `.env` ou exportando no shell) para que o build do frontend injete o valor correto.
+   - Defina `VITE_API_URL` apontando para o endpoint público da API (no `.env` ou exportando no shell) para que o build do frontend injete o valor correto. O script de build do frontend falha cedo caso a variável não esteja configurada, evitando imagens quebradas.
    - (Opcional) Exponha `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`, `API_PORT`, `WEB_PORT` diretamente no shell antes de subir o Compose para sobrescrever os padrões.
 
 2. **Subir a stack**
