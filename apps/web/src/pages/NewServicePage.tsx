@@ -222,6 +222,31 @@ const NewServicePage = () => {
     return appointmentOptions.find((appointment) => appointment.id === selectedAppointmentId) ?? null;
   }, [appointmentDetails, appointmentOptions, selectedAppointmentId]);
 
+  const appointmentSelectOptions = useMemo(() => {
+    const options = [...availableAppointments];
+
+    if (selectedAppointment && !options.some((appointment) => appointment.id === selectedAppointment.id)) {
+      options.unshift(selectedAppointment);
+    }
+
+    return options;
+  }, [availableAppointments, selectedAppointment]);
+
+  const linkedAppointmentFallbackLabel = useMemo(() => {
+    if (!attendance?.appointmentId || selectedAppointment) return null;
+
+    const summary = attendance.appointment;
+    if (!summary) return null;
+
+    const start = new Date(summary.scheduledStart);
+    const end = new Date(summary.scheduledEnd);
+    const date = start.toLocaleDateString('pt-BR');
+    const startTime = start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const endTime = end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    return `${date} ${startTime} - ${endTime}`;
+  }, [attendance?.appointment, attendance?.appointmentId, selectedAppointment]);
+
   useEffect(() => {
     if (!attendance) return;
 
@@ -840,9 +865,15 @@ const NewServicePage = () => {
               label="Agendamento (opcional)"
               value={selectedAppointmentId}
               onChange={(event) => setSelectedAppointmentId(event.target.value)}
+              disabled={Boolean(isEditing && attendance?.appointmentId)}
             >
               <option value="">Registrar sem agendamento</option>
-              {availableAppointments.map((appointment) => (
+              {linkedAppointmentFallbackLabel ? (
+                <option value={attendance?.appointmentId ?? ''}>
+                  {linkedAppointmentFallbackLabel} (vínculo atual)
+                </option>
+              ) : null}
+              {appointmentSelectOptions.map((appointment) => (
                 <option key={appointment.id} value={appointment.id}>
                   {formatAppointmentLabel(appointment)}
                 </option>
