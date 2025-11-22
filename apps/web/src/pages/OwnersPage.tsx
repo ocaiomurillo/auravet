@@ -29,6 +29,9 @@ interface OwnerFormValues {
 const OwnersPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOwner, setEditingOwner] = useState<Owner | null>(null);
+  const [filterName, setFilterName] = useState('');
+  const [filterEmail, setFilterEmail] = useState('');
+  const [filterCpf, setFilterCpf] = useState('');
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
   const canEdit = hasModule('owners:write');
@@ -133,6 +136,64 @@ const OwnersPage = () => {
     }
   });
 
+  const filteredOwners = useMemo(() => {
+    if (!owners) return [];
+
+    const normalize = (value: string) => value.toLowerCase();
+    const normalizeCpf = (value: string) => value.replace(/\D/g, '');
+
+    return owners.filter((owner) => {
+      const matchesName = owner.nome
+        ? normalize(owner.nome).includes(normalize(filterName))
+        : false;
+      const matchesEmail = owner.email
+        ? normalize(owner.email).includes(normalize(filterEmail))
+        : false;
+      const matchesCpf = owner.cpf
+        ? normalizeCpf(owner.cpf).includes(normalizeCpf(filterCpf))
+        : false;
+
+      return (
+        (!filterName || matchesName) && (!filterEmail || matchesEmail) && (!filterCpf || matchesCpf)
+      );
+    });
+  }, [filterCpf, filterEmail, filterName, owners]);
+
+  const handleExport = () => {
+    if (!filteredOwners.length) return;
+
+    const headers = ['Nome', 'E-mail', 'Telefone', 'CPF', 'Endereço', 'Total de animais'];
+    const rows = filteredOwners.map((owner) => [
+      owner.nome ?? '',
+      owner.email ?? '',
+      owner.telefone ?? '',
+      formatCpf(owner.cpf) ?? '',
+      buildOwnerAddress(owner) ?? '',
+      String(owner.animals?.length ?? 0),
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => {
+            const safeCell = cell.replace(/"/g, '""');
+            return `"${safeCell}"`;
+          })
+          .join(','),
+      )
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'tutores.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -148,9 +209,38 @@ const OwnersPage = () => {
       <Card>
         {isLoading ? <p>Carregando tutores...</p> : null}
         {error ? <p className="text-red-500">Não foi possível carregar os tutores.</p> : null}
-        {owners?.length ? (
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
+          <Field
+            label="Buscar por nome"
+            placeholder="Nome do tutor"
+            value={filterName}
+            onChange={(event) => setFilterName(event.target.value)}
+          />
+          <Field
+            label="Buscar por e-mail"
+            placeholder="email@auravet.com"
+            value={filterEmail}
+            onChange={(event) => setFilterEmail(event.target.value)}
+          />
+          <Field
+            label="Buscar por CPF"
+            placeholder="000.000.000-00"
+            value={filterCpf}
+            onChange={(event) => setFilterCpf(event.target.value)}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 pb-4">
+          <p className="text-sm text-brand-grafite/70">
+            {filteredOwners.length} tutor{filteredOwners.length === 1 ? '' : 'es'} encontrado
+            {filteredOwners.length === 1 ? '' : 's'}.
+          </p>
+          <Button onClick={handleExport} disabled={!filteredOwners.length}>
+            Exportar para Excel
+          </Button>
+        </div>
+        {filteredOwners.length ? (
           <ul className="space-y-4">
-            {owners.map((owner) => {
+            {filteredOwners.map((owner) => {
               const ownerCpf = formatCpf(owner.cpf);
               const ownerAddress = buildOwnerAddress(owner);
 
@@ -193,6 +283,9 @@ const OwnersPage = () => {
               );
             })}
           </ul>
+        ) : null}
+        {!isLoading && owners?.length && !filteredOwners.length ? (
+          <p className="text-sm text-brand-grafite/70">Nenhum tutor corresponde aos filtros aplicados.</p>
         ) : null}
         {!isLoading && !owners?.length ? (
           <p className="text-sm text-brand-grafite/70">
