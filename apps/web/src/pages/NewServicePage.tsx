@@ -850,8 +850,8 @@ const NewServicePage = () => {
             </SelectField>
           </div>
 
-          <div className="grid gap-4 md:col-span-2 md:grid-cols-3">
-            <SelectField className="md:col-span-2" label="Pet" required {...register('animalId')}>
+          <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+            <SelectField label="Pet" required {...register('animalId')}>
               <option value="">Selecione um pet</option>
               {animals?.map((animal) => (
                 <option key={animal.id} value={animal.id}>
