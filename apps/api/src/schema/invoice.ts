@@ -7,10 +7,16 @@ export const invoiceFilterSchema = z.object({
   to: z.string().optional(),
 });
 
-export const invoiceGenerateSchema = z.object({
-  serviceId: z.string().cuid(),
-  dueDate: z.string().optional(),
-});
+export const invoiceGenerateSchema = z
+  .object({
+    serviceId: z.string().cuid().optional(),
+    appointmentId: z.string().cuid().optional(),
+    dueDate: z.string().optional(),
+  })
+  .refine((value) => Boolean(value.serviceId || value.appointmentId), {
+    message: 'Informe um atendimento ou agendamento para gerar a conta.',
+    path: ['serviceId'],
+  });
 
 export const invoiceIdSchema = z.object({
   id: z.string().cuid(),

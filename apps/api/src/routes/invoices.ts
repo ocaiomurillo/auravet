@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { AppointmentStatus, Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -36,6 +36,35 @@ const endOfDay = (date: Date) => {
   const result = new Date(date);
   result.setHours(23, 59, 59, 999);
   return result;
+};
+
+const resolveServiceIdForInvoice = async (
+  tx: Prisma.TransactionClient,
+  payload: z.infer<typeof invoiceGenerateSchema>,
+) => {
+  if (payload.serviceId) {
+    return payload.serviceId;
+  }
+
+  if (!payload.appointmentId) {
+    throw new HttpError(400, 'Selecione um atendimento ou agendamento para faturar.');
+  }
+
+  const appointment = await tx.appointment.findUnique({ where: { id: payload.appointmentId } });
+
+  if (!appointment) {
+    throw new HttpError(404, 'Agendamento não encontrado para faturamento.');
+  }
+
+  if (appointment.status !== AppointmentStatus.CONCLUIDO) {
+    throw new HttpError(400, 'Apenas agendamentos concluídos podem ser faturados.');
+  }
+
+  if (!appointment.serviceId) {
+    throw new HttpError(400, 'Agendamento selecionado ainda não possui atendimento vinculado.');
+  }
+
+  return appointment.serviceId;
 };
 
 invoicesRouter.get(
@@ -173,12 +202,14 @@ invoicesRouter.post(
     const dueDate = payload.dueDate ? parseDate(payload.dueDate, 'vencimento') : undefined;
     const responsibleId = req.user?.id ?? null;
 
-    const invoice = await prisma.$transaction((tx) =>
-      syncInvoiceForService(tx, payload.serviceId, {
+    const invoice = await prisma.$transaction(async (tx) => {
+      const serviceId = await resolveServiceIdForInvoice(tx, payload);
+
+      return syncInvoiceForService(tx, serviceId, {
         dueDate,
         responsibleId,
-      }),
-    );
+      });
+    });
 
     res.status(201).json(serializeInvoice(invoice));
   }),

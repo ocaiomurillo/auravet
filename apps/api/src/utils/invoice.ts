@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { AppointmentStatus, Prisma, PrismaClient } from '@prisma/client';
 
 import { HttpError } from './http-error';
 import { serializeService } from './serializers';
@@ -239,18 +239,27 @@ export const fetchInvoiceCandidates = async (
   tx: Prisma.TransactionClient | PrismaClient,
   ownerId?: string,
 ) => {
-  const services = await tx.servico.findMany({
+  const appointments = await tx.appointment.findMany({
     where: {
-      invoiceItems: { none: {} },
-      animal: ownerId ? { ownerId } : undefined,
+      status: AppointmentStatus.CONCLUIDO,
+      serviceId: { not: null },
+      service: { invoiceItems: { none: {} } },
+      ownerId: ownerId ?? undefined,
     },
     include: {
-      animal: { include: { owner: true } },
-      items: { include: { product: true } },
-      catalogItems: { include: { definition: true } },
+      service: {
+        include: {
+          animal: { include: { owner: true } },
+          items: { include: { product: true } },
+          catalogItems: { include: { definition: true } },
+          appointment: true,
+        },
+      },
     },
-    orderBy: { data: 'desc' },
+    orderBy: { scheduledStart: 'desc' },
   });
+
+  const services = appointments.flatMap((appointment) => (appointment.service ? [appointment.service] : []));
 
   return services.map((service) => serializeService(service, { includeAnimal: true }));
 };

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import Button from '../components/Button';
@@ -9,14 +9,16 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient, productsApi, serviceDefinitionsApi, servicesApi } from '../lib/apiClient';
+import { apiClient, appointmentsApi, productsApi, serviceDefinitionsApi, servicesApi } from '../lib/apiClient';
 import type {
   Animal,
+  Appointment,
   Attendance,
   AttendanceResponsible,
   CollaboratorSummary,
   Product,
 } from '../types/api';
+import { formatApiErrorMessage } from '../utils/apiErrors';
 
 interface AttendanceProductItemFormValue {
   productId: string;
@@ -56,6 +58,7 @@ type AttendanceCatalogItemPayload = {
 
 type CreateAttendancePayload = {
   animalId: string;
+  appointmentId?: string;
   data: string;
   preco?: number;
   responsavelId?: string;
@@ -75,10 +78,20 @@ const toDateTimeLocal = (iso: string) => {
   )}:${pad(date.getMinutes())}`;
 };
 
+const formatAppointmentLabel = (appointment: Appointment) => {
+  const start = new Date(appointment.scheduledStart);
+  const end = new Date(appointment.scheduledEnd);
+  const date = start.toLocaleDateString('pt-BR');
+  const startTime = start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const endTime = end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${startTime} - ${endTime} • ${appointment.animal.nome} (${appointment.owner.nome})`;
+};
+
 const NewServicePage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { id: serviceId } = useParams();
+  const [searchParams] = useSearchParams();
   const { user, hasModule } = useAuth();
   const canOverrideProductPrice = hasModule('products:write');
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -87,6 +100,13 @@ const NewServicePage = () => {
   >(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [pendingNotes, setPendingNotes] = useState<{ conteudo: string; createdAt: string }[]>([]);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState(
+    searchParams.get('appointmentId') ?? '',
+  );
+  const formatErrorMessage = useCallback(
+    (error: unknown, fallback: string) => formatApiErrorMessage(error, fallback),
+    [],
+  );
 
   const isEditing = Boolean(serviceId);
 
@@ -149,6 +169,21 @@ const NewServicePage = () => {
         .then((response) => response.collaborators ?? []),
   });
 
+  const { data: appointmentOptions = [] } = useQuery({
+    queryKey: ['appointments', 'for-service'],
+    queryFn: () => appointmentsApi.list(),
+    select: (response) =>
+      response.appointments.filter(
+        (appointment) => appointment.status !== 'CONCLUIDO' && !appointment.serviceId,
+      ),
+  });
+
+  const { data: appointmentDetails } = useQuery({
+    queryKey: ['appointment', selectedAppointmentId],
+    queryFn: () => appointmentsApi.getById(selectedAppointmentId).then((response) => response.appointment),
+    enabled: Boolean(selectedAppointmentId),
+  });
+
   const { data: attendance, isFetching: isLoadingAttendance } = useQuery({
     queryKey: ['attendance', serviceId],
     queryFn: () => servicesApi.getById(serviceId ?? ''),
@@ -174,6 +209,17 @@ const NewServicePage = () => {
     return collaborators.slice().sort((a, b) => a.nome.localeCompare(b.nome));
   }, [collaborators]);
 
+  const availableAppointments = useMemo(() => {
+    return appointmentOptions.slice().sort((a, b) =>
+      a.scheduledStart.localeCompare(b.scheduledStart),
+    );
+  }, [appointmentOptions]);
+
+  const selectedAppointment = useMemo<Appointment | null>(() => {
+    if (appointmentDetails) return appointmentDetails;
+    return appointmentOptions.find((appointment) => appointment.id === selectedAppointmentId) ?? null;
+  }, [appointmentDetails, appointmentOptions, selectedAppointmentId]);
+
   useEffect(() => {
     if (!attendance) return;
 
@@ -196,6 +242,7 @@ const NewServicePage = () => {
       })),
     });
 
+    setSelectedAppointmentId(attendance.appointmentId ?? '');
     setPendingNotes([]);
     setNoteDraft('');
   }, [attendance, reset]);
@@ -408,6 +455,16 @@ const NewServicePage = () => {
     });
   }, [availableDefinitions, catalogItems, setValue]);
 
+  useEffect(() => {
+    if (!selectedAppointment) return;
+
+    setValue('animalId', selectedAppointment.animalId);
+    setValue('responsavelId', selectedAppointment.veterinarianId);
+    setValue('assistantId', selectedAppointment.assistantId ?? '');
+    setValue('data', toDateTimeLocal(selectedAppointment.scheduledStart));
+    setValue('fim', toDateTimeLocal(selectedAppointment.scheduledEnd));
+  }, [selectedAppointment, setValue]);
+
   const createAttendance = useMutation({
     mutationFn: (payload: CreateAttendancePayload) => apiClient.post<Attendance>('/services', payload),
     onSuccess: async (service, payload) => {
@@ -434,6 +491,7 @@ const NewServicePage = () => {
         }
       }
 
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['attendances'] });
       queryClient.invalidateQueries({ queryKey: ['animals'] });
       reset({
@@ -445,12 +503,13 @@ const NewServicePage = () => {
         catalogItems: [],
         items: [],
       });
+      setSelectedAppointmentId('');
       setPendingNotes([]);
       setNoteDraft('');
       navigate(`/animals`, { state: { highlight: service.animalId } });
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Não foi possível registrar o atendimento.';
+      const message = formatErrorMessage(err, 'Não foi possível registrar o atendimento.');
       setSubmitError(message);
       toast.error(message);
     },
@@ -466,24 +525,29 @@ const NewServicePage = () => {
       setPendingNotes([]);
       setNoteDraft('');
       queryClient.invalidateQueries({ queryKey: ['attendance', serviceId] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['attendances'] });
       queryClient.invalidateQueries({ queryKey: ['animals'] });
       queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Não foi possível atualizar o atendimento.';
+      const message = formatErrorMessage(err, 'Não foi possível atualizar o atendimento.');
       setSubmitError(message);
       toast.error(message);
     },
   });
 
   const hasInvalidSchedule = useMemo(() => {
-    if (!startDateTime || !endDateTime) return true;
+    if (!startDateTime) return true;
 
     const start = new Date(startDateTime);
+    if (Number.isNaN(start.getTime())) return true;
+
+    if (!endDateTime) return false;
+
     const end = new Date(endDateTime);
 
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return true;
+    if (Number.isNaN(end.getTime())) return true;
 
     return end <= start;
   }, [endDateTime, startDateTime]);
@@ -522,12 +586,12 @@ const NewServicePage = () => {
       return;
     }
 
-    if (!end || Number.isNaN(end.getTime())) {
-      toast.error('Informe a data e hora de término do atendimento.');
+    if (end && Number.isNaN(end.getTime())) {
+      toast.error('Informe uma data de término válida ou deixe em branco para rascunhos.');
       return;
     }
 
-    if (end <= start) {
+    if (end && end <= start) {
       toast.error('A data de término precisa ser posterior ao início.');
       return;
     }
@@ -631,17 +695,25 @@ const NewServicePage = () => {
       0,
     );
 
+    const productsTotalValue = sanitizedItems.reduce(
+      (sum, item) => sum + item.precoUnitario * item.quantidade,
+      0,
+    );
+
+    const overallTotalValue = servicesTotalValue + productsTotalValue;
+
     const notePayload = pendingNotes.map((note) => ({ conteudo: note.conteudo }));
 
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
+      appointmentId: selectedAppointmentId || undefined,
       data: start.toISOString(),
-      preco: Number(servicesTotalValue.toFixed(2)),
+      preco: Number(overallTotalValue.toFixed(2)),
       responsavelId: values.responsavelId,
       tipo: resolvedServiceType ?? 'CONSULTA',
       catalogItems: sanitizedCatalogItems,
       items: sanitizedItems,
-      notes: notePayload,
+      notes: notePayload.length ? notePayload : undefined,
     };
 
     setSubmitError(null);
@@ -676,6 +748,19 @@ const NewServicePage = () => {
         description="Preencha com atenção para manter o histórico impecável e inclua quantos serviços forem necessários no mesmo atendimento."
       >
         <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
+          <SelectField
+            label="Agendamento (opcional)"
+            value={selectedAppointmentId}
+            onChange={(event) => setSelectedAppointmentId(event.target.value)}
+          >
+            <option value="">Registrar sem agendamento</option>
+            {availableAppointments.map((appointment) => (
+              <option key={appointment.id} value={appointment.id}>
+                {formatAppointmentLabel(appointment)}
+              </option>
+            ))}
+          </SelectField>
+
           <SelectField label="Pet" required {...register('animalId')}>
             <option value="">Selecione um pet</option>
             {animals?.map((animal) => (
@@ -701,7 +786,12 @@ const NewServicePage = () => {
             {...register('data')}
           />
 
-          <Field label="Término do atendimento" type="datetime-local" required {...register('fim')} />
+          <Field
+            label="Término do atendimento"
+            type="datetime-local"
+            helperText="Opcional: preencha ao concluir para registrar a duração."
+            {...register('fim')}
+          />
 
           <SelectField
             label="Responsável pelo atendimento"
@@ -1062,25 +1152,36 @@ const NewServicePage = () => {
           </div>
 
           {submitError ? (
-            <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="md:col-span-2 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <span className="font-semibold">{submitError}</span>
               {lastPayload ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={createAttendance.isPending || updateAttendance.isPending}
-                  onClick={() => {
-                    if (isEditing && serviceId) {
-                      updateAttendance.mutate({ id: serviceId, payload: lastPayload });
-                    } else {
-                      createAttendance.mutate(lastPayload as CreateAttendancePayload);
-                    }
-                  }}
-                >
-                  {createAttendance.isPending || updateAttendance.isPending
-                    ? 'Tentando novamente...'
-                    : 'Tentar novamente'}
-                </Button>
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>Último payload enviado registrado para depuração.</span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={createAttendance.isPending || updateAttendance.isPending}
+                      onClick={() => {
+                        if (isEditing && serviceId) {
+                          updateAttendance.mutate({ id: serviceId, payload: lastPayload });
+                        } else {
+                          createAttendance.mutate(lastPayload as CreateAttendancePayload);
+                        }
+                      }}
+                    >
+                      {createAttendance.isPending || updateAttendance.isPending
+                        ? 'Tentando novamente...'
+                        : 'Tentar novamente'}
+                    </Button>
+                  </div>
+                  <details className="rounded-xl border border-red-100 bg-white/80 p-3 text-brand-grafite">
+                    <summary className="cursor-pointer text-xs font-semibold text-red-700">Ver payload enviado</summary>
+                    <pre className="mt-2 max-h-64 overflow-auto text-xs leading-relaxed">
+                      {JSON.stringify(lastPayload, null, 2)}
+                    </pre>
+                  </details>
+                </>
               ) : null}
             </div>
           ) : null}
