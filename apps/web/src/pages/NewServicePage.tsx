@@ -111,12 +111,13 @@ const NewServicePage = () => {
 
   const isEditing = Boolean(serviceId);
 
-  const { register, handleSubmit, watch, reset, setValue, control } = useForm<AttendanceFormValues>({
-    defaultValues: {
-      animalId: '',
-      data: '',
-      fim: '',
-      responsavelId: '',
+  const { register, handleSubmit, watch, reset, setValue, control, trigger, getValues } =
+    useForm<AttendanceFormValues>({
+      defaultValues: {
+        animalId: '',
+        data: '',
+        fim: '',
+        responsavelId: '',
       assistantId: '',
       catalogItems: [],
       items: [],
@@ -272,6 +273,35 @@ const NewServicePage = () => {
     [products],
   );
 
+  const handleCatalogDefinitionChange = useCallback(
+    (index: number, definitionId: string) => {
+      setValue(`catalogItems.${index}.serviceDefinitionId`, definitionId, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+
+      const definition = availableDefinitions.find((candidate) => candidate.id === definitionId);
+      const suggestedPrice = definition ? definition.precoSugerido.toFixed(2) : '';
+
+      setValue(`catalogItems.${index}.precoUnitario`, suggestedPrice, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+
+      const currentQuantity = getValues(`catalogItems.${index}.quantidade`);
+      const parsedQuantity = Number(currentQuantity);
+      if (!currentQuantity || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+        setValue(`catalogItems.${index}.quantidade`, '1', {
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+
+      trigger('catalogItems');
+    },
+    [availableDefinitions, getValues, setValue, trigger],
+  );
+
   const handleAddNote = () => {
     const content = noteDraft.trim();
     if (!content) {
@@ -323,6 +353,32 @@ const NewServicePage = () => {
   const resolveProductBasePrice = useCallback(
     (product?: Product) => product?.precoBaseCatalogo ?? product?.precoVenda ?? 0,
     [],
+  );
+
+  const handleProductChange = useCallback(
+    (index: number, productId: string) => {
+      setValue(`items.${index}.productId`, productId, { shouldDirty: true, shouldTouch: true });
+
+      const product = availableProducts.find((candidate) => candidate.id === productId);
+      const basePrice = product ? resolveProductBasePrice(product).toFixed(2) : '';
+
+      setValue(`items.${index}.precoUnitario`, basePrice, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+
+      const currentQuantity = getValues(`items.${index}.quantidade`);
+      const parsedQuantity = Number(currentQuantity);
+      if (!currentQuantity || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+        setValue(`items.${index}.quantidade`, '1', {
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+
+      trigger('items');
+    },
+    [availableProducts, getValues, resolveProductBasePrice, setValue, trigger],
   );
 
   const duplicateProductIds = useMemo(() => {
@@ -884,6 +940,7 @@ const NewServicePage = () => {
                   };
                 const definition = detail.definition;
                 const currentDefinitionId = catalogItems?.[index]?.serviceDefinitionId ?? '';
+                const definitionRegister = register(`catalogItems.${index}.serviceDefinitionId` as const);
 
                 return (
                   <div key={field.id} className="space-y-3 rounded-2xl border border-brand-azul/40 bg-white/80 p-4">
@@ -892,7 +949,11 @@ const NewServicePage = () => {
                         label="Serviço"
                         required
                         helperText={definition?.descricao ?? 'Selecione um serviço do catálogo'}
-                        {...register(`catalogItems.${index}.serviceDefinitionId` as const)}
+                        {...definitionRegister}
+                        onChange={(event) => {
+                          definitionRegister.onChange(event);
+                          handleCatalogDefinitionChange(index, event.target.value);
+                        }}
                       >
                         <option value="">Selecione um serviço</option>
                         {availableDefinitions.map((serviceDefinition) => (
@@ -1014,6 +1075,7 @@ const NewServicePage = () => {
                   ? `Disponível: ${product.estoqueAtual} • Mínimo: ${product.estoqueMinimo}`
                   : 'Selecione um produto';
                 const currentProductId = items?.[index]?.productId ?? '';
+                const productRegister = register(`items.${index}.productId` as const);
 
                 return (
                   <div key={field.id} className="space-y-3 rounded-2xl border border-brand-azul/40 bg-white/80 p-4">
@@ -1022,7 +1084,11 @@ const NewServicePage = () => {
                         label="Produto"
                         required
                         helperText={stockHelper}
-                        {...register(`items.${index}.productId` as const)}
+                        {...productRegister}
+                        onChange={(event) => {
+                          productRegister.onChange(event);
+                          handleProductChange(index, event.target.value);
+                        }}
                       >
                         <option value="">Selecione um produto</option>
                         {availableProducts.map((productOption) => (
