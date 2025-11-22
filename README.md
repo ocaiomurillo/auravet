@@ -42,6 +42,10 @@ auravet/
    - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME` (opcionais)
    - `VITE_API_URL` (URL consumida pelo frontend; defina antes de gerar o build de produção)
 
+> Produção: a imagem da API não traz valores padrão para `DATABASE_URL` ou `JWT_SECRET`. Defina-os explicitamente (via `.env`,
+> secrets ou variáveis do orquestrador) antes de subir containers; o processo de inicialização falha cedo se eles estiverem em
+> branco. O `docker-compose.yml` já exige `JWT_SECRET` e permite sobrepor `DATABASE_URL` para apontar para um banco gerenciado.
+
 > Dica: o workspace do frontend carrega automaticamente `.env.development`, `.env.staging` e `.env.production` em `apps/web/`.
 > Esses arquivos já trazem valores padrão para `VITE_API_URL` por ambiente (dev: `http://localhost:4000`, stage: `https://api.stage.auravet.com`,
 > prod: `https://api.auravet.com`). Use `--mode <ambiente>` ao rodar `npm run build --workspace apps/web` se quiser selecionar

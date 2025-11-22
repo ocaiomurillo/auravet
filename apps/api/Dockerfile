@@ -12,7 +12,8 @@ COPY apps/web/package.json ./apps/web/
 RUN npm install
 
 COPY . .
-ENV DATABASE_URL=postgresql://auravet:auravet@db:5432/auravet?schema=public
+ARG DATABASE_URL=postgresql://auravet:auravet@db:5432/auravet?schema=public
+ENV DATABASE_URL=${DATABASE_URL}
 RUN npm run prisma:generate --workspace apps/api
 RUN npm run build --workspace apps/api
 
@@ -29,6 +30,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/prisma ./prisma
 COPY --from=builder /app/apps/api/package.json ./package.json
+
+ENV DATABASE_URL= \
+  JWT_SECRET=
 
 EXPOSE 4000
 CMD ["node", "dist/main.js"]
