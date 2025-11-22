@@ -835,72 +835,78 @@ const NewServicePage = () => {
         description="Preencha com atenção para manter o histórico impecável e inclua quantos serviços forem necessários no mesmo atendimento."
       >
         <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
-          <SelectField
-            label="Agendamento (opcional)"
-            value={selectedAppointmentId}
-            onChange={(event) => setSelectedAppointmentId(event.target.value)}
-          >
-            <option value="">Registrar sem agendamento</option>
-            {availableAppointments.map((appointment) => (
-              <option key={appointment.id} value={appointment.id}>
-                {formatAppointmentLabel(appointment)}
-              </option>
-            ))}
-          </SelectField>
+          <div className="md:col-span-2">
+            <SelectField
+              label="Agendamento (opcional)"
+              value={selectedAppointmentId}
+              onChange={(event) => setSelectedAppointmentId(event.target.value)}
+            >
+              <option value="">Registrar sem agendamento</option>
+              {availableAppointments.map((appointment) => (
+                <option key={appointment.id} value={appointment.id}>
+                  {formatAppointmentLabel(appointment)}
+                </option>
+              ))}
+            </SelectField>
+          </div>
 
-          <SelectField label="Pet" required {...register('animalId')}>
-            <option value="">Selecione um pet</option>
-            {animals?.map((animal) => (
-              <option key={animal.id} value={animal.id}>
-                {animal.nome} — Tutor(a): {animal.owner?.nome ?? '—'}
-              </option>
-            ))}
-          </SelectField>
+          <div className="grid gap-4 md:col-span-2 md:grid-cols-3">
+            <SelectField className="md:col-span-2" label="Pet" required {...register('animalId')}>
+              <option value="">Selecione um pet</option>
+              {animals?.map((animal) => (
+                <option key={animal.id} value={animal.id}>
+                  {animal.nome} — Tutor(a): {animal.owner?.nome ?? '—'}
+                </option>
+              ))}
+            </SelectField>
 
-          <Field
-            label="Tutor"
-            value={selectedAnimal ? selectedAnimal.owner?.nome ?? '—' : ''}
-            placeholder="Selecione um pet"
-            readOnly
-            helperText={tutorHelperText}
-            error={petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o atendimento.' : undefined}
-          />
+            <Field
+              label="Tutor"
+              value={selectedAnimal ? selectedAnimal.owner?.nome ?? '—' : ''}
+              placeholder="Selecione um pet"
+              readOnly
+              helperText={tutorHelperText}
+              error={
+                petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o atendimento.' : undefined
+              }
+            />
+          </div>
 
-          <Field
-            label="Início do atendimento"
-            type="datetime-local"
-            required
-            {...register('data')}
-          />
+          <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+            <Field
+              label="Início do atendimento"
+              type="datetime-local"
+              required
+              {...register('data')}
+            />
 
-          <Field
-            label="Término do atendimento"
-            type="datetime-local"
-            helperText="Opcional: preencha ao concluir para registrar a duração."
-            {...register('fim')}
-          />
+            <Field
+              label="Término do atendimento"
+              type="datetime-local"
+              helperText="Opcional: preencha ao concluir para registrar a duração."
+              {...register('fim')}
+            />
+          </div>
 
-          <SelectField
-            label="Responsável pelo atendimento"
-            required
-            {...register('responsavelId')}
-          >
-            <option value="">Selecione um responsável</option>
-            {availableResponsibles.map((responsible) => (
-              <option key={responsible.id} value={responsible.id}>
-                {responsible.nome} — {responsible.email}
-              </option>
-            ))}
-          </SelectField>
+          <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+            <SelectField label="Profissional responsável" required {...register('responsavelId')}>
+              <option value="">Selecione um responsável</option>
+              {availableResponsibles.map((responsible) => (
+                <option key={responsible.id} value={responsible.id}>
+                  {responsible.nome} — {responsible.email}
+                </option>
+              ))}
+            </SelectField>
 
-          <SelectField label="Assistente (opcional)" {...register('assistantId')}>
-            <option value="">Sem assistente</option>
-            {availableAssistants.map((assistant) => (
-              <option key={assistant.id} value={assistant.id}>
-                {assistant.nome} — {assistant.email}
-              </option>
-            ))}
-          </SelectField>
+            <SelectField label="Profissional assistente" {...register('assistantId')}>
+              <option value="">Sem assistente</option>
+              {availableAssistants.map((assistant) => (
+                <option key={assistant.id} value={assistant.id}>
+                  {assistant.nome} — {assistant.email}
+                </option>
+              ))}
+            </SelectField>
+          </div>
 
           <div className="md:col-span-2 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
