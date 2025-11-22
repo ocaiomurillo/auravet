@@ -764,12 +764,13 @@ appointmentsRouter.patch(
 
         const createdService = await tx.servico.create({
           data: {
-            animalId: existing.animalId,
+            animal: { connect: { id: existing.animalId } },
             tipo: servicePayload.tipo ?? 'CONSULTA',
             data: now,
             preco: toDecimal(servicePayload.preco ?? 0),
             observacoes:
               servicePayload.observacoes ?? normalizeNotes(payload.notes ?? existing.notes ?? undefined) ?? null,
+            appointment: { connect: { id } },
           },
         });
 
@@ -787,6 +788,13 @@ appointmentsRouter.patch(
         });
 
         serviceId = existing.serviceId;
+      }
+
+      if (serviceId) {
+        await tx.servico.update({
+          where: { id: serviceId },
+          data: { appointment: { connect: { id } } },
+        });
       }
 
       const updated = await tx.appointment.update({

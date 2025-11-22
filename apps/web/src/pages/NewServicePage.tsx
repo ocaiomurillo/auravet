@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import Button from '../components/Button';
@@ -9,9 +9,10 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient, productsApi, serviceDefinitionsApi, servicesApi } from '../lib/apiClient';
+import { apiClient, appointmentsApi, productsApi, serviceDefinitionsApi, servicesApi } from '../lib/apiClient';
 import type {
   Animal,
+  Appointment,
   Attendance,
   AttendanceResponsible,
   CollaboratorSummary,
@@ -56,6 +57,7 @@ type AttendanceCatalogItemPayload = {
 
 type CreateAttendancePayload = {
   animalId: string;
+  appointmentId?: string;
   data: string;
   preco?: number;
   responsavelId?: string;
@@ -75,10 +77,20 @@ const toDateTimeLocal = (iso: string) => {
   )}:${pad(date.getMinutes())}`;
 };
 
+const formatAppointmentLabel = (appointment: Appointment) => {
+  const start = new Date(appointment.scheduledStart);
+  const end = new Date(appointment.scheduledEnd);
+  const date = start.toLocaleDateString('pt-BR');
+  const startTime = start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const endTime = end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${startTime} - ${endTime} • ${appointment.animal.nome} (${appointment.owner.nome})`;
+};
+
 const NewServicePage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { id: serviceId } = useParams();
+  const [searchParams] = useSearchParams();
   const { user, hasModule } = useAuth();
   const canOverrideProductPrice = hasModule('products:write');
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -87,6 +99,9 @@ const NewServicePage = () => {
   >(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [pendingNotes, setPendingNotes] = useState<{ conteudo: string; createdAt: string }[]>([]);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState(
+    searchParams.get('appointmentId') ?? '',
+  );
 
   const isEditing = Boolean(serviceId);
 
@@ -149,6 +164,21 @@ const NewServicePage = () => {
         .then((response) => response.collaborators ?? []),
   });
 
+  const { data: appointmentOptions = [] } = useQuery({
+    queryKey: ['appointments', 'for-service'],
+    queryFn: () => appointmentsApi.list(),
+    select: (response) =>
+      response.appointments.filter(
+        (appointment) => appointment.status !== 'CONCLUIDO' && !appointment.serviceId,
+      ),
+  });
+
+  const { data: appointmentDetails } = useQuery({
+    queryKey: ['appointment', selectedAppointmentId],
+    queryFn: () => appointmentsApi.getById(selectedAppointmentId).then((response) => response.appointment),
+    enabled: Boolean(selectedAppointmentId),
+  });
+
   const { data: attendance, isFetching: isLoadingAttendance } = useQuery({
     queryKey: ['attendance', serviceId],
     queryFn: () => servicesApi.getById(serviceId ?? ''),
@@ -174,6 +204,17 @@ const NewServicePage = () => {
     return collaborators.slice().sort((a, b) => a.nome.localeCompare(b.nome));
   }, [collaborators]);
 
+  const availableAppointments = useMemo(() => {
+    return appointmentOptions.slice().sort((a, b) =>
+      a.scheduledStart.localeCompare(b.scheduledStart),
+    );
+  }, [appointmentOptions]);
+
+  const selectedAppointment = useMemo<Appointment | null>(() => {
+    if (appointmentDetails) return appointmentDetails;
+    return appointmentOptions.find((appointment) => appointment.id === selectedAppointmentId) ?? null;
+  }, [appointmentDetails, appointmentOptions, selectedAppointmentId]);
+
   useEffect(() => {
     if (!attendance) return;
 
@@ -196,6 +237,7 @@ const NewServicePage = () => {
       })),
     });
 
+    setSelectedAppointmentId(attendance.appointmentId ?? '');
     setPendingNotes([]);
     setNoteDraft('');
   }, [attendance, reset]);
@@ -408,6 +450,16 @@ const NewServicePage = () => {
     });
   }, [availableDefinitions, catalogItems, setValue]);
 
+  useEffect(() => {
+    if (!selectedAppointment) return;
+
+    setValue('animalId', selectedAppointment.animalId);
+    setValue('responsavelId', selectedAppointment.veterinarianId);
+    setValue('assistantId', selectedAppointment.assistantId ?? '');
+    setValue('data', toDateTimeLocal(selectedAppointment.scheduledStart));
+    setValue('fim', toDateTimeLocal(selectedAppointment.scheduledEnd));
+  }, [selectedAppointment, setValue]);
+
   const createAttendance = useMutation({
     mutationFn: (payload: CreateAttendancePayload) => apiClient.post<Attendance>('/services', payload),
     onSuccess: async (service, payload) => {
@@ -434,6 +486,7 @@ const NewServicePage = () => {
         }
       }
 
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['attendances'] });
       queryClient.invalidateQueries({ queryKey: ['animals'] });
       reset({
@@ -445,6 +498,7 @@ const NewServicePage = () => {
         catalogItems: [],
         items: [],
       });
+      setSelectedAppointmentId('');
       setPendingNotes([]);
       setNoteDraft('');
       navigate(`/animals`, { state: { highlight: service.animalId } });
@@ -466,6 +520,7 @@ const NewServicePage = () => {
       setPendingNotes([]);
       setNoteDraft('');
       queryClient.invalidateQueries({ queryKey: ['attendance', serviceId] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['attendances'] });
       queryClient.invalidateQueries({ queryKey: ['animals'] });
       queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
@@ -635,6 +690,7 @@ const NewServicePage = () => {
 
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
+      appointmentId: selectedAppointmentId || undefined,
       data: start.toISOString(),
       preco: Number(servicesTotalValue.toFixed(2)),
       responsavelId: values.responsavelId,
@@ -676,6 +732,19 @@ const NewServicePage = () => {
         description="Preencha com atenção para manter o histórico impecável e inclua quantos serviços forem necessários no mesmo atendimento."
       >
         <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
+          <SelectField
+            label="Agendamento (opcional)"
+            value={selectedAppointmentId}
+            onChange={(event) => setSelectedAppointmentId(event.target.value)}
+          >
+            <option value="">Registrar sem agendamento</option>
+            {availableAppointments.map((appointment) => (
+              <option key={appointment.id} value={appointment.id}>
+                {formatAppointmentLabel(appointment)}
+              </option>
+            ))}
+          </SelectField>
+
           <SelectField label="Pet" required {...register('animalId')}>
             <option value="">Selecione um pet</option>
             {animals?.map((animal) => (
