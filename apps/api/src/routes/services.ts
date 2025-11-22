@@ -1,6 +1,7 @@
 import { AppointmentStatus, Prisma, Product, ServiceDefinition } from '@prisma/client';
 import { Router } from 'express';
 
+import { env } from '../config/env';
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
 import { requirePermission } from '../middlewares/require-permission';
@@ -15,7 +16,24 @@ export const servicesRouter = Router();
 
 servicesRouter.use(authenticate);
 
-const serviceInclude = {
+const serviceNotesEnabled = env.SERVICE_NOTES_ENABLED;
+
+const serviceNotesInclude = serviceNotesEnabled
+  ? Prisma.validator<Prisma.ServiceNoteFindManyArgs>()({
+      include: {
+        author: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+  : undefined;
+
+const serviceInclude = Prisma.validator<Prisma.ServicoInclude>()({
   animal: {
     include: {
       owner: true,
@@ -32,18 +50,7 @@ const serviceInclude = {
       definition: true,
     },
   },
-  notes: {
-    include: {
-      author: {
-        select: {
-          id: true,
-          nome: true,
-          email: true,
-        },
-      },
-    },
-    orderBy: { createdAt: 'asc' },
-  },
+  notes: serviceNotesInclude ?? false,
   responsavel: {
     select: {
       id: true,
@@ -51,7 +58,7 @@ const serviceInclude = {
       email: true,
     },
   },
-} as const;
+});
 
 const parseDate = (value: string) => {
   const date = new Date(value);
@@ -403,7 +410,7 @@ servicesRouter.post(
         });
       }
 
-      if (noteEntries.length && authorId) {
+      if (serviceNotesEnabled && noteEntries.length && authorId) {
         await tx.serviceNote.createMany({
           data: noteEntries.map((conteudo) => ({
             conteudo,
@@ -413,7 +420,7 @@ servicesRouter.post(
         });
       }
 
-      if (noteEntries.length) {
+      if (serviceNotesEnabled && noteEntries.length) {
         return tx.servico.findUniqueOrThrow({ where: { id: created.id }, include: serviceInclude });
       }
 
@@ -651,7 +658,7 @@ servicesRouter.put(
           updateData.preco = toDecimal(Number(resolvedPrice.toFixed(2)));
         }
 
-        if (noteEntries.length && authorId) {
+        if (serviceNotesEnabled && noteEntries.length && authorId) {
           await tx.serviceNote.createMany({
             data: noteEntries.map((conteudo) => ({
               conteudo,

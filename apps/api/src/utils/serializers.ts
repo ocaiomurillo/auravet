@@ -20,7 +20,7 @@ import { buildAuthenticatedUser } from './auth';
 
 type ServiceItemWithProduct = ServiceProductUsage & { product: Product };
 type ServiceCatalogUsageWithDefinition = ServiceCatalogUsage & { definition: ServiceDefinition };
-type ServiceNoteWithAuthor = ServiceNote & { author: { id: string; nome: string; email: string } };
+type ServiceNoteWithAuthor = ServiceNote & { author?: { id: string; nome: string; email: string } | null };
 
 type InvoiceItemWithRelations = Prisma.InvoiceItemGetPayload<{
   include: {
@@ -456,16 +456,20 @@ export const serializeService = (
       }
     : null,
   notes:
-    service.notes?.map((note) => ({
-      id: note.id,
-      conteudo: note.conteudo,
-      createdAt: note.createdAt.toISOString(),
-      author: {
-        id: note.author.id,
-        nome: note.author.nome,
-        email: note.author.email,
-      },
-    })) ?? [],
+    service.notes
+      ?.filter((note): note is ServiceNoteWithAuthor & { author: NonNullable<ServiceNoteWithAuthor['author']> } =>
+        Boolean(note.author),
+      )
+      .map((note) => ({
+        id: note.id,
+        conteudo: note.conteudo,
+        createdAt: note.createdAt.toISOString(),
+        author: {
+          id: note.author.id,
+          nome: note.author.nome,
+          email: note.author.email,
+        },
+      })) ?? [],
   };
 
   if (options?.includeAnimal && service.animal) {
