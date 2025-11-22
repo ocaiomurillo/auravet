@@ -44,6 +44,6 @@
     "typescript": "^5.4.2"
   },
   "prisma": {
-    "seed": "npm run prisma:generate && tsx prisma/seed.ts"
+    "seed": "npm run prisma:generate && npm run seed:build && node prisma/dist/seed.js"
   }
 }

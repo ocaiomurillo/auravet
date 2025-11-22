@@ -5,6 +5,8 @@ import { Prisma, PrismaClient, TipoServico, Especie } from '@prisma/client';
 const SALT_LENGTH = 16;
 const KEY_LENGTH = 64;
 
+console.log('>>>> SEED AURAVET: INICIANDO <<<<');
+
 const parseSaltRounds = () => {
   const rawValue = process.env.PASSWORD_SALT_ROUNDS;
   const parsedValue = rawValue ? Number(rawValue) : 10;
