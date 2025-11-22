@@ -635,9 +635,14 @@ const CashierPage = () => {
       const fileName = `auravet-fatura-${selectedInvoice.id}.pdf`;
       const blobUrl = doc.output('bloburl');
 
-      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
       doc.save(fileName);
-      toast.success('PDF da fatura gerado. Você pode visualizar ou imprimir.');
+
+      if (newWindow) {
+        toast.success('PDF da fatura gerado. Abrimos em nova aba e iniciamos o download.');
+      } else {
+        toast.success('PDF da fatura gerado. O download foi iniciado; permita pop-ups para visualizar.');
+      }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Não foi possível gerar o PDF desta conta.',
@@ -920,9 +925,6 @@ const CashierPage = () => {
             <Button variant="ghost" onClick={handleCloseInvoice}>
               Fechar
             </Button>
-            <Button variant="ghost" onClick={handlePrintInvoice} disabled={isGeneratingPdf}>
-              {isGeneratingPdf ? 'Gerando PDF...' : 'Imprimir fatura'}
-            </Button>
             {selectedInvoice?.status.slug !== 'QUITADA' ? (
               <Button onClick={handleMarkAsPaid} disabled={markPaidMutation.isPending}>
                 {markPaidMutation.isPending ? 'Registrando...' : 'Registrar pagamento'}
@@ -933,47 +935,58 @@ const CashierPage = () => {
       >
         {selectedInvoice ? (
           <div className="space-y-4 text-sm text-brand-grafite/80">
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Tutor</p>
-                <p className="text-brand-escuro">{selectedInvoice.owner.nome}</p>
-                <p className="text-xs text-brand-grafite/60">{selectedInvoice.owner.email}</p>
-                {selectedInvoice.owner.telefone ? (
-                  <p className="text-xs text-brand-grafite/60">{selectedInvoice.owner.telefone}</p>
-                ) : null}
-                {selectedInvoiceOwnerCpf ? (
-                  <p className="text-xs text-brand-grafite/60">CPF: {selectedInvoiceOwnerCpf}</p>
-                ) : null}
-                {selectedInvoiceOwnerAddress ? (
-                  <p className="text-xs text-brand-grafite/60">{selectedInvoiceOwnerAddress}</p>
-                ) : null}
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Tutor</p>
+                  <p className="text-brand-escuro">{selectedInvoice.owner.nome}</p>
+                  <p className="text-xs text-brand-grafite/60">{selectedInvoice.owner.email}</p>
+                  {selectedInvoice.owner.telefone ? (
+                    <p className="text-xs text-brand-grafite/60">{selectedInvoice.owner.telefone}</p>
+                  ) : null}
+                  {selectedInvoiceOwnerCpf ? (
+                    <p className="text-xs text-brand-grafite/60">CPF: {selectedInvoiceOwnerCpf}</p>
+                  ) : null}
+                  {selectedInvoiceOwnerAddress ? (
+                    <p className="text-xs text-brand-grafite/60">{selectedInvoiceOwnerAddress}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Status</p>
+                  <p className="font-semibold text-brand-escuro">{selectedInvoice.status.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Total</p>
+                  <p className="font-semibold text-brand-escuro">
+                    {currencyFormatter.format(selectedInvoice.total)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Vencimento</p>
+                  <p>{new Date(selectedInvoice.dueDate).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Pagamento</p>
+                  <p>
+                    {selectedInvoice.paidAt
+                      ? new Date(selectedInvoice.paidAt).toLocaleDateString('pt-BR')
+                      : 'Em aberto'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Responsável</p>
+                  <p>{selectedInvoice.responsible?.nome ?? 'Ainda não definido'}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Status</p>
-                <p className="font-semibold text-brand-escuro">{selectedInvoice.status.name}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Total</p>
-                <p className="font-semibold text-brand-escuro">
-                  {currencyFormatter.format(selectedInvoice.total)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Vencimento</p>
-                <p>{new Date(selectedInvoice.dueDate).toLocaleDateString('pt-BR')}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Pagamento</p>
-                <p>
-                  {selectedInvoice.paidAt
-                    ? new Date(selectedInvoice.paidAt).toLocaleDateString('pt-BR')
-                    : 'Em aberto'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Responsável</p>
-                <p>{selectedInvoice.responsible?.nome ?? 'Ainda não definido'}</p>
-              </div>
+
+              <Button
+                variant="ghost"
+                onClick={handlePrintInvoice}
+                disabled={isGeneratingPdf}
+                className="self-start"
+              >
+                {isGeneratingPdf ? 'Gerando PDF...' : 'Baixar PDF da fatura'}
+              </Button>
             </div>
 
             <div className="rounded-2xl border border-brand-azul/20 bg-brand-azul/5 p-4">
