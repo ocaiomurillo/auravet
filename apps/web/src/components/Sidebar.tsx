@@ -5,7 +5,7 @@ import clsx from 'clsx';
 
 import { useAuth } from '../contexts/AuthContext';
 
-import { SidebarBranding, SidebarUserInfo } from './Header';
+import { LogoutButton, SidebarBranding, SidebarUserInfo } from './Header';
 import { navItems } from './navItems';
 
 const Sidebar = () => {
@@ -45,16 +45,19 @@ const Sidebar = () => {
         aria-label="Barra lateral de navegação"
       >
         <div className="flex h-full flex-col gap-6 px-5 py-6">
-          <div className="flex items-start justify-between gap-4">
-            <SidebarBranding />
-            <button
-              type="button"
-              onClick={() => setIsMobileOpen(false)}
-              className="rounded-full p-2 text-brand-grafite/60 transition hover:bg-brand-azul/15 hover:text-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-azul/40 md:hidden"
-              aria-label="Fechar menu"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-4">
+              <SidebarBranding />
+              <button
+                type="button"
+                onClick={() => setIsMobileOpen(false)}
+                className="rounded-full p-2 text-brand-grafite/60 transition hover:bg-brand-azul/15 hover:text-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-azul/40 md:hidden"
+                aria-label="Fechar menu"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <LogoutButton />
           </div>
 
           <nav className="flex-1 overflow-y-auto">
