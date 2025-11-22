@@ -704,9 +704,11 @@ const NewServicePage = () => {
 
     const notePayload = pendingNotes.map((note) => ({ conteudo: note.conteudo }));
 
+    const resolvedAppointmentId = selectedAppointmentId || attendance?.appointmentId || undefined;
+
     const payload: CreateAttendancePayload = {
       animalId: values.animalId,
-      appointmentId: selectedAppointmentId || undefined,
+      appointmentId: resolvedAppointmentId,
       data: start.toISOString(),
       preco: Number(overallTotalValue.toFixed(2)),
       responsavelId: values.responsavelId,

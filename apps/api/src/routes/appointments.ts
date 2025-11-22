@@ -343,7 +343,7 @@ appointmentsRouter.get(
     const filters = appointmentBillableQuerySchema.parse(req.query);
 
     const where: Prisma.AppointmentWhereInput = {
-      status: AppointmentStatusMap.CONCLUIDO,
+      status: { in: [AppointmentStatusMap.CONCLUIDO, AppointmentStatusMap.CONFIRMADO] },
       ownerId: filters.ownerId,
       serviceId: { not: null },
       service: { invoiceItems: { none: {} } },
