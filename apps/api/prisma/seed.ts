@@ -1,6 +1,13 @@
 import { randomBytes, scrypt as scryptCallback } from 'crypto';
 
-import { Prisma, PrismaClient, TipoServico, Especie } from '@prisma/client';
+import {
+  Prisma,
+  PrismaClient,
+  TipoServico,
+  Especie,
+  AppointmentStatus,
+} from '@prisma/client';
+
 
 const SALT_LENGTH = 16;
 const KEY_LENGTH = 64;
@@ -1195,6 +1202,111 @@ await Promise.all(
       }),
     ),
   );
+
+    // -----------------------------
+  // Seed de agendamentos e atendimentos
+  // -----------------------------
+  const animals = await prisma.animal.findMany({
+    include: { owner: true },
+  });
+
+  const veterinarians = await prisma.user.findMany({
+    where: { role: { slug: 'MEDICO' } },
+  });
+
+  const nurses = await prisma.user.findMany({
+    where: { role: { slug: 'ENFERMEIRO' } },
+  });
+
+  const serviceDefs = await prisma.serviceDefinition.findMany({
+    where: { isActive: true },
+  });
+
+  const pickRandom = <T,>(arr: T[]): T | null =>
+    arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+
+  const now = new Date();
+
+  const TOTAL_FUTURE_APPOINTMENTS = 50;
+
+  // Alguns agendamentos futuros (AGENDADO / CONFIRMADO), sem atendimento ainda
+  for (let i = 0; i < TOTAL_FUTURE_APPOINTMENTS; i++) {
+    const animal = animals[i];
+    const vet = pickRandom(veterinarians);
+    const assistant = pickRandom(nurses);
+
+    if (!vet) break;
+
+    const daysAhead = i + 1;
+    const start = new Date(now);
+    start.setDate(now.getDate() + daysAhead);
+    start.setHours(9 + i, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setHours(start.getHours() + 1);
+
+    await prisma.appointment.create({
+      data: {
+        animalId: animal.id,
+        ownerId: animal.ownerId,
+        veterinarianId: vet.id,
+        assistantId: assistant?.id ?? null,
+        status: i % 2 === 0 ? AppointmentStatus.AGENDADO : AppointmentStatus.CONFIRMADO,
+        scheduledStart: start,
+        scheduledEnd: end,
+        confirmedAt: i % 2 === 0 ? null : now,
+        notes:
+          i % 2 === 0
+            ? 'Agendamento criado via seed (check-up / consulta rotineira).'
+            : 'Agendamento confirmado via seed (consulta já confirmada com tutor).',
+      },
+    });
+  }
+
+  // Alguns atendimentos concluídos, com agendamento já finalizado + serviço vinculado
+  for (let i = 0; i < Math.min(animals.length, 5); i++) {
+    const animal = animals[animals.length - 1 - i];
+    const vet = pickRandom(veterinarians);
+    const assistant = pickRandom(nurses);
+    const def = pickRandom(serviceDefs);
+
+    if (!vet || !def) break;
+
+    const daysAgo = i + 1;
+    const start = new Date(now);
+    start.setDate(now.getDate() - daysAgo);
+    start.setHours(14, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setHours(start.getHours() + 1);
+
+    const appointment = await prisma.appointment.create({
+      data: {
+        animalId: animal.id,
+        ownerId: animal.ownerId,
+        veterinarianId: vet.id,
+        assistantId: assistant?.id ?? null,
+        status: AppointmentStatus.CONCLUIDO,
+        scheduledStart: start,
+        scheduledEnd: end,
+        confirmedAt: start,
+        completedAt: end,
+        notes: `Atendimento de ${def.nome} concluído via seed.`,
+      },
+    });
+
+    await prisma.servico.create({
+      data: {
+        animalId: animal.id,
+        tipo: def.tipo,
+        data: end,
+        preco: new Prisma.Decimal(def.precoSugerido),
+        observacoes: `Serviço ${def.nome} realizado durante o agendamento seed.`,
+        responsavelId: vet.id,
+        appointmentId: appointment.id, // vínculo Servico -> Appointment
+      },
+    });
+  }
 
   const statusMap = new Map(invoiceStatuses.map((status) => [status.slug, status]));
   const openStatus = statusMap.get('ABERTA');
