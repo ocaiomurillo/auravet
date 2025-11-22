@@ -251,13 +251,21 @@ const buildAttendancePdf = async (service: Attendance, appointment?: Appointment
     addPdfSectionTitle(doc, 'Prontuário do atendimento', currentY);
     currentY += 8;
 
-    service.notes.forEach((note) => {
-      currentY = ensurePdfSpace(doc, currentY, 18);
-      const header = `${note.author.nome} — ${new Date(note.createdAt).toLocaleString('pt-BR')}`;
+    const sortedNotes = [...service.notes].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+
+    sortedNotes.forEach((note) => {
+      const wrapped = doc.splitTextToSize(note.conteudo, 180);
+      const entryHeight = 6 + wrapped.length * 6 + 4;
+      currentY = ensurePdfSpace(doc, currentY, entryHeight);
+
+      const header = `Autor: ${note.author.nome} — ${formatDateTime(note.createdAt)}`;
       doc.setFontSize(10);
+      doc.setTextColor(30, 41, 59);
       doc.text(header, 15, currentY);
       currentY += 6;
-      const wrapped = doc.splitTextToSize(note.conteudo, 180);
+
       doc.text(wrapped, 15, currentY);
       currentY += wrapped.length * 6 + 4;
     });
@@ -265,8 +273,11 @@ const buildAttendancePdf = async (service: Attendance, appointment?: Appointment
     currentY += 12;
     addPdfSectionTitle(doc, 'Prontuário do atendimento', currentY);
     currentY += 8;
+
     const wrapped = doc.splitTextToSize(service.observacoes, 180);
+    currentY = ensurePdfSpace(doc, currentY, wrapped.length * 6 + 4);
     doc.text(wrapped, 15, currentY);
+    currentY += wrapped.length * 6 + 4;
   }
 
   const fileDate = new Date(service.data).toISOString().split('T')[0];
