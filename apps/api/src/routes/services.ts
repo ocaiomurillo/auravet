@@ -1,4 +1,4 @@
-import { Prisma, Product, ServiceDefinition } from '@prisma/client';
+import { AppointmentStatus, Prisma, Product, ServiceDefinition } from '@prisma/client';
 import { Router } from 'express';
 
 import { prisma } from '../lib/prisma';
@@ -185,6 +185,49 @@ const ensureResponsibleExists = async (tx: Prisma.TransactionClient, userId: str
   }
 };
 
+const ensureAppointmentForService = async (
+  tx: Prisma.TransactionClient,
+  appointmentId: string,
+  animalId: string,
+  currentServiceId: string | null,
+) => {
+  const appointment = await tx.appointment.findUnique({ where: { id: appointmentId } });
+
+  if (!appointment) {
+    throw new HttpError(404, 'Agendamento não encontrado para vincular ao atendimento.');
+  }
+
+  if (appointment.serviceId && appointment.serviceId !== currentServiceId) {
+    throw new HttpError(400, 'Agendamento selecionado já está vinculado a outro atendimento.');
+  }
+
+  if (appointment.animalId !== animalId) {
+    throw new HttpError(400, 'Agendamento selecionado pertence a outro pet.');
+  }
+
+  return appointment;
+};
+
+const concludeAppointmentForService = async (
+  tx: Prisma.TransactionClient,
+  appointment: { id: string; confirmedAt: Date | null; completedAt: Date | null; notes: string | null },
+  serviceId: string,
+  { notes, completedAt }: { notes?: string | null; completedAt: Date },
+) => {
+  const completionTime = completedAt ?? new Date();
+
+  await tx.appointment.update({
+    where: { id: appointment.id },
+    data: {
+      status: AppointmentStatus.CONCLUIDO,
+      serviceId,
+      confirmedAt: appointment.confirmedAt ?? completionTime,
+      completedAt: appointment.completedAt ?? completionTime,
+      notes: notes ?? appointment.notes ?? null,
+    },
+  });
+};
+
 const calculateCatalogItemsTotal = (items: ServiceCatalogItemInput[]) =>
   items.reduce((sum, item) => sum + item.precoUnitario * item.quantidade, 0);
 
@@ -277,6 +320,8 @@ servicesRouter.post(
 
     await ensureAnimalExists(payload.animalId);
 
+    const serviceDate = parseDate(payload.data);
+
     const authorId = req.user?.id ?? null;
     const noteEntries = (payload.notes ?? [])
       .map((note) => note.conteudo.trim())
@@ -299,6 +344,12 @@ servicesRouter.post(
         await ensureResponsibleExists(tx, responsibleId);
       }
 
+      let appointment: Awaited<ReturnType<typeof tx.appointment.findUnique>> | null = null;
+
+      if (payload.appointmentId) {
+        appointment = await ensureAppointmentForService(tx, payload.appointmentId, payload.animalId, null);
+      }
+
       await validateStockForCreation(tx, items);
       await loadServiceDefinitionsMap(tx, catalogItems.map((item) => item.serviceDefinitionId));
 
@@ -308,12 +359,13 @@ servicesRouter.post(
 
       const created = await tx.servico.create({
         data: {
-          animalId: payload.animalId,
+          animal: { connect: { id: payload.animalId } },
           tipo: payload.tipo,
-          data: parseDate(payload.data),
+          data: serviceDate,
           preco: toDecimal(normalizedPriceValue),
           observacoes: payload.observacoes ?? null,
-          responsavelId: responsibleId,
+          responsavel: responsibleId ? { connect: { id: responsibleId } } : undefined,
+          appointment: appointment ? { connect: { id: appointment.id } } : undefined,
           catalogItems: {
             create: catalogItems.map((item) => ({
               serviceDefinitionId: item.serviceDefinitionId,
@@ -343,6 +395,13 @@ servicesRouter.post(
       }
 
       await syncInvoiceForService(tx, created.id, { responsibleId: created.responsavelId ?? responsibleId });
+
+      if (appointment) {
+        await concludeAppointmentForService(tx, appointment, created.id, {
+          notes: payload.observacoes ?? null,
+          completedAt: serviceDate,
+        });
+      }
 
       if (noteEntries.length && authorId) {
         await tx.serviceNote.createMany({
@@ -411,6 +470,7 @@ servicesRouter.put(
           include: {
             items: true,
             catalogItems: true,
+            appointment: true,
             invoiceItems: {
               include: {
                 invoice: {
@@ -425,6 +485,15 @@ servicesRouter.put(
 
         if (!existing) {
           throw new HttpError(404, 'Serviço não encontrado.');
+        }
+
+        const currentAppointmentId = existing.appointmentId ?? existing.appointment?.id ?? null;
+
+        if (payload.animalId && currentAppointmentId && existing.appointment?.animalId !== payload.animalId) {
+          throw new HttpError(
+            400,
+            'Não é possível alterar o pet de um atendimento já vinculado a um agendamento.',
+          );
         }
 
         const hasPaidInvoice = existing.invoiceItems?.some(
@@ -446,6 +515,24 @@ servicesRouter.put(
           );
         }
 
+        const targetAnimalId = payload.animalId ?? existing.animalId;
+        let appointmentForLink: Awaited<ReturnType<typeof tx.appointment.findUnique>> | null = null;
+
+        if (payload.appointmentId) {
+          if (currentAppointmentId && payload.appointmentId !== currentAppointmentId) {
+            throw new HttpError(400, 'Atendimento já está vinculado a outro agendamento.');
+          }
+
+          appointmentForLink = await ensureAppointmentForService(
+            tx,
+            payload.appointmentId,
+            targetAnimalId,
+            id,
+          );
+        } else if (currentAppointmentId) {
+          appointmentForLink = existing.appointment ?? null;
+        }
+
         const updateData: Prisma.ServicoUpdateInput = {};
 
         if (payload.animalId !== undefined) {
@@ -459,6 +546,12 @@ servicesRouter.put(
         }
         if (payload.observacoes !== undefined) {
           updateData.observacoes = payload.observacoes ?? null;
+        }
+
+        if (payload.appointmentId !== undefined) {
+          updateData.appointment = { connect: { id: payload.appointmentId } };
+        } else if (!existing.appointmentId && existing.appointment) {
+          updateData.appointment = { connect: { id: existing.appointment.id } };
         }
 
         let resolvedPrice: number | undefined = payload.preco;
@@ -577,6 +670,13 @@ servicesRouter.put(
         await syncInvoiceForService(tx, id, {
           responsibleId: updated.responsavelId ?? req.user?.id ?? null,
         });
+
+        if (appointmentForLink) {
+          await concludeAppointmentForService(tx, appointmentForLink, updated.id, {
+            notes: payload.observacoes ?? existing.observacoes ?? null,
+            completedAt: updated.data,
+          });
+        }
 
         return updated;
       });

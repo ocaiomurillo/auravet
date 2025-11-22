@@ -83,10 +83,12 @@ model Servico {
   observacoes  String?
   createdAt    DateTime    @default(now())
   responsavelId String?
+  appointmentId String?    @unique
   items        ServiceProductUsage[]
   catalogItems ServiceCatalogUsage[]
   notes        ServiceNote[]
-  appointment  Appointment? @relation("AppointmentService")
+  appointment  Appointment? @relation("ServiceAppointment", fields: [appointmentId], references: [id])
+  appointmentFromService Appointment? @relation("AppointmentService")
   invoiceItems InvoiceItem[]
   responsavel  User?        @relation("ServiceResponsavel", fields: [responsavelId], references: [id])
 }
@@ -191,6 +193,7 @@ model Appointment {
   veterinarian  User       @relation("VeterinarianAppointments", fields: [veterinarianId], references: [id])
   assistant     User?      @relation("AssistantAppointments", fields: [assistantId], references: [id])
   service       Servico?   @relation("AppointmentService", fields: [serviceId], references: [id])
+  serviceRecord Servico?   @relation("ServiceAppointment")
 }
 
 model Product {
