@@ -16,10 +16,13 @@ auravet/
 ```
 
 ## 🧰 Tecnologias principais
-- Node.js 20 + Express, Prisma ORM, Swagger
-- React 18, Vite, TailwindCSS, React Query
-- PostgreSQL 16
-- Husky, ESLint, Prettier, TypeScript estrito
+| Categoria | Tecnologias | Papel | Por que escolhemos |
+| --- | --- | --- | --- |
+| Backend | Node.js 20, Express 4, Prisma, Zod, Swagger UI | Servir a API REST, validar entrada e manter schema/migrações do banco. | Ecossistema consolidado, baixo tempo de boot (Express) e produtividade com schema typesafe do Prisma + Zod. Swagger UI facilita descoberta de rotas. |
+| Frontend | React 18, Vite 5, TailwindCSS 3, React Router 6, React Query 5, React Hook Form 7, Headless UI, Radix Slot, Sonner, Heroicons | Construir SPA performática, roteada e com formulários e estados assíncronos previsíveis. | Vite entrega DX rápida, Tailwind acelera UI consistente e React Query/Hook Form simplificam cache e validação de formulários. Biblioteca de ícones e componentes headless evitam reinventar acessibilidade. |
+| Banco de dados | PostgreSQL 16 | Armazenamento relacional de produção. | Estável, com tipos fortes e suporte nativo a migrações/versionamento via Prisma. |
+| APIs e comunicação | REST + Swagger (`/docs`), CORS configurado, consumo via `VITE_API_URL` | Documentar e expor contratos HTTP e permitir chamadas seguras do front. | Swagger mantém documentação viva; CORS controlado evita vazamentos; `VITE_API_URL` injeta o endpoint correto no build. |
+| Build, testes e qualidade | TypeScript estrito, TSX, ESLint, Prettier, Husky + lint-staged, npm workspaces, Docker Compose, Node Test Runner (API) | Garantir compilação, lint, formatação e ganchos de commit; gerenciar monorepo e infraestrutura local/Docker. | Ferramentas padrão do ecossistema Node, automatizam checagens antes dos commits e fornecem ambientes reprodutíveis (Compose). |
 
 ## ✅ Pré-requisitos
 | Cenário | Dependências |
@@ -90,12 +93,13 @@ Se preferir um passo a passo manual, use as seções abaixo.
    - O seed cria o usuário administrador (email e senha definidos em `.env`).
 
 5. **Executar em modo desenvolvimento**
-   ```bash
-   npm run dev
-   ```
-   - API: `http://localhost:4000`
-   - Swagger: `http://localhost:4000/docs`
-   - Frontend: `http://localhost:5173`
+ ```bash
+  npm run dev
+  ```
+  - O script usa `concurrently` para rodar **Express (API)** via `tsx watch` e o **Vite** do frontend lado a lado.
+  - API: `http://localhost:4000`
+  - Swagger: `http://localhost:4000/docs`
+  - Frontend: `http://localhost:5173`
 
 6. **Executar serviços individualmente (opcional)**
    ```bash
