@@ -1,5 +1,7 @@
+import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 
+import { env } from '../config/env';
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
 import { requirePermission } from '../middlewares/require-permission';
@@ -17,6 +19,19 @@ import { serializeAnimal, serializeService } from '../utils/serializers';
 export const animalsRouter = Router();
 
 animalsRouter.use(authenticate);
+
+const serviceNotesEnabled = env.SERVICE_NOTES_ENABLED;
+
+const serviceNotesInclude = serviceNotesEnabled
+  ? Prisma.validator<Prisma.ServiceNoteFindManyArgs>()({
+      include: {
+        author: {
+          select: { id: true, nome: true, email: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+  : undefined;
 
 const parseDate = (value: string | undefined) => {
   if (!value) return undefined;
@@ -47,6 +62,7 @@ animalsRouter.get(
                 product: true,
               },
             },
+            notes: serviceNotesInclude ?? false,
           },
         },
       },
@@ -88,6 +104,7 @@ animalsRouter.post(
                 product: true,
               },
             },
+            notes: serviceNotesInclude ?? false,
           },
           orderBy: { data: 'desc' },
         },
@@ -116,6 +133,7 @@ animalsRouter.get(
                 product: true,
               },
             },
+            notes: serviceNotesInclude ?? false,
           },
         },
       },
@@ -155,14 +173,7 @@ animalsRouter.get(
             definition: true,
           },
         },
-        notes: {
-          include: {
-            author: {
-              select: { id: true, nome: true, email: true },
-            },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
+        notes: serviceNotesInclude ?? false,
         responsavel: {
           select: {
             id: true,
@@ -215,14 +226,7 @@ animalsRouter.put(
                 definition: true,
               },
             },
-            notes: {
-              include: {
-                author: {
-                  select: { id: true, nome: true, email: true },
-                },
-              },
-              orderBy: { createdAt: 'asc' },
-            },
+            notes: serviceNotesInclude ?? false,
             responsavel: {
               select: {
                 id: true,

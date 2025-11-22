@@ -18,6 +18,10 @@ const envSchema = z.object({
   PASSWORD_SALT_ROUNDS: z.coerce.number().min(4).default(10),
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1000).default(60_000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().min(1).default(10),
+  SERVICE_NOTES_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 
 const parsed = envSchema.safeParse(process.env);
