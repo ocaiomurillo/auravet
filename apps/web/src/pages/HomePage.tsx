@@ -67,7 +67,7 @@ const HomePage = () => {
           canCreateAttendances ? (
             <Button asChild variant="primary">
               <Link to="/new-service" className="flex items-center gap-2">
-                <PlusCircleIcon className="h-5 w-5" /> Registrar Atendimento
+                <PlusCircleIcon className="h-5 w-5" /> Atendimento
               </Link>
             </Button>
           ) : null
@@ -130,11 +130,11 @@ const HomePage = () => {
       {canViewAttendances ? (
         <Card
           title="Atendimentos"
-          description="Monitore atendimentos — consultas, exames, vacinas e cirurgias — com filtros inteligentes."
+          description="Monitore atendimentos — consultas, exames, vacinas e cirurgias."
           actions={
             <Button variant="secondary" asChild>
               <Link to="/appointments" className="flex items-center gap-2">
-                <ArrowRightCircleIcon className="h-5 w-5" /> Acessar agenda de atendimentos
+                <ArrowRightCircleIcon className="h-5 w-5" /> Acessar
               </Link>
             </Button>
           }
