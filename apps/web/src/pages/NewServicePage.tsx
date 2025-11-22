@@ -19,6 +19,7 @@ import type {
   Product,
 } from '../types/api';
 import { formatApiErrorMessage, type ApiErrorLike } from '../utils/apiErrors';
+import { buildAttendancePdf } from '../utils/attendancePdf';
 
 interface AttendanceProductItemFormValue {
   productId: string;
@@ -542,6 +543,25 @@ const NewServicePage = () => {
     onError: (err: unknown) => {
       const message = formatErrorMessage(err, 'Não foi possível atualizar o atendimento.');
       setSubmitError(message);
+      toast.error(message);
+    },
+  });
+
+  const attendancePdf = useMutation({
+    mutationFn: async () => {
+      if (!serviceId) {
+        throw new Error('Atendimento precisa ser salvo antes de gerar o PDF.');
+      }
+
+      const service = await servicesApi.getById(serviceId);
+      await buildAttendancePdf(service);
+    },
+    onSuccess: () => {
+      toast.success('PDF do atendimento gerado.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Não foi possível gerar o PDF do atendimento. Tente novamente.';
       toast.error(message);
     },
   });
@@ -1197,7 +1217,21 @@ const NewServicePage = () => {
             </div>
           ) : null}
 
-          <div className="md:col-span-2 flex justify-end gap-3">
+          <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={
+                !serviceId ||
+                attendancePdf.isPending ||
+                createAttendance.isPending ||
+                updateAttendance.isPending ||
+                isLoadingAttendance
+              }
+              onClick={() => attendancePdf.mutate()}
+            >
+              {attendancePdf.isPending ? 'Gerando PDF...' : 'Gerar PDF do atendimento'}
+            </Button>
             <Button
               type="button"
               variant="ghost"
