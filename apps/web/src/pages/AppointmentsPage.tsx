@@ -25,7 +25,7 @@ const statusLabels: Record<Appointment['status'], string> = {
   CANCELADO: 'Cancelado',
 };
 
-const attendanceTypeLabels: Record<AttendanceType, string> = {
+const attendanceTypeLabels: Partial<Record<AttendanceType | string, string>> = {
   CONSULTA: 'Consulta',
   EXAME: 'Exame',
   VACINACAO: 'Vacinação',
@@ -33,12 +33,24 @@ const attendanceTypeLabels: Record<AttendanceType, string> = {
   OUTROS: 'Outros cuidados',
 };
 
+const getAttendanceTypeLabel = (tipo?: string | null) => {
+  if (!tipo) return 'Tipo não informado';
+  if (attendanceTypeLabels[tipo]) return attendanceTypeLabels[tipo] as string;
+
+  const humanizedType = tipo
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/^\p{L}/u, (letter) => letter.toUpperCase());
+
+  return humanizedType || 'Tipo não informado';
+};
+
 interface AppointmentFormState {
   ownerId: string;
   animalId: string;
   veterinarianId: string;
   assistantId: string;
-  tipo: AttendanceType;
+  tipo: AttendanceType | '';
   status: Appointment['status'];
   scheduledStart: string;
   scheduledEnd: string;
@@ -94,7 +106,7 @@ const AppointmentsPage = () => {
     animalId: '',
     veterinarianId: '',
     assistantId: '',
-    tipo: 'CONSULTA',
+    tipo: '',
     status: 'AGENDADO',
     scheduledStart: '',
     scheduledEnd: '',
@@ -251,7 +263,7 @@ const AppointmentsPage = () => {
     onSuccess: (response) => {
       const { appointment } = response;
       toast.success(
-        `Agendamento de ${attendanceTypeLabels[appointment.tipo] ?? appointment.tipo} criado com sucesso.`,
+        `Agendamento de ${getAttendanceTypeLabel(appointment.tipo)} criado com sucesso.`,
       );
       if (appointment.availability.veterinarianConflict || appointment.availability.assistantConflict) {
         toast.warning(
@@ -265,7 +277,7 @@ const AppointmentsPage = () => {
         animalId: '',
         veterinarianId: '',
         assistantId: '',
-        tipo: 'CONSULTA',
+        tipo: '',
         status: 'AGENDADO',
         scheduledStart: '',
         scheduledEnd: '',
@@ -301,7 +313,7 @@ const AppointmentsPage = () => {
       animalId: '',
       veterinarianId: '',
       assistantId: '',
-      tipo: 'CONSULTA',
+      tipo: '',
       status: 'AGENDADO',
       scheduledStart: '',
       scheduledEnd: '',
@@ -355,12 +367,14 @@ const AppointmentsPage = () => {
       return;
     }
 
+    const attendanceType = createForm.tipo as AttendanceType;
+
     createMutation.mutate({
       ownerId: createForm.ownerId,
       animalId: createForm.animalId,
       veterinarianId: createForm.veterinarianId,
       assistantId: createForm.assistantId || undefined,
-      tipo: createForm.tipo,
+      tipo: attendanceType,
       scheduledStart: startDate.toISOString(),
       scheduledEnd: endDate.toISOString(),
       status: createForm.status,
@@ -516,7 +530,7 @@ const AppointmentsPage = () => {
                       {appointment.durationMinutes} min
                     </p>
                     <p className="text-sm text-brand-grafite/70">
-                      Tipo de atendimento: {attendanceTypeLabels[appointment.tipo] ?? appointment.tipo}
+                      Tipo de atendimento: {getAttendanceTypeLabel(appointment.tipo)}
                     </p>
                     <p className="text-sm text-brand-grafite/70">
                       Tutor(a): {appointment.owner.nome} • Veterinário(a): {appointment.veterinarian.nome}
@@ -739,11 +753,14 @@ const AppointmentsPage = () => {
             onChange={(event) =>
               setCreateForm((prev) => ({
                 ...prev,
-                tipo: event.target.value as AttendanceType,
+                tipo: event.target.value as AttendanceType | '',
               }))
             }
             required
           >
+            <option value="" disabled>
+              Selecione o tipo de atendimento
+            </option>
             {Object.entries(attendanceTypeLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
