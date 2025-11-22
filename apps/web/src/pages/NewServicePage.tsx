@@ -109,7 +109,11 @@ const NewServicePage = () => {
     [],
   );
 
-  const isEditing = Boolean(serviceId);
+  const isExistingAttendance = Boolean(serviceId);
+  const isViewing = searchParams.get('mode') === 'view';
+  const isEditing = isExistingAttendance && !isViewing;
+  const shouldDisableBaseFields = isExistingAttendance || isViewing;
+  const isFormReadOnly = isViewing;
 
   const { register, handleSubmit, watch, reset, setValue, control, trigger, getValues } =
     useForm<AttendanceFormValues>({
@@ -189,7 +193,7 @@ const NewServicePage = () => {
   const { data: attendance, isFetching: isLoadingAttendance } = useQuery({
     queryKey: ['attendance', serviceId],
     queryFn: () => servicesApi.getById(serviceId ?? ''),
-    enabled: isEditing && Boolean(serviceId),
+    enabled: isExistingAttendance && Boolean(serviceId),
   });
 
   const selectedAnimal = useMemo(
@@ -665,7 +669,8 @@ const NewServicePage = () => {
   const disableSubmit =
     createAttendance.isPending ||
     updateAttendance.isPending ||
-    (isEditing && isLoadingAttendance) ||
+    isViewing ||
+    (isExistingAttendance && isLoadingAttendance) ||
     insufficientStock ||
     hasDuplicateItems ||
     hasDuplicateCatalogItems ||
@@ -673,6 +678,10 @@ const NewServicePage = () => {
     hasInvalidSchedule;
 
   const onSubmit = handleSubmit(({ items: formItems, catalogItems: formCatalogItems, ...values }) => {
+    if (isViewing) {
+      return;
+    }
+
     if (!values.animalId) {
       toast.error('Selecione um pet para registrar o atendimento.');
       return;
@@ -831,17 +840,23 @@ const NewServicePage = () => {
     setSubmitError(null);
     setLastPayload(payload);
 
-    if (isEditing && serviceId) {
+    if (isExistingAttendance && serviceId) {
       updateAttendance.mutate({ id: serviceId, payload });
     } else {
       createAttendance.mutate(payload);
     }
   });
 
-  const pageTitle = isEditing ? 'Editar atendimento' : 'Registrar Atendimento';
-  const pageDescription = isEditing
-    ? 'Atualize serviços, insumos e entradas do prontuário mantendo o histórico organizado.'
-    : 'Combine múltiplos serviços do catálogo e produtos utilizados para gerar um atendimento completo.';
+  const pageTitle = isViewing
+    ? 'Visualizar atendimento'
+    : isExistingAttendance
+      ? 'Editar atendimento'
+      : 'Registrar Atendimento';
+  const pageDescription = isViewing
+    ? 'Campos bloqueados para visualização. Gere o PDF ou volte para editar o atendimento.'
+    : isExistingAttendance
+      ? 'Atualize serviços, insumos e entradas do prontuário mantendo o histórico organizado.'
+      : 'Combine múltiplos serviços do catálogo e produtos utilizados para gerar um atendimento completo.';
 
   return (
     <div className="space-y-6">
@@ -865,7 +880,7 @@ const NewServicePage = () => {
               label="Agendamento (opcional)"
               value={selectedAppointmentId}
               onChange={(event) => setSelectedAppointmentId(event.target.value)}
-              disabled={Boolean(isEditing && attendance?.appointmentId)}
+              disabled={Boolean(isExistingAttendance && attendance?.appointmentId) || isFormReadOnly}
             >
               <option value="">Registrar sem agendamento</option>
               {linkedAppointmentFallbackLabel ? (
@@ -882,7 +897,7 @@ const NewServicePage = () => {
           </div>
 
           <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
-            <SelectField label="Pet" required {...register('animalId')}>
+            <SelectField label="Pet" required disabled={shouldDisableBaseFields} {...register('animalId')}>
               <option value="">Selecione um pet</option>
               {animals?.map((animal) => (
                 <option key={animal.id} value={animal.id}>
@@ -895,7 +910,8 @@ const NewServicePage = () => {
               label="Tutor"
               value={selectedAnimal ? selectedAnimal.owner?.nome ?? '—' : ''}
               placeholder="Selecione um pet"
-              readOnly
+              readOnly={shouldDisableBaseFields}
+              disabled={isFormReadOnly}
               helperText={tutorHelperText}
               error={
                 petWithoutTutor ? 'Vincule um tutor ao pet antes de registrar o atendimento.' : undefined
@@ -909,6 +925,8 @@ const NewServicePage = () => {
               type="datetime-local"
               required
               {...register('data')}
+              readOnly={shouldDisableBaseFields}
+              disabled={isFormReadOnly}
             />
 
             <Field
@@ -916,11 +934,18 @@ const NewServicePage = () => {
               type="datetime-local"
               helperText="Opcional: preencha ao concluir para registrar a duração."
               {...register('fim')}
+              readOnly={shouldDisableBaseFields}
+              disabled={isFormReadOnly}
             />
           </div>
 
           <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
-            <SelectField label="Profissional responsável" required {...register('responsavelId')}>
+            <SelectField
+              label="Profissional responsável"
+              required
+              disabled={shouldDisableBaseFields}
+              {...register('responsavelId')}
+            >
               <option value="">Selecione um responsável</option>
               {availableResponsibles.map((responsible) => (
                 <option key={responsible.id} value={responsible.id}>
@@ -929,7 +954,7 @@ const NewServicePage = () => {
               ))}
             </SelectField>
 
-            <SelectField label="Profissional assistente" {...register('assistantId')}>
+            <SelectField label="Profissional assistente" disabled={shouldDisableBaseFields} {...register('assistantId')}>
               <option value="">Sem assistente</option>
               {availableAssistants.map((assistant) => (
                 <option key={assistant.id} value={assistant.id}>
@@ -953,7 +978,7 @@ const NewServicePage = () => {
                     observacoes: '',
                   })
                 }
-                disabled={!availableDefinitions.length}
+                disabled={isFormReadOnly || !availableDefinitions.length}
               >
                 Adicionar serviço
               </Button>
@@ -986,6 +1011,7 @@ const NewServicePage = () => {
                         label="Serviço"
                         required
                         helperText={definition?.descricao ?? 'Selecione um serviço do catálogo'}
+                        disabled={isFormReadOnly}
                         {...definitionRegister}
                         onChange={(event) => {
                           definitionRegister.onChange(event);
@@ -1005,6 +1031,8 @@ const NewServicePage = () => {
                         min="1"
                         step="1"
                         required
+                        readOnly={isFormReadOnly}
+                        disabled={isFormReadOnly}
                         {...register(`catalogItems.${index}.quantidade` as const)}
                       />
                       <Field
@@ -1013,6 +1041,8 @@ const NewServicePage = () => {
                         min="0"
                         step="0.01"
                         required
+                        readOnly={isFormReadOnly}
+                        disabled={isFormReadOnly}
                         {...register(`catalogItems.${index}.precoUnitario` as const)}
                       />
                     </div>
@@ -1020,6 +1050,8 @@ const NewServicePage = () => {
                       Observações
                       <textarea
                         {...register(`catalogItems.${index}.observacoes` as const)}
+                        disabled={isFormReadOnly}
+                        readOnly={isFormReadOnly}
                         className="mt-1 w-full rounded-xl border border-brand-azul/40 bg-white/90 px-4 py-2 text-sm text-brand-grafite focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/40"
                         rows={2}
                         placeholder="Detalhes relevantes sobre este serviço"
@@ -1030,7 +1062,12 @@ const NewServicePage = () => {
                     ) : null}
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-brand-grafite/80">
                       <span>Subtotal: R$ {detail.subtotal.toFixed(2)}</span>
-                      <Button type="button" variant="ghost" onClick={() => removeCatalogItem(index)}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={isFormReadOnly}
+                        onClick={() => removeCatalogItem(index)}
+                      >
                         Remover
                       </Button>
                     </div>
@@ -1083,7 +1120,7 @@ const NewServicePage = () => {
                 type="button"
                 variant="secondary"
                 onClick={() => append({ productId: '', quantidade: '1', precoUnitario: '' })}
-                disabled={!availableProducts.length}
+                disabled={isFormReadOnly || !availableProducts.length}
               >
                 Adicionar produto
               </Button>
@@ -1121,6 +1158,7 @@ const NewServicePage = () => {
                         label="Produto"
                         required
                         helperText={stockHelper}
+                        disabled={isFormReadOnly}
                         {...productRegister}
                         onChange={(event) => {
                           productRegister.onChange(event);
@@ -1141,6 +1179,8 @@ const NewServicePage = () => {
                         min="1"
                         step="1"
                         required
+                        readOnly={isFormReadOnly}
+                        disabled={isFormReadOnly}
                         {...register(`items.${index}.quantidade` as const)}
                       />
                       <Field
@@ -1150,6 +1190,7 @@ const NewServicePage = () => {
                         step="0.01"
                         required
                         readOnly={!canOverrideProductPrice}
+                        disabled={isFormReadOnly}
                         helperText={
                           canOverrideProductPrice
                             ? undefined
@@ -1178,7 +1219,12 @@ const NewServicePage = () => {
                     ) : null}
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-brand-grafite/80">
                       <span>Subtotal: R$ {detail.subtotal.toFixed(2)}</span>
-                      <Button type="button" variant="ghost" onClick={() => remove(index)}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={isFormReadOnly}
+                        onClick={() => remove(index)}
+                      >
                         Remover
                       </Button>
                     </div>
@@ -1242,6 +1288,8 @@ const NewServicePage = () => {
                 <textarea
                   value={noteDraft}
                   onChange={(event) => setNoteDraft(event.target.value)}
+                  readOnly={isFormReadOnly}
+                  disabled={isFormReadOnly}
                   className="mt-1 w-full rounded-xl border border-brand-azul/60 bg-white/90 px-4 py-3 text-sm text-brand-grafite focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/50"
                   rows={3}
                   placeholder="Descreva evolução clínica, condutas e orientações."
@@ -1251,7 +1299,12 @@ const NewServicePage = () => {
                 <Button
                   type="button"
                   onClick={handleAddNote}
-                  disabled={noteDraft.trim().length === 0 || createAttendance.isPending || updateAttendance.isPending}
+                  disabled={
+                    isFormReadOnly ||
+                    noteDraft.trim().length === 0 ||
+                    createAttendance.isPending ||
+                    updateAttendance.isPending
+                  }
                 >
                   Registrar entrada
                 </Button>
@@ -1295,9 +1348,9 @@ const NewServicePage = () => {
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={createAttendance.isPending || updateAttendance.isPending}
+                      disabled={isViewing || createAttendance.isPending || updateAttendance.isPending}
                       onClick={() => {
-                        if (isEditing && serviceId) {
+                        if (isExistingAttendance && serviceId) {
                           updateAttendance.mutate({ id: serviceId, payload: lastPayload });
                         } else {
                           createAttendance.mutate(lastPayload as CreateAttendancePayload);
@@ -1338,6 +1391,7 @@ const NewServicePage = () => {
             <Button
               type="button"
               variant="ghost"
+              disabled={isFormReadOnly}
               onClick={() => {
                 reset({
                   animalId: '',
@@ -1357,9 +1411,11 @@ const NewServicePage = () => {
             <Button type="submit" disabled={disableSubmit}>
               {createAttendance.isPending || updateAttendance.isPending
                 ? 'Salvando atendimento...'
-                : isEditing
-                  ? 'Salvar atendimento'
-                  : 'Registrar Atendimento'}
+                : isViewing
+                  ? 'Visualização'
+                  : isEditing
+                    ? 'Salvar atendimento'
+                    : 'Registrar Atendimento'}
             </Button>
           </div>
         </form>
