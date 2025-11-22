@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -27,6 +27,12 @@ interface ProductFormValues {
   isSellable: 'true' | 'false';
 }
 
+interface FiltersState {
+  search: string;
+  status: 'all' | 'active' | 'inactive';
+  sellable: 'all' | 'sellable' | 'unsellable';
+}
+
 interface StockFormValues {
   amount: number;
 }
@@ -51,6 +57,11 @@ const ProductsPage = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
+  const [filters, setFilters] = useState<FiltersState>({
+    search: '',
+    status: 'all',
+    sellable: 'all',
+  });
 
   const {
     data: products,
@@ -208,6 +219,108 @@ const ProductsPage = () => {
     adjustStock.mutate({ id: stockProduct.id, amount: values.amount });
   });
 
+  const sortedProducts = useMemo(() => {
+    return (products ?? []).slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = filters.search.trim().toLowerCase();
+
+    return sortedProducts.filter((product) => {
+      const matchesSearch = normalizedSearch ? product.nome.toLowerCase().includes(normalizedSearch) : true;
+      const matchesStatus =
+        filters.status === 'all'
+          ? true
+          : filters.status === 'active'
+            ? product.isActive
+            : !product.isActive;
+      const matchesSellable =
+        filters.sellable === 'all'
+          ? true
+          : filters.sellable === 'sellable'
+            ? product.isSellable
+            : !product.isSellable;
+
+      return matchesSearch && matchesStatus && matchesSellable;
+    });
+  }, [filters, sortedProducts]);
+
+  const handleFiltersReset = () => {
+    setFilters({ search: '', status: 'all', sellable: 'all' });
+  };
+
+  const buildExportRows = () =>
+    filteredProducts.map((product) => ({
+      Nome: product.nome,
+      'Preço de venda': product.precoVenda.toFixed(2),
+      'Estoque atual': product.estoqueAtual,
+      Status: product.isActive ? 'Ativo' : 'Inativo',
+      Disponibilidade: product.isSellable ? 'Disponível para venda' : 'Indisponível para venda',
+    }));
+
+  const handleExportCsv = () => {
+    if (!filteredProducts.length) {
+      toast.error('Nenhum produto encontrado para exportação.');
+      return;
+    }
+
+    const exportHeaders = ['Nome', 'Preço de venda', 'Estoque atual', 'Status', 'Disponibilidade'] as const;
+    const rows = buildExportRows().map((row) => exportHeaders.map((header) => row[header]));
+    const csvContent = [exportHeaders, ...rows]
+      .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `auravet-produtos-${Date.now()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Exportação em CSV preparada.');
+  };
+
+  const handleExportXlsx = () => {
+    if (!filteredProducts.length) {
+      toast.error('Nenhum produto encontrado para exportação.');
+      return;
+    }
+
+    const exportHeaders = ['Nome', 'Preço de venda', 'Estoque atual', 'Status', 'Disponibilidade'] as const;
+    const rows = [exportHeaders, ...buildExportRows().map((row) => exportHeaders.map((header) => row[header]))];
+    const escapeXml = (value: string | number) =>
+      String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    const xmlRows = rows
+      .map(
+        (row) =>
+          `<Row>${row
+            .map((cell) => `<Cell><Data ss:Type="String">${escapeXml(cell)}</Data></Cell>`)
+            .join('')}</Row>`,
+      )
+      .join('');
+    const xmlContent = `<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Produtos"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
+
+    const blob = new Blob([xmlContent], {
+      type: 'application/vnd.ms-excel',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `auravet-produtos-${Date.now()}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Exportação em XLSX preparada.');
+  };
+
   const currencyFormatter = new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
@@ -229,14 +342,69 @@ const ProductsPage = () => {
       </div>
 
       <Card
+        title="Filtros do catálogo"
+        description="Busque produtos por nome, status e disponibilidade."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={handleExportCsv} disabled={isLoading}>
+              Exportar CSV
+            </Button>
+            <Button variant="secondary" onClick={handleExportXlsx} disabled={isLoading}>
+              Exportar XLSX
+            </Button>
+            <Button variant="ghost" onClick={handleFiltersReset} disabled={isLoading}>
+              Limpar filtros
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-4">
+          <Field
+            label="Buscar por nome"
+            value={filters.search}
+            onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
+            placeholder="Digite parte do nome"
+            className="md:col-span-2"
+          />
+          <SelectField
+            label="Status"
+            value={filters.status}
+            onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value as FiltersState['status'] }))}
+          >
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="inactive">Inativos</option>
+          </SelectField>
+          <SelectField
+            label="Disponibilidade"
+            value={filters.sellable}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, sellable: event.target.value as FiltersState['sellable'] }))
+            }
+          >
+            <option value="all">Todas</option>
+            <option value="sellable">Disponível para venda</option>
+            <option value="unsellable">Indisponível para venda</option>
+          </SelectField>
+        </div>
+      </Card>
+
+      <Card
         title="Controle de prateleira"
         description="Consulte valores, estoque mínimo e status para decisões rápidas e cuidadosas."
+        actions={
+          !isLoading && products?.length ? (
+            <p className="text-sm text-brand-grafite/70">
+              Exibindo {filteredProducts.length} de {products.length} produtos
+            </p>
+          ) : null
+        }
       >
         {isLoading ? <p>Carregando produtos...</p> : null}
         {error ? <p className="text-red-500">Não foi possível carregar os produtos.</p> : null}
-        {products?.length ? (
+        {filteredProducts.length ? (
           <ul className="space-y-3">
-            {products.map((product) => (
+            {filteredProducts.map((product) => (
               <li
                 key={product.id}
                 className="flex flex-col gap-3 rounded-2xl border border-brand-azul/30 bg-white/80 p-4 md:flex-row md:items-center md:justify-between"
@@ -247,7 +415,7 @@ const ProductsPage = () => {
                     <p className="text-sm text-brand-grafite/70">{product.descricao}</p>
                   ) : null}
                   <p className="text-sm text-brand-grafite/70">
-                    Custo: {currencyFormatter.format(product.custo)} • Preço de venda:{' '}
+                    Custo: {currencyFormatter.format(product.custo)} • Preço de venda{' '}
                     {currencyFormatter.format(product.precoVenda)}
                   </p>
                   <p className="text-sm text-brand-grafite/70">
@@ -290,6 +458,9 @@ const ProductsPage = () => {
               </li>
             ))}
           </ul>
+        ) : null}
+        {!isLoading && !!products?.length && !filteredProducts.length ? (
+          <p className="text-sm text-brand-grafite/70">Nenhum produto encontrado com os filtros selecionados.</p>
         ) : null}
         {!isLoading && !products?.length ? (
           <p className="text-sm text-brand-grafite/70">
