@@ -194,6 +194,8 @@ export const serviceDefinitionsApi = {
   list: () => apiClient.get<ServiceDefinition[]>('/service-definitions'),
   create: (payload: CreateServiceDefinitionPayload) =>
     apiClient.post<ServiceDefinition>('/service-definitions', payload),
+  update: (id: string, payload: CreateServiceDefinitionPayload) =>
+    apiClient.put<ServiceDefinition>(`/service-definitions/${id}`, payload),
 };
 
 export const dashboardApi = {
