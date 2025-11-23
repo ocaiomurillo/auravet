@@ -48,9 +48,13 @@ export const invoiceInstallmentSchema = z.object({
 
 export const invoicePaymentSchema = z.object({
   paymentMethod: paymentMethodSchema,
-  paymentCondition: paymentConditionSchema,
+  paymentCondition: paymentConditionSchema.optional(),
+  paymentConditionId: z.string().cuid().optional(),
   installments: z.array(invoiceInstallmentSchema).min(1, 'Informe ao menos uma parcela.'),
   paymentNotes: z.string().max(500).optional(),
+}).refine((value) => Boolean(value.paymentCondition || value.paymentConditionId), {
+  message: 'Selecione uma condição de pagamento.',
+  path: ['paymentCondition'],
 });
 
 export const invoiceAdjustmentSchema = z.object({

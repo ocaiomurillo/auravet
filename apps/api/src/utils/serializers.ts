@@ -151,6 +151,7 @@ export type SerializedInvoice = {
   id: string;
   ownerId: string;
   status: { id: string; slug: string; name: string };
+  paymentConditionId: string | null;
   paymentConditionDetails: {
     id: string;
     nome: string;
@@ -683,6 +684,7 @@ export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoi
       slug: invoice.status.slug,
       name: invoice.status.name,
     },
+    paymentConditionId: invoice.paymentConditionId ?? null,
     paymentConditionDetails: invoice.paymentCondition
       ? {
           id: invoice.paymentCondition.id,
