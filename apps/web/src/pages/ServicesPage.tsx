@@ -14,6 +14,7 @@ import type { AttendanceType, ServiceDefinition, ServiceProfessional } from '../
 import { serviceDefinitionCreateSchema } from '../schema/serviceDefinition';
 import type { ServiceDefinitionCreateOutput } from '../schema/serviceDefinition';
 import { formatApiErrorMessage } from '../utils/apiErrors';
+import { createXlsxBlob, downloadBlob } from '../utils/xlsxExport';
 
 type ProfessionalOptionValue = ServiceProfessional | '';
 
@@ -202,64 +203,20 @@ const ServicesPage = () => {
       Descrição: definition.descricao ?? '',
     }));
 
-  const handleExportCsv = () => {
-    if (!filteredDefinitions.length) {
-      toast.error('Nenhum serviço encontrado para exportação.');
-      return;
-    }
-
-    const rows = buildExportRows().map((row) => exportHeaders.map((header) => row[header]));
-    const csvContent = [exportHeaders, ...rows]
-      .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `auravet-servicos-${Date.now()}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success('Exportação em CSV preparada.');
-  };
-
   const handleExportXlsx = () => {
     if (!filteredDefinitions.length) {
       toast.error('Nenhum serviço encontrado para exportação.');
       return;
     }
 
-    const rows = [exportHeaders, ...buildExportRows().map((row) => exportHeaders.map((header) => row[header]))];
-    const escapeXml = (value: string) =>
-      value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-    const xmlRows = rows
-      .map(
-        (row) =>
-          `<Row>${row
-            .map((cell) => `<Cell><Data ss:Type="String">${escapeXml(String(cell))}</Data></Cell>`)
-            .join('')}</Row>`,
-      )
-      .join('');
-    const xmlContent = `<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Serviços"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
-
-    const blob = new Blob([xmlContent], {
-      type: 'application/vnd.ms-excel',
+    const rows = buildExportRows().map((row) => exportHeaders.map((header) => row[header]));
+    const blob = createXlsxBlob({
+      sheetName: 'Serviços',
+      headers: exportHeaders,
+      rows,
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `auravet-servicos-${Date.now()}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+
+    downloadBlob(blob, `auravet-servicos-${Date.now()}.xlsx`);
     toast.success('Exportação em XLSX preparada.');
   };
 
@@ -284,9 +241,6 @@ const ServicesPage = () => {
         description="Busque por nome, tipo ou profissional/função."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" onClick={handleExportCsv} disabled={isLoading}>
-              Exportar CSV
-            </Button>
             <Button variant="secondary" onClick={handleExportXlsx} disabled={isLoading}>
               Exportar XLSX
             </Button>
