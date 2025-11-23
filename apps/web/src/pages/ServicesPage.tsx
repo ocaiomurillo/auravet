@@ -226,7 +226,7 @@ const ServicesPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Catálogo de serviços</h1>
+          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Serviços</h1>
           <p className="text-sm text-brand-grafite/70">
             Cadastre os serviços que serão utilizados nos atendimentos, incluindo valores sugeridos e profissional/função.
           </p>
@@ -242,7 +242,7 @@ const ServicesPage = () => {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" onClick={handleExportXlsx} disabled={isLoading}>
-              Exportar XLSX
+              Exportar para Excel
             </Button>
             <Button variant="ghost" onClick={handleFiltersReset} disabled={isLoading}>
               Limpar filtros
@@ -288,7 +288,7 @@ const ServicesPage = () => {
       </Card>
 
       <Card title="Serviços cadastrados" description="Use estes serviços ao registrar novos atendimentos.">
-        {isLoading ? <p>Carregando catálogo...</p> : null}
+        {isLoading ? <p>Carregando serviços...</p> : null}
         {loadErrorMessage ? <p className="text-red-500">{loadErrorMessage}</p> : null}
         {!isLoading && !filteredDefinitions.length ? (
           <p className="text-sm text-brand-grafite/70">Nenhum serviço encontrado com os filtros selecionados.</p>
@@ -323,7 +323,7 @@ const ServicesPage = () => {
 
                 {definition.profissional ? (
                   <p className="text-sm text-brand-grafite/80">
-                    Profissional/Função: {professionalLabels[definition.profissional] ?? definition.profissional}
+                    Profissional Indicado: {professionalLabels[definition.profissional] ?? definition.profissional}
                   </p>
                 ) : null}
                 {definition.descricao ? (
@@ -339,7 +339,7 @@ const ServicesPage = () => {
         open={isFormModalOpen}
         onClose={handleCloseFormModal}
         title={editingDefinition ? 'Editar serviço' : 'Novo serviço'}
-        description="Organize seu catálogo para agilizar futuros atendimentos."
+        description="Cadastre serviços para agilizar futuros atendimentos."
         actions={
           <>
             <Button variant="ghost" onClick={handleCloseFormModal} disabled={isSavingDefinition}>
@@ -369,7 +369,7 @@ const ServicesPage = () => {
             ))}
           </SelectField>
           <SelectField
-            label="Profissional ou função"
+            label="Profissional indicado"
             {...register('profissional')}
           >
             <option value="">Selecione uma opção</option>
