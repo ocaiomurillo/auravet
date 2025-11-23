@@ -144,6 +144,17 @@ export interface InvoiceStatus {
   name: string;
 }
 
+export type PaymentMethod = 'DINHEIRO' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO' | 'PIX' | 'BOLETO' | 'OUTROS';
+
+export type PaymentCondition = 'A_VISTA' | 'DIAS_30' | 'DIAS_60' | 'CARTAO_2X' | 'CARTAO_3X';
+
+export interface InvoiceInstallment {
+  id: string;
+  dueDate: string;
+  amount: number;
+  paidAt: string | null;
+}
+
 export interface InvoiceItemProductSummary {
   id: string;
   nome: string;
@@ -181,6 +192,8 @@ export interface Invoice {
   total: number;
   dueDate: string;
   paidAt: string | null;
+  paymentMethod: PaymentMethod | null;
+  paymentCondition: PaymentCondition | null;
   paymentNotes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -191,6 +204,7 @@ export interface Invoice {
     email: string;
   } | null;
   items: InvoiceItem[];
+  installments: InvoiceInstallment[];
 }
 
 export interface InvoiceSummary {
