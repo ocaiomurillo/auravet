@@ -6,6 +6,8 @@ import type {
   Owner,
   Prisma,
   Product,
+  PaymentMethod,
+  PaymentCondition,
   Role,
   ServiceCatalogUsage,
   ServiceDefinition,
@@ -57,6 +59,7 @@ type InvoiceWithRelations = Prisma.InvoiceGetPayload<{
         };
       };
     };
+    installments: true;
   };
 }>;
 
@@ -137,6 +140,13 @@ export type SerializedInvoiceItem = {
   } | null;
 };
 
+export type SerializedInvoiceInstallment = {
+  id: string;
+  dueDate: string;
+  amount: number;
+  paidAt: string | null;
+};
+
 export type SerializedInvoice = {
   id: string;
   ownerId: string;
@@ -151,12 +161,15 @@ export type SerializedInvoice = {
   total: number;
   dueDate: string;
   paidAt: string | null;
+  paymentMethod: PaymentMethod | null;
+  paymentCondition: PaymentCondition | null;
   paymentNotes: string | null;
   createdAt: string;
   updatedAt: string;
   owner: SerializedInvoiceOwner;
   responsible: { id: string; nome: string; email: string } | null;
   items: SerializedInvoiceItem[];
+  installments: SerializedInvoiceInstallment[];
 };
 
 export type SerializedInvoiceOwner = Omit<SerializedOwner, 'animals'>;
@@ -682,6 +695,8 @@ export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoi
     total: Number(invoice.total),
     dueDate: invoice.dueDate.toISOString(),
     paidAt: invoice.paidAt ? invoice.paidAt.toISOString() : null,
+    paymentMethod: invoice.paymentMethod ?? null,
+    paymentCondition: invoice.paymentCondition ?? null,
     paymentNotes: invoice.paymentNotes ?? null,
     createdAt: invoice.createdAt.toISOString(),
     updatedAt: invoice.updatedAt.toISOString(),
@@ -690,5 +705,11 @@ export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoi
       ? { id: invoice.responsible.id, nome: invoice.responsible.nome, email: invoice.responsible.email }
       : null,
     items: invoice.items.map((item) => serializeInvoiceItem(item)),
+    installments: invoice.installments.map((installment) => ({
+      id: installment.id,
+      dueDate: installment.dueDate.toISOString(),
+      amount: Number(installment.amount),
+      paidAt: installment.paidAt ? installment.paidAt.toISOString() : null,
+    })),
   };
 };

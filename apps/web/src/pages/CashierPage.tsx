@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -8,7 +8,15 @@ import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
-import type { Invoice, InvoiceItem, InvoiceListResponse, OwnerSummary, Product } from '../types/api';
+import type {
+  Invoice,
+  InvoiceItem,
+  InvoiceListResponse,
+  OwnerSummary,
+  PaymentCondition,
+  PaymentMethod,
+  Product,
+} from '../types/api';
 import { apiClient, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 import { JsPDFInstance, applyPdfBrandFont, loadJsPdf, loadLogoDataUrl } from '../utils/pdf';
@@ -63,13 +71,107 @@ const slugify = (value: string) =>
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+type InstallmentFormState = {
+  id: string;
+  amount: string;
+  dueDate: string;
+  paidAt: string | null;
+};
+
+const paymentMethodOptions: Array<{ value: PaymentMethod; label: string }> = [
+  { value: 'DINHEIRO', label: 'Dinheiro' },
+  { value: 'CARTAO_CREDITO', label: 'Cartão de crédito' },
+  { value: 'CARTAO_DEBITO', label: 'Cartão de débito' },
+  { value: 'PIX', label: 'Pix' },
+  { value: 'BOLETO', label: 'Boleto' },
+  { value: 'OUTROS', label: 'Outros' },
+];
+
+const paymentConditionOptions: Array<{
+  value: PaymentCondition;
+  label: string;
+  installments: number;
+  startOffset: number;
+  interval: number;
+}> = [
+  { value: 'A_VISTA', label: 'À vista', installments: 1, startOffset: 0, interval: 0 },
+  { value: 'DIAS_30', label: '30 dias', installments: 1, startOffset: 30, interval: 0 },
+  { value: 'DIAS_60', label: '60 dias', installments: 1, startOffset: 60, interval: 0 },
+  { value: 'CARTAO_2X', label: '2x cartão', installments: 2, startOffset: 0, interval: 30 },
+  { value: 'CARTAO_3X', label: '3x cartão', installments: 3, startOffset: 0, interval: 30 },
+];
+
+const paymentMethodLabel = (method: PaymentMethod | null | undefined) =>
+  paymentMethodOptions.find((option) => option.value === method)?.label ?? 'Não definido';
+
+const paymentConditionLabel = (condition: PaymentCondition | null | undefined) =>
+  paymentConditionOptions.find((option) => option.value === condition)?.label ?? 'Não definido';
+
+const normalizeDateInput = (value: string) => value.split('T')[0];
+
+const addDays = (date: Date, days: number) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
+const buildInstallmentSchedule = (
+  condition: PaymentCondition,
+  total: number,
+  anchorDateIso: string,
+): InstallmentFormState[] => {
+  const conditionConfig =
+    paymentConditionOptions.find((option) => option.value === condition) ?? paymentConditionOptions[0];
+  const anchorDate = new Date(anchorDateIso);
+  const baseAmount = Number((total / conditionConfig.installments).toFixed(2));
+  let accumulated = 0;
+
+  return Array.from({ length: conditionConfig.installments }).map((_, index) => {
+    const isLast = index === conditionConfig.installments - 1;
+    const amount = isLast ? Number((total - accumulated).toFixed(2)) : baseAmount;
+    accumulated += amount;
+    const dueDate = addDays(anchorDate, conditionConfig.startOffset + conditionConfig.interval * index);
+
+    return {
+      id: `installment-${index}-${condition}-${anchorDate.getTime()}`,
+      amount: amount.toFixed(2),
+      dueDate: normalizeDateInput(dueDate.toISOString()),
+      paidAt: null,
+    };
+  });
+};
+
+const resolveInvoiceInstallmentsForDisplay = (invoice: Invoice, fallbackCondition?: PaymentCondition) => {
+  if (invoice.installments.length) {
+    return [...invoice.installments].sort(
+      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+    );
+  }
+
+  const schedule = buildInstallmentSchedule(
+    fallbackCondition ?? invoice.paymentCondition ?? 'A_VISTA',
+    invoice.total,
+    invoice.dueDate,
+  );
+
+  return schedule.map((installment, index) => ({
+    id: installment.id ?? `${invoice.id}-installment-${index}`,
+    amount: Number(installment.amount),
+    dueDate: installment.dueDate,
+    paidAt: installment.paidAt,
+  }));
+};
+
 const buildInvoicePdf = async (invoice: Invoice) => {
   const JsPdf = await loadJsPdf();
   const doc = new JsPdf();
   const fontName = await applyPdfBrandFont(doc);
   const logo = await loadLogoDataUrl();
-  const dueDate = new Date(invoice.dueDate);
+  const installmentsForPdf = resolveInvoiceInstallmentsForDisplay(invoice);
+  const dueDate = new Date(installmentsForPdf[0]?.dueDate ?? invoice.dueDate);
   const createdAt = new Date(invoice.createdAt);
+  const paidInstallments = installmentsForPdf.filter((installment) => installment.paidAt);
+  const nextPendingInstallment = installmentsForPdf.find((installment) => !installment.paidAt);
   const primaryPet = invoice.items.find((item) => item.service?.animal?.nome)?.service?.animal?.nome;
   const primaryServiceDate = invoice.items.find((item) => item.service?.data)?.service?.data;
   const referenceDate = primaryServiceDate ? new Date(primaryServiceDate) : null;
@@ -96,7 +198,7 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   const referenceSummary = referenceDate
     ? `Referente a atendimento em ${referenceDate.toLocaleDateString('pt-BR')}`
     : null;
-  const statusLine = `Status: ${invoice.status.name}`;
+  const statusLine = `Status: ${invoice.status.name} • ${paidInstallments.length}/${installmentsForPdf.length} parcelas pagas`;
 
   doc.setFont(fontName, 'bold');
   doc.setTextColor(...brandColors.text);
@@ -229,14 +331,54 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   }
 
   currentY = ensureSpace(doc, currentY, 20);
-  addSectionTitle(doc, 'Notas de pagamento', currentY, fontName);
+  addSectionTitle(doc, 'Condições de pagamento', currentY, fontName);
   currentY += 8;
-  const notes = invoice.paymentNotes?.trim() || 'Nenhuma observação registrada.';
-  const wrappedNotes = doc.splitTextToSize(notes, 175);
+  appendKeyValue(doc, 'Forma', paymentMethodLabel(invoice.paymentMethod), currentY, brandColors.text, fontName);
+  currentY += 6;
+  appendKeyValue(doc, 'Condição', paymentConditionLabel(invoice.paymentCondition), currentY, brandColors.text, fontName);
+  currentY += 10;
+
+  addSectionTitle(doc, 'Parcelas', currentY, fontName);
+  currentY += 8;
+  doc.setFont(fontName, 'bold');
+  doc.setTextColor(...brandColors.text);
+  doc.text('#', 15, currentY);
+  doc.text('Vencimento', 30, currentY);
+  doc.text('Valor', 90, currentY, { align: 'right' as const });
+  doc.text('Status', 190, currentY, { align: 'right' as const });
+  currentY += 4;
+  doc.setLineWidth(0.2);
+  doc.line(15, currentY, 195, currentY);
+  currentY += 6;
+
+  installmentsForPdf.forEach((installment, index) => {
+    currentY = ensureSpace(doc, currentY, 10);
+    doc.setFont(fontName, 'normal');
+    doc.setTextColor(...brandColors.text);
+    doc.text(String(index + 1), 15, currentY);
+    doc.text(new Date(installment.dueDate).toLocaleDateString('pt-BR'), 30, currentY);
+    doc.text(currencyFormatter.format(installment.amount), 90, currentY, { align: 'right' as const });
+    doc.text(
+      installment.paidAt
+        ? `Pago em ${new Date(installment.paidAt).toLocaleDateString('pt-BR')}`
+        : 'Em aberto',
+      190,
+      currentY,
+      { align: 'right' as const },
+    );
+    currentY += 6;
+  });
+
+  currentY += 4;
   doc.setFont(fontName, 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(30, 41, 59);
-  doc.text(wrappedNotes, 15, currentY);
+  doc.setTextColor(...brandColors.muted);
+  doc.text(
+    nextPendingInstallment
+      ? `Próximo vencimento em ${new Date(nextPendingInstallment.dueDate).toLocaleDateString('pt-BR')}`
+      : 'Todas as parcelas estão quitadas.',
+    15,
+    currentY,
+  );
 
   return doc;
 };
@@ -259,7 +401,9 @@ const CashierPage = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const selectedInvoiceOwnerCpf = selectedInvoice ? formatCpf(selectedInvoice.owner.cpf) : null;
   const selectedInvoiceOwnerAddress = selectedInvoice ? buildOwnerAddress(selectedInvoice.owner) : null;
-  const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('DINHEIRO');
+  const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>('A_VISTA');
+  const [installments, setInstallments] = useState<InstallmentFormState[]>([]);
   const [isExtraItemFormOpen, setIsExtraItemFormOpen] = useState(false);
   const [extraItemMode, setExtraItemMode] = useState<'product' | 'custom'>('product');
   const [extraItemProductId, setExtraItemProductId] = useState('');
@@ -270,6 +414,78 @@ const CashierPage = () => {
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const adjustedInvoiceItemIdsRef = useRef<Set<string>>(new Set());
+
+  const buildInstallmentsFromInvoice = useCallback(
+    (invoice: Invoice, conditionOverride?: PaymentCondition) => {
+      if (invoice.installments.length) {
+        return invoice.installments.map((installment, index) => ({
+          id: installment.id ?? `${invoice.id}-installment-${index}`,
+          amount: installment.amount.toFixed(2),
+          dueDate: normalizeDateInput(installment.dueDate),
+          paidAt: installment.paidAt ? normalizeDateInput(installment.paidAt) : null,
+        }));
+      }
+
+      const condition = conditionOverride ?? invoice.paymentCondition ?? paymentCondition;
+      return buildInstallmentSchedule(condition, invoice.total, invoice.dueDate);
+    },
+    [paymentCondition],
+  );
+
+  const applyPaymentStateFromInvoice = useCallback(
+    (invoice: Invoice) => {
+      const condition = invoice.paymentCondition ?? paymentCondition;
+      setPaymentMethod(invoice.paymentMethod ?? 'DINHEIRO');
+      setPaymentCondition(condition);
+      setInstallments(buildInstallmentsFromInvoice(invoice, condition));
+    },
+    [buildInstallmentsFromInvoice, paymentCondition],
+  );
+
+  const updateInvoiceState = useCallback(
+    (invoice: Invoice) => {
+      setSelectedInvoice(invoice);
+      applyPaymentStateFromInvoice(invoice);
+    },
+    [applyPaymentStateFromInvoice],
+  );
+
+  const resolveInvoiceInstallments = useCallback(
+    (invoice: Invoice) => {
+      if (invoice.installments.length) {
+        return invoice.installments;
+      }
+
+      const schedule = buildInstallmentSchedule(
+        invoice.paymentCondition ?? paymentCondition,
+        invoice.total,
+        invoice.dueDate,
+      );
+
+      return schedule.map((installment, index) => ({
+        id: installment.id ?? `${invoice.id}-installment-${index}`,
+        amount: Number(installment.amount),
+        dueDate: installment.dueDate,
+        paidAt: installment.paidAt,
+      }));
+    },
+    [paymentCondition],
+  );
+
+  const summarizeInvoicePayments = useCallback(
+    (invoice: Invoice) => {
+      const installmentsList = [...resolveInvoiceInstallments(invoice)].sort(
+        (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+      );
+
+      const paidCount = installmentsList.filter((installment) => installment.paidAt).length;
+      const nextDueDate = installmentsList.find((installment) => !installment.paidAt)?.dueDate ?? null;
+      const isPaid = installmentsList.length ? paidCount === installmentsList.length : Boolean(invoice.paidAt);
+
+      return { installmentsList, paidCount, nextDueDate, isPaid, totalInstallments: installmentsList.length };
+    },
+    [resolveInvoiceInstallments],
+  );
 
   const { data: owners } = useQuery({
     queryKey: ['owners', 'basic'],
@@ -303,14 +519,22 @@ const CashierPage = () => {
   });
 
   const markPaidMutation = useMutation({
-    mutationFn: (payload: { id: string; paidAt?: string; paymentNotes?: string }) =>
-      invoicesApi.markAsPaid(payload.id, { paidAt: payload.paidAt, paymentNotes: payload.paymentNotes }),
+    mutationFn: (payload: {
+      id: string;
+      paymentMethod: PaymentMethod;
+      paymentCondition: PaymentCondition;
+      installments: { amount: number; dueDate: string; paidAt?: string }[];
+    }) =>
+      invoicesApi.markAsPaid(payload.id, {
+        paymentMethod: payload.paymentMethod,
+        paymentCondition: payload.paymentCondition,
+        installments: payload.installments,
+      }),
     onSuccess: async (invoice) => {
       toast.success('Pagamento registrado com sucesso.');
       await adjustStockForItems(invoice.items);
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      setSelectedInvoice(invoice);
-      setPaymentNotes(invoice.paymentNotes ?? '');
+      updateInvoiceState(invoice);
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Não foi possível registrar o pagamento.');
@@ -327,8 +551,7 @@ const CashierPage = () => {
       await adjustStockForItems(invoice.items);
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
-      setSelectedInvoice(invoice);
-      setPaymentNotes(invoice.paymentNotes ?? '');
+      updateInvoiceState(invoice);
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Não foi possível adicionar o item extra.');
@@ -345,8 +568,7 @@ const CashierPage = () => {
       toast.success('Item removido da conta.');
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['sellable-products'] });
-      setSelectedInvoice(invoice);
-      setPaymentNotes(invoice.paymentNotes ?? '');
+      updateInvoiceState(invoice);
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Não foi possível remover o item.');
@@ -378,6 +600,18 @@ const CashierPage = () => {
     }
     return quantity > 0 && unitPrice >= 0 ? quantity * unitPrice : 0;
   }, [extraItemQuantity, extraItemUnitPrice]);
+
+  const selectedInvoiceSummary = useMemo(
+    () => (selectedInvoice ? summarizeInvoicePayments(selectedInvoice) : null),
+    [selectedInvoice, summarizeInvoicePayments],
+  );
+
+  const installmentsTotal = useMemo(
+    () => installments.reduce((acc, installment) => acc + Number(installment.amount || 0), 0),
+    [installments],
+  );
+
+  const isSelectedInvoicePaid = selectedInvoiceSummary?.isPaid ?? false;
 
   const adjustStockForItems = async (items: InvoiceItem[]) => {
     const adjustments: InvoiceItem[] = [];
@@ -418,9 +652,11 @@ const CashierPage = () => {
 
   useEffect(() => {
     if (selectedInvoice) {
-      setPaymentNotes(selectedInvoice.paymentNotes ?? '');
+      applyPaymentStateFromInvoice(selectedInvoice);
     } else {
-      setPaymentNotes('');
+      setPaymentMethod('DINHEIRO');
+      setPaymentCondition('A_VISTA');
+      setInstallments([]);
     }
 
     setIsExtraItemFormOpen(false);
@@ -429,14 +665,14 @@ const CashierPage = () => {
     setExtraItemDescription('');
     setExtraItemQuantity('1');
     setExtraItemUnitPrice('');
-  }, [selectedInvoice]);
+  }, [applyPaymentStateFromInvoice, selectedInvoice]);
 
   useEffect(() => {
     const alreadyAdjusted = new Set<string>();
 
     if (selectedInvoice) {
       const previousAdjustments = adjustedInvoiceItemIdsRef.current;
-      const assumeAdjusted = selectedInvoice.status.slug === 'QUITADA';
+      const assumeAdjusted = isSelectedInvoicePaid;
 
       selectedInvoice.items.forEach((item) => {
         if (!item.productId) return;
@@ -447,7 +683,7 @@ const CashierPage = () => {
     }
 
     adjustedInvoiceItemIdsRef.current = alreadyAdjusted;
-  }, [selectedInvoice]);
+  }, [selectedInvoice, isSelectedInvoicePaid]);
 
   useEffect(() => {
     if (extraItemMode !== 'product') {
@@ -504,22 +740,76 @@ const CashierPage = () => {
   };
 
   const handleOpenInvoice = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setPaymentNotes(invoice.paymentNotes ?? '');
+    updateInvoiceState(invoice);
   };
 
   const handleCloseInvoice = () => {
     setSelectedInvoice(null);
-    setPaymentNotes('');
+    setInstallments([]);
   };
 
   const handleMarkAsPaid = () => {
     if (!selectedInvoice) return;
 
+    if (!installments.length) {
+      setInstallments(buildInstallmentsFromInvoice(selectedInvoice));
+      toast.error('Configure as parcelas antes de registrar o pagamento.');
+      return;
+    }
+
+    const installmentsPayload = installments.map((installment) => ({
+      amount: Number(installment.amount),
+      dueDate: installment.dueDate,
+      paidAt: installment.paidAt || undefined,
+    }));
+
+    const hasInvalidInstallment = installmentsPayload.some(
+      (installment) => !installment.dueDate || Number.isNaN(installment.amount) || installment.amount <= 0,
+    );
+
+    if (hasInvalidInstallment) {
+      toast.error('Revise valores e vencimentos das parcelas antes de salvar.');
+      return;
+    }
+
+    const totalFromInstallments = installmentsPayload.reduce((acc, installment) => acc + installment.amount, 0);
+    if (Math.abs(totalFromInstallments - selectedInvoice.total) > 0.01) {
+      toast.error('A soma das parcelas deve ser igual ao total da conta.');
+      return;
+    }
+
     markPaidMutation.mutate({
       id: selectedInvoice.id,
-      paymentNotes: paymentNotes || undefined,
+      paymentMethod,
+      paymentCondition,
+      installments: installmentsPayload,
     });
+  };
+
+  const handlePaymentConditionChange = (condition: PaymentCondition) => {
+    setPaymentCondition(condition);
+    if (selectedInvoice) {
+      setInstallments(buildInstallmentsFromInvoice(selectedInvoice, condition));
+    }
+  };
+
+  const handleInstallmentFieldChange = (
+    id: string,
+    field: 'amount' | 'dueDate' | 'paidAt',
+    value: string,
+  ) => {
+    setInstallments((prev) =>
+      prev.map((installment) => (installment.id === id ? { ...installment, [field]: value } : installment)),
+    );
+  };
+
+  const handleInstallmentPaidToggle = (id: string, checked: boolean) => {
+    const today = new Date().toISOString().slice(0, 10);
+    setInstallments((prev) =>
+      prev.map((installment) =>
+        installment.id === id ? { ...installment, paidAt: checked ? installment.paidAt ?? today : null } : installment,
+      ),
+    );
   };
 
   const handleExtraItemModeChange = (mode: 'product' | 'custom') => {
@@ -538,7 +828,7 @@ const CashierPage = () => {
 
     if (!selectedInvoice) return;
 
-    if (selectedInvoice.status.slug === 'QUITADA') {
+    if (isSelectedInvoicePaid) {
       toast.error('Esta conta já foi quitada e não aceita novos itens.');
       return;
     }
@@ -674,9 +964,10 @@ const CashierPage = () => {
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Próximos vencimentos</p>
             <p className="text-sm text-brand-grafite/80">
               {invoices
-                .filter((invoice) => !invoice.paidAt)
+                .map((invoice) => summarizeInvoicePayments(invoice).nextDueDate)
+                .filter((dueDate): dueDate is string => Boolean(dueDate))
                 .slice(0, 3)
-                .map((invoice) => new Date(invoice.dueDate).toLocaleDateString('pt-BR'))
+                .map((dueDate) => new Date(dueDate).toLocaleDateString('pt-BR'))
                 .join(' • ') || 'Sem contas próximas.'}
             </p>
           </div>
@@ -767,7 +1058,7 @@ const CashierPage = () => {
                 <tr className="text-left text-sm font-semibold uppercase tracking-wide text-brand-grafite/70">
                   <th className="px-4 py-3">Tutor</th>
                   <th className="px-4 py-3">Total</th>
-                  <th className="px-4 py-3">Vencimento</th>
+                  <th className="px-4 py-3">Pagamento</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Responsável</th>
                   <th className="px-4 py-3 text-right">Ações</th>
@@ -777,6 +1068,7 @@ const CashierPage = () => {
                 {invoices.map((invoice) => {
                   const ownerCpf = formatCpf(invoice.owner.cpf);
                   const ownerAddress = buildOwnerAddress(invoice.owner);
+                  const paymentSummary = summarizeInvoicePayments(invoice);
 
                   return (
                     <tr key={invoice.id} className="text-sm text-brand-grafite/80">
@@ -793,27 +1085,38 @@ const CashierPage = () => {
                           <p className="text-xs text-brand-grafite/60">{ownerAddress}</p>
                         ) : null}
                       </td>
-                    <td className="px-4 py-3 font-semibold text-brand-escuro">
-                      {currencyFormatter.format(invoice.total)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {new Date(invoice.dueDate).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          invoice.status.slug === 'QUITADA'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {invoice.status.name}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {invoice.responsible ? (
-                        <>
-                          <p className="font-semibold text-brand-escuro">{invoice.responsible.nome}</p>
+                      <td className="px-4 py-3 font-semibold text-brand-escuro">
+                        {currencyFormatter.format(invoice.total)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-brand-escuro">{paymentMethodLabel(invoice.paymentMethod)}</p>
+                        <p className="text-xs text-brand-grafite/60">{paymentConditionLabel(invoice.paymentCondition)}</p>
+                        <p className="text-xs text-brand-grafite/60">
+                          {paymentSummary.totalInstallments > 0
+                            ? `${paymentSummary.paidCount}/${paymentSummary.totalInstallments} parcelas pagas`
+                            : 'Pagamento à vista'}
+                          {paymentSummary.nextDueDate
+                            ? ` • Próx. ${new Date(paymentSummary.nextDueDate).toLocaleDateString('pt-BR')}`
+                            : paymentSummary.isPaid
+                              ? ' • Quitada'
+                              : ''}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                            paymentSummary.isPaid
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {paymentSummary.isPaid ? 'Quitada' : 'Em aberto'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {invoice.responsible ? (
+                          <>
+                            <p className="font-semibold text-brand-escuro">{invoice.responsible.nome}</p>
                           <p className="text-xs text-brand-grafite/60">{invoice.responsible.email}</p>
                         </>
                       ) : (
@@ -851,7 +1154,7 @@ const CashierPage = () => {
             <Button variant="ghost" onClick={handleCloseInvoice}>
               Fechar
             </Button>
-            {selectedInvoice?.status.slug !== 'QUITADA' ? (
+            {!isSelectedInvoicePaid ? (
               <Button onClick={handleMarkAsPaid} disabled={markPaidMutation.isPending}>
                 {markPaidMutation.isPending ? 'Registrando...' : 'Registrar pagamento'}
               </Button>
@@ -879,7 +1182,10 @@ const CashierPage = () => {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Status</p>
-                  <p className="font-semibold text-brand-escuro">{selectedInvoice.status.name}</p>
+                  <p className="font-semibold text-brand-escuro">
+                    {selectedInvoiceSummary?.isPaid ? 'Quitada' : 'Em aberto'}
+                  </p>
+                  <p className="text-xs text-brand-grafite/60">{selectedInvoice.status.name}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Total</p>
@@ -888,16 +1194,28 @@ const CashierPage = () => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Vencimento</p>
-                  <p>{new Date(selectedInvoice.dueDate).toLocaleDateString('pt-BR')}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Parcelas</p>
+                  <p className="font-semibold text-brand-escuro">
+                    {selectedInvoiceSummary
+                      ? `${selectedInvoiceSummary.paidCount}/${
+                          selectedInvoiceSummary.totalInstallments || 1
+                        } pagas`
+                      : '—'}
+                  </p>
+                  <p className="text-xs text-brand-grafite/60">
+                    {selectedInvoiceSummary?.nextDueDate
+                      ? `Próximo vencimento em ${new Date(
+                          selectedInvoiceSummary.nextDueDate,
+                        ).toLocaleDateString('pt-BR')}`
+                      : 'Sem parcelas pendentes'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Pagamento</p>
-                  <p>
-                    {selectedInvoice.paidAt
-                      ? new Date(selectedInvoice.paidAt).toLocaleDateString('pt-BR')
-                      : 'Em aberto'}
+                  <p className="font-semibold text-brand-escuro">
+                    {paymentMethodLabel(selectedInvoice.paymentMethod)}
                   </p>
+                  <p className="text-xs text-brand-grafite/60">{paymentConditionLabel(selectedInvoice.paymentCondition)}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Responsável</p>
@@ -961,7 +1279,7 @@ const CashierPage = () => {
                           </span>
                         ) : null}
                       </div>
-                      {selectedInvoice.status.slug !== 'QUITADA' && !item.servicoId ? (
+                      {!isSelectedInvoicePaid && !item.servicoId ? (
                         <Button
                           type="button"
                           variant="ghost"
@@ -981,7 +1299,7 @@ const CashierPage = () => {
                 ))}
               </ul>
 
-              {selectedInvoice.status.slug !== 'QUITADA' ? (
+              {!isSelectedInvoicePaid ? (
                 <div className="mt-4 rounded-2xl border border-dashed border-brand-azul/40 bg-white/95 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -1099,16 +1417,105 @@ const CashierPage = () => {
               ) : null}
             </div>
 
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Notas de pagamento</p>
-              <textarea
-                className="mt-2 w-full rounded-xl border border-brand-azul/40 bg-white/95 p-3 text-sm text-brand-grafite shadow-inner focus:border-brand-escuro focus:outline-none focus:ring-2 focus:ring-brand-escuro/30"
-                rows={4}
-                placeholder="Registre detalhes sobre como e quando o pagamento foi feito."
-                value={paymentNotes}
-                onChange={(event) => setPaymentNotes(event.target.value)}
-                disabled={selectedInvoice.status.slug === 'QUITADA'}
-              />
+            <div className="rounded-2xl border border-brand-azul/20 bg-white/95 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Pagamento</p>
+                  <p className="text-sm text-brand-grafite/70">
+                    Defina a forma de pagamento e ajuste os vencimentos das parcelas desta conta.
+                  </p>
+                </div>
+                <p className="text-xs font-semibold text-brand-escuro">
+                  Total das parcelas: {currencyFormatter.format(installmentsTotal)}
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <SelectField
+                  label="Forma de pagamento"
+                  value={paymentMethod}
+                  onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+                  disabled={isSelectedInvoicePaid}
+                >
+                  {paymentMethodOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </SelectField>
+
+                <SelectField
+                  label="Condição"
+                  value={paymentCondition}
+                  onChange={(event) => handlePaymentConditionChange(event.target.value as PaymentCondition)}
+                  disabled={isSelectedInvoicePaid}
+                >
+                  {paymentConditionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {installments.map((installment, index) => (
+                  <div
+                    key={installment.id}
+                    className="rounded-xl border border-brand-azul/20 bg-brand-azul/5 p-3 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="font-semibold text-brand-escuro">Parcela {index + 1}</p>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-brand-escuro">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-brand-azul/60 text-brand-escuro focus:ring-brand-escuro/40"
+                          checked={Boolean(installment.paidAt)}
+                          onChange={(event) => handleInstallmentPaidToggle(installment.id, event.target.checked)}
+                          disabled={isSelectedInvoicePaid}
+                        />
+                        Pago
+                      </label>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <Field
+                        label="Valor (R$)"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={installment.amount}
+                        onChange={(event) =>
+                          handleInstallmentFieldChange(installment.id, 'amount', event.target.value)
+                        }
+                        disabled={isSelectedInvoicePaid}
+                      />
+                      <Field
+                        label="Vencimento"
+                        type="date"
+                        value={installment.dueDate}
+                        onChange={(event) =>
+                          handleInstallmentFieldChange(installment.id, 'dueDate', event.target.value)
+                        }
+                        disabled={isSelectedInvoicePaid}
+                      />
+                      <Field
+                        label="Pago em"
+                        type="date"
+                        value={installment.paidAt ?? ''}
+                        onChange={(event) =>
+                          handleInstallmentFieldChange(installment.id, 'paidAt', event.target.value)
+                        }
+                        disabled={isSelectedInvoicePaid || !installment.paidAt}
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {installments.length === 0 ? (
+                  <p className="text-xs text-brand-grafite/60">Nenhuma parcela configurada para esta conta.</p>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}

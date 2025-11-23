@@ -7,6 +7,8 @@ import type {
   Invoice,
   InvoiceListResponse,
   InvoiceStatus,
+  PaymentCondition,
+  PaymentMethod,
   Product,
   ServiceProfessional,
   ServiceDefinition,
@@ -245,8 +247,15 @@ export const invoicesApi = {
     paymentConditionId?: string;
   }) =>
     apiClient.post<Invoice>('/invoices', payload),
-  markAsPaid: (id: string, payload: { paidAt?: string; paymentNotes?: string }) =>
-    apiClient.post<Invoice>(`/invoices/${id}/pay`, payload),
+  markAsPaid: (
+    id: string,
+    payload: {
+      paymentMethod: PaymentMethod;
+      paymentCondition: PaymentCondition;
+      installments: { amount: number; dueDate: string; paidAt?: string }[];
+      paymentNotes?: string;
+    },
+  ) => apiClient.post<Invoice>(`/invoices/${id}/pay`, payload),
   addManualItem: (
     invoiceId: string,
     payload: { description: string; quantity: number; unitPrice: number; productId?: string },

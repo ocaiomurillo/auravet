@@ -16,6 +16,29 @@ const escapeHtml = (value: string) =>
 const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('pt-BR') : '—';
 
+const paymentMethodLabels: Record<NonNullable<SerializedInvoice['paymentMethod']>, string> = {
+  DINHEIRO: 'Dinheiro',
+  CARTAO_CREDITO: 'Cartão de crédito',
+  CARTAO_DEBITO: 'Cartão de débito',
+  PIX: 'Pix',
+  BOLETO: 'Boleto',
+  OUTROS: 'Outros',
+};
+
+const paymentConditionLabels: Record<NonNullable<SerializedInvoice['paymentCondition']>, string> = {
+  A_VISTA: 'À vista',
+  DIAS_30: '30 dias',
+  DIAS_60: '60 dias',
+  CARTAO_2X: '2x cartão',
+  CARTAO_3X: '3x cartão',
+};
+
+const formatPaymentMethod = (method: SerializedInvoice['paymentMethod']) =>
+  method ? paymentMethodLabels[method] ?? method : '—';
+
+const formatPaymentCondition = (condition: SerializedInvoice['paymentCondition']) =>
+  condition ? paymentConditionLabels[condition] ?? condition : '—';
+
 const buildOwnerAddress = (invoice: SerializedInvoice) => {
   const { owner } = invoice;
   const parts = [
@@ -69,6 +92,25 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
     .join('');
 
   const paymentNotes = invoice.paymentNotes ? escapeHtml(invoice.paymentNotes) : null;
+  const installments = invoice.installments;
+  const paidInstallments = installments.filter((installment) => installment.paidAt);
+  const nextDueDate = installments.find((installment) => !installment.paidAt)?.dueDate ?? null;
+  const latestPayment = paidInstallments.length
+    ? paidInstallments[paidInstallments.length - 1].paidAt
+    : invoice.paidAt;
+  const installmentsRows = installments
+    .map((installment, index) => {
+      const statusLabel = installment.paidAt ? `Pago em ${formatDate(installment.paidAt)}` : 'Em aberto';
+      return `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${formatDate(installment.dueDate)}</td>
+          <td>${currencyFormatter.format(installment.amount)}</td>
+          <td>${statusLabel}</td>
+        </tr>
+      `;
+    })
+    .join('');
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -112,8 +154,10 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
       <div class="card">
         <strong>Status</strong>
         <p>${escapeHtml(invoice.status.name)}</p>
-        <small>Vencimento: ${formatDate(invoice.dueDate)}</small>
-        <small>Pagamento: ${formatDate(invoice.paidAt)}</small>
+        <small>Próximo vencimento: ${formatDate(nextDueDate ?? invoice.dueDate)}</small>
+        <small>Último pagamento: ${formatDate(latestPayment)}</small>
+        <small>Forma: ${escapeHtml(formatPaymentMethod(invoice.paymentMethod))}</small>
+        <small>Condição: ${escapeHtml(formatPaymentCondition(invoice.paymentCondition))}</small>
       </div>
       <div class="card">
         <strong>Responsável</strong>
@@ -152,6 +196,24 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
     </table>
 
     <p class="total">Total: ${currencyFormatter.format(invoice.total)}</p>
+    <h3 style="margin-top: 24px;">Parcelas</h3>
+    ${
+      installments.length
+        ? `<table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Vencimento</th>
+          <th>Valor</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${installmentsRows}
+      </tbody>
+    </table>`
+        : '<p>Pagamento à vista.</p>'
+    }
     ${paymentNotes ? `<div class="notes"><strong>Notas de pagamento</strong><br />${paymentNotes}</div>` : ''}
   </body>
 </html>`;

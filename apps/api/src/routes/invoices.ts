@@ -16,7 +16,14 @@ import {
 } from '../schema/invoice';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
-import { fetchInvoiceCandidates, getPaidStatus, invoiceInclude, syncInvoiceForService } from '../utils/invoice';
+import {
+  fetchInvoiceCandidates,
+  getOpenStatus,
+  getPaidStatus,
+  invoiceInclude,
+  reconcileInstallmentsForInvoice,
+  syncInvoiceForService,
+} from '../utils/invoice';
 import { serializeInvoice } from '../utils/serializers';
 import { buildInvoicePrintHtml } from '../utils/invoice-print';
 
@@ -389,6 +396,7 @@ invoicesRouter.post(
         where: { id },
         include: {
           status: true,
+          installments: true,
         },
       });
 
@@ -400,16 +408,56 @@ invoicesRouter.post(
         throw new HttpError(400, 'Esta conta já está quitada.');
       }
 
+      const installments = payload.installments.map((installment, index) => ({
+        amount: new Prisma.Decimal(installment.amount),
+        dueDate: parseDate(installment.dueDate, `vencimento da parcela ${index + 1}`),
+        paidAt: installment.paidAt
+          ? parseDate(installment.paidAt, `pagamento da parcela ${index + 1}`)
+          : null,
+      }));
+
+      const totalFromInstallments = installments.reduce(
+        (acc, installment) => acc.add(installment.amount),
+        new Prisma.Decimal(0),
+      );
+
+      const difference = existing.total.sub(totalFromInstallments).abs();
+      if (difference.gt(new Prisma.Decimal('0.01'))) {
+        throw new HttpError(400, 'A soma das parcelas deve ser igual ao valor total da conta.');
+      }
+
       const paidStatus = await getPaidStatus(tx);
-      const paidAt = payload.paidAt ? parseDate(payload.paidAt, 'data de pagamento') : new Date();
+      const openStatus = await getOpenStatus(tx);
+
+      const isFullyPaid = installments.every((installment) => Boolean(installment.paidAt));
+      const latestPayment = installments.reduce<Date | null>((latest, installment) => {
+        if (!installment.paidAt) return latest;
+        return !latest || installment.paidAt > latest ? installment.paidAt : latest;
+      }, null);
+      const earliestDueDate = installments.reduce(
+        (earliest, installment) => (installment.dueDate < earliest ? installment.dueDate : earliest),
+        installments[0].dueDate,
+      );
+
+      await tx.invoiceInstallment.deleteMany({ where: { invoiceId: id } });
 
       return tx.invoice.update({
         where: { id },
         data: {
-          statusId: paidStatus.id,
-          paidAt,
+          statusId: isFullyPaid ? paidStatus.id : openStatus.id,
+          paidAt: latestPayment,
           paymentNotes: payload.paymentNotes ?? null,
+          paymentMethod: payload.paymentMethod,
+          paymentCondition: payload.paymentCondition,
           responsibleId: req.user?.id ?? existing.responsibleId,
+          dueDate: earliestDueDate,
+          installments: {
+            create: installments.map((installment) => ({
+              amount: installment.amount,
+              dueDate: installment.dueDate,
+              paidAt: installment.paidAt,
+            })),
+          },
         },
         include: invoiceInclude,
       });
@@ -486,11 +534,21 @@ const recalculateInvoiceTotal = async (tx: Prisma.TransactionClient, invoiceId: 
 
   const total = aggregate._sum.total ?? new Prisma.Decimal(0);
 
-  return tx.invoice.update({
+  const invoice = await tx.invoice.update({
     where: { id: invoiceId },
     data: { total },
     include: invoiceInclude,
   });
+
+  await reconcileInstallmentsForInvoice(tx, invoiceId, total, invoice.dueDate);
+
+  const refreshed = await tx.invoice.findUnique({ where: { id: invoiceId }, include: invoiceInclude });
+
+  if (!refreshed) {
+    throw new HttpError(404, 'Conta não encontrada.');
+  }
+
+  return refreshed;
 };
 
 invoicesRouter.post(

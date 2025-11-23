@@ -42,6 +42,9 @@ export const invoiceInclude = {
       },
     },
   },
+  installments: {
+    orderBy: { dueDate: 'asc' },
+  },
 } as const;
 
 export type InvoiceWithRelations = Prisma.InvoiceGetPayload<{
@@ -58,6 +61,7 @@ type ServiceForInvoice = Prisma.ServicoGetPayload<{
         invoice: {
           include: {
             status: true;
+            installments: true;
           };
         };
       };
@@ -88,6 +92,7 @@ const loadServiceForInvoice = async (
           invoice: {
             include: {
               status: true,
+              installments: true,
             },
           },
         },
@@ -145,6 +150,44 @@ const calculateInvoiceTotal = (service: ServiceForInvoice) => {
     new Prisma.Decimal(0),
   );
   return servicesTotal.add(productsTotal);
+};
+
+const ZERO_DECIMAL = new Prisma.Decimal(0);
+
+export const reconcileInstallmentsForInvoice = async (
+  tx: Prisma.TransactionClient,
+  invoiceId: string,
+  total: Prisma.Decimal,
+  fallbackDueDate: Date,
+) => {
+  const installments = await tx.invoiceInstallment.findMany({
+    where: { invoiceId },
+    orderBy: { dueDate: 'asc' },
+  });
+
+  if (!installments.length) {
+    await tx.invoiceInstallment.create({
+      data: {
+        invoiceId,
+        amount: total,
+        dueDate: fallbackDueDate,
+      },
+    });
+    return fallbackDueDate;
+  }
+
+  const sum = installments.reduce((acc, installment) => acc.add(installment.amount), ZERO_DECIMAL);
+  const difference = total.sub(sum);
+
+  if (!difference.equals(ZERO_DECIMAL)) {
+    const lastInstallment = installments[installments.length - 1];
+    await tx.invoiceInstallment.update({
+      where: { id: lastInstallment.id },
+      data: { amount: lastInstallment.amount.add(difference) },
+    });
+  }
+
+  return installments[0].dueDate;
 };
 
 export interface SyncInvoiceOptions {
@@ -213,7 +256,7 @@ export const syncInvoiceForService = async (
     const manualItemsTotal = manualItemsTotalResult._sum.total ?? new Prisma.Decimal(0);
     const total = serviceTotal.add(manualItemsTotal);
 
-    const updated = await tx.invoice.update({
+    await tx.invoice.update({
       where: { id: existingInvoice.id },
       data: {
         dueDate: resolvedDueDate,
@@ -228,7 +271,14 @@ export const syncInvoiceForService = async (
       include: invoiceInclude,
     });
 
-    return updated;
+    await reconcileInstallmentsForInvoice(tx, existingInvoice.id, total, resolvedDueDate);
+
+    const refreshed = await tx.invoice.findUnique({ where: { id: existingInvoice.id }, include: invoiceInclude });
+    if (!refreshed) {
+      throw new HttpError(404, 'Conta vinculada ao atendimento não foi encontrada.');
+    }
+
+    return refreshed;
   }
 
   const openStatus = await ensureInvoiceStatus(tx, OPEN_STATUS_SLUG);
@@ -248,7 +298,14 @@ export const syncInvoiceForService = async (
     include: invoiceInclude,
   });
 
-  return created;
+  await reconcileInstallmentsForInvoice(tx, created.id, serviceTotal, resolvedDueDate);
+
+  const refreshed = await tx.invoice.findUnique({ where: { id: created.id }, include: invoiceInclude });
+  if (!refreshed) {
+    throw new HttpError(404, 'Conta vinculada ao atendimento não foi encontrada.');
+  }
+
+  return refreshed;
 };
 
 export const fetchInvoiceCandidates = async (
@@ -280,4 +337,5 @@ export const fetchInvoiceCandidates = async (
   return services.map((service) => serializeService(service, { includeAnimal: true }));
 };
 
+export const getOpenStatus = async (tx: Prisma.TransactionClient) => ensureInvoiceStatus(tx, OPEN_STATUS_SLUG);
 export const getPaidStatus = async (tx: Prisma.TransactionClient) => ensureInvoiceStatus(tx, PAID_STATUS_SLUG);

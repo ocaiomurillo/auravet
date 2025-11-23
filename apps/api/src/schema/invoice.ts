@@ -7,6 +7,23 @@ export const invoiceFilterSchema = z.object({
   to: z.string().optional(),
 });
 
+export const paymentMethodSchema = z.enum([
+  'DINHEIRO',
+  'CARTAO_CREDITO',
+  'CARTAO_DEBITO',
+  'PIX',
+  'BOLETO',
+  'OUTROS',
+]);
+
+export const paymentConditionSchema = z.enum([
+  'A_VISTA',
+  'DIAS_30',
+  'DIAS_60',
+  'CARTAO_2X',
+  'CARTAO_3X',
+]);
+
 export const invoiceGenerateSchema = z
   .object({
     serviceId: z.string().cuid().optional(),
@@ -23,8 +40,16 @@ export const invoiceIdSchema = z.object({
   id: z.string().cuid(),
 });
 
-export const invoicePaymentSchema = z.object({
+export const invoiceInstallmentSchema = z.object({
+  dueDate: z.string(),
+  amount: z.number().positive('Informe um valor válido para a parcela.'),
   paidAt: z.string().optional(),
+});
+
+export const invoicePaymentSchema = z.object({
+  paymentMethod: paymentMethodSchema,
+  paymentCondition: paymentConditionSchema,
+  installments: z.array(invoiceInstallmentSchema).min(1, 'Informe ao menos uma parcela.'),
   paymentNotes: z.string().max(500).optional(),
 });
 

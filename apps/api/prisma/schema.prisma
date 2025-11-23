@@ -41,6 +41,23 @@ enum AppointmentStatus {
   CONCLUIDO
 }
 
+enum PaymentMethod {
+  DINHEIRO
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  PIX
+  BOLETO
+  OUTROS
+}
+
+enum PaymentCondition {
+  A_VISTA
+  DIAS_30
+  DIAS_60
+  CARTAO_2X
+  CARTAO_3X
+}
+
 model Owner {
   id          String   @id @default(cuid())
   nome        String
@@ -252,6 +269,8 @@ model Invoice {
   total          Decimal  @db.Decimal(10, 2)
   dueDate        DateTime
   paidAt         DateTime?
+  paymentMethod  PaymentMethod?
+  paymentCondition PaymentCondition?
   paymentNotes   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -261,6 +280,7 @@ model Invoice {
   responsible  User?         @relation("InvoiceResponsible", fields: [responsibleId], references: [id])
   paymentCondition PaymentCondition? @relation(fields: [paymentConditionId], references: [id])
   items        InvoiceItem[]
+  installments InvoiceInstallment[]
 }
 
 model InvoiceStatus {
@@ -298,4 +318,14 @@ model PaymentCondition {
   updatedAt   DateTime @updatedAt
 
   invoices Invoice[]
+model InvoiceInstallment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  dueDate   DateTime
+  amount    Decimal  @db.Decimal(10, 2)
+  paidAt    DateTime?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
 }
