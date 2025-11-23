@@ -12,6 +12,7 @@ import RolesPage from './pages/RolesPage';
 import ServicesPage from './pages/ServicesPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import UsersPage from './pages/UsersPage';
+import PaymentConditionsPage from './pages/PaymentConditionsPage';
 import ProductsPage from './pages/ProductsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import CalendarPage from './pages/CalendarPage';
@@ -47,6 +48,9 @@ const App = () => {
           </Route>
           <Route element={<RequireModules modules={['cashier:access']} />}>
             <Route path="accounting" element={<AccountingPage />} />
+          </Route>
+          <Route element={<RequireModules modules={['cashier:access']} />}>
+            <Route path="payment-conditions" element={<PaymentConditionsPage />} />
           </Route>
           <Route element={<RequireModules modules={['cashier:access']} />}>
             <Route path="cashier" element={<CashierPage />} />

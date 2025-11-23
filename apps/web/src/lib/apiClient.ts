@@ -12,6 +12,7 @@ import type {
   Product,
   ServiceProfessional,
   ServiceDefinition,
+  PaymentCondition,
 } from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
 
@@ -239,7 +240,12 @@ export const invoicesApi = {
   list: (filters: InvoiceFilters = {}) => apiClient.get<InvoiceListResponse>(`/invoices${buildInvoiceQuery(filters)}`),
   statuses: () => apiClient.get<InvoiceStatus[]>('/invoices/statuses'),
   getById: (id: string) => apiClient.get<Invoice>(`/invoices/${id}`),
-  generateFromAppointment: (payload: { appointmentId?: string; serviceId?: string; dueDate?: string }) =>
+  generateFromAppointment: (payload: {
+    appointmentId?: string;
+    serviceId?: string;
+    dueDate?: string;
+    paymentConditionId?: string;
+  }) =>
     apiClient.post<Invoice>('/invoices', payload),
   markAsPaid: (
     id: string,
@@ -262,4 +268,19 @@ export const invoicesApi = {
     return apiClient.getBlob(`/invoices/export${suffix}`);
   },
   print: (id: string) => apiClient.getText(`/invoices/${id}/print`),
+};
+
+export interface PaymentConditionPayload {
+  nome: string;
+  prazoDias: number;
+  parcelas: number;
+  observacoes?: string | null;
+}
+
+export const paymentConditionsApi = {
+  list: () => apiClient.get<PaymentCondition[]>('/payment-conditions'),
+  create: (payload: PaymentConditionPayload) => apiClient.post<PaymentCondition>('/payment-conditions', payload),
+  update: (id: string, payload: PaymentConditionPayload) =>
+    apiClient.put<PaymentCondition>(`/payment-conditions/${id}`, payload),
+  remove: (id: string) => apiClient.delete<void>(`/payment-conditions/${id}`),
 };

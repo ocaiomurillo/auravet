@@ -1,4 +1,4 @@
-import { AppointmentStatus, Prisma, PrismaClient } from '@prisma/client';
+import { AppointmentStatus, PaymentCondition, Prisma, PrismaClient } from '@prisma/client';
 
 import { HttpError } from './http-error';
 import { serializeService } from './serializers';
@@ -15,6 +15,7 @@ const addDays = (date: Date, days: number) => {
 export const invoiceInclude = {
   owner: true,
   status: true,
+  paymentCondition: true,
   responsible: {
     select: {
       id: true,
@@ -48,7 +49,7 @@ export const invoiceInclude = {
 
 export type InvoiceWithRelations = Prisma.InvoiceGetPayload<{
   include: typeof invoiceInclude;
-}>;
+}> & { paymentCondition: PaymentCondition | null };
 
 type ServiceForInvoice = Prisma.ServicoGetPayload<{
   include: {
@@ -192,16 +193,26 @@ export const reconcileInstallmentsForInvoice = async (
 export interface SyncInvoiceOptions {
   dueDate?: Date;
   responsibleId?: string | null;
+  paymentConditionId?: string | null;
 }
 
 export const syncInvoiceForService = async (
   tx: Prisma.TransactionClient,
   serviceId: string,
-  { dueDate, responsibleId }: SyncInvoiceOptions = {},
+  { dueDate, responsibleId, paymentConditionId }: SyncInvoiceOptions = {},
 ): Promise<InvoiceWithRelations> => {
   const service = await loadServiceForInvoice(tx, serviceId);
   const existingInvoiceItem = service.invoiceItems[0];
   const existingInvoice = existingInvoiceItem?.invoice ?? null;
+
+  const conditionId = paymentConditionId ?? existingInvoice?.paymentConditionId ?? null;
+  const condition = conditionId
+    ? await tx.paymentCondition.findUnique({ where: { id: conditionId } })
+    : null;
+
+  if (conditionId && !condition) {
+    throw new HttpError(404, 'Condição de pagamento não encontrada.');
+  }
 
   if (existingInvoice && existingInvoice.status.slug === PAID_STATUS_SLUG) {
     const invoice = await tx.invoice.findUnique({
@@ -217,8 +228,11 @@ export const syncInvoiceForService = async (
   const { serviceItems, productItems } = buildInvoiceItemsData(service);
   const serviceTotal = calculateInvoiceTotal(service);
 
-  const resolvedDueDate = dueDate ?? existingInvoice?.dueDate ?? addDays(new Date(service.data), 7);
+  const conditionDueDate = condition ? addDays(new Date(service.data), condition.prazoDias) : null;
+  const resolvedDueDate =
+    dueDate ?? existingInvoice?.dueDate ?? conditionDueDate ?? addDays(new Date(service.data), 7);
   const resolvedResponsible = responsibleId ?? existingInvoice?.responsibleId ?? null;
+  const resolvedConditionId = condition?.id ?? existingInvoice?.paymentConditionId ?? null;
 
   if (existingInvoice) {
     const productIds = service.items.map((item) => item.productId);
@@ -246,6 +260,7 @@ export const syncInvoiceForService = async (
       where: { id: existingInvoice.id },
       data: {
         dueDate: resolvedDueDate,
+        paymentConditionId: resolvedConditionId,
         responsibleId: resolvedResponsible,
         total,
         items: {
@@ -273,6 +288,7 @@ export const syncInvoiceForService = async (
       ownerId: service.animal.ownerId,
       statusId: openStatus.id,
       responsibleId: resolvedResponsible,
+      paymentConditionId: resolvedConditionId,
       dueDate: resolvedDueDate,
       total: serviceTotal,
       items: {

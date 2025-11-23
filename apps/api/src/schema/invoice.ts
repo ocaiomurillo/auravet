@@ -29,6 +29,7 @@ export const invoiceGenerateSchema = z
     serviceId: z.string().cuid().optional(),
     appointmentId: z.string().cuid().optional(),
     dueDate: z.string().optional(),
+    paymentConditionId: z.string().cuid().optional(),
   })
   .refine((value) => Boolean(value.serviceId || value.appointmentId), {
     message: 'Informe um atendimento ou agendamento para gerar a conta.',

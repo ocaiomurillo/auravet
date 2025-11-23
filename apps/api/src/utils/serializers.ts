@@ -43,6 +43,7 @@ type InvoiceWithRelations = Prisma.InvoiceGetPayload<{
   include: {
     owner: true;
     status: true;
+    paymentCondition: true;
     responsible: { select: { id: true; nome: true; email: true } };
     items: {
       include: {
@@ -150,6 +151,13 @@ export type SerializedInvoice = {
   id: string;
   ownerId: string;
   status: { id: string; slug: string; name: string };
+  paymentCondition: {
+    id: string;
+    nome: string;
+    prazoDias: number;
+    parcelas: number;
+    observacoes: string | null;
+  } | null;
   total: number;
   dueDate: string;
   paidAt: string | null;
@@ -675,6 +683,15 @@ export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoi
       slug: invoice.status.slug,
       name: invoice.status.name,
     },
+    paymentCondition: invoice.paymentCondition
+      ? {
+          id: invoice.paymentCondition.id,
+          nome: invoice.paymentCondition.nome,
+          prazoDias: invoice.paymentCondition.prazoDias,
+          parcelas: invoice.paymentCondition.parcelas,
+          observacoes: invoice.paymentCondition.observacoes ?? null,
+        }
+      : null,
     total: Number(invoice.total),
     dueDate: invoice.dueDate.toISOString(),
     paidAt: invoice.paidAt ? invoice.paidAt.toISOString() : null,

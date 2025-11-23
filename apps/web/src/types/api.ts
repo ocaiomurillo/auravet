@@ -144,6 +144,14 @@ export interface InvoiceStatus {
   name: string;
 }
 
+export interface PaymentCondition {
+  id: string;
+  nome: string;
+  prazoDias: number;
+  parcelas: number;
+  observacoes: string | null;
+  createdAt: string;
+  updatedAt: string;
 export type PaymentMethod = 'DINHEIRO' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO' | 'PIX' | 'BOLETO' | 'OUTROS';
 
 export type PaymentCondition = 'A_VISTA' | 'DIAS_30' | 'DIAS_60' | 'CARTAO_2X' | 'CARTAO_3X';
@@ -189,6 +197,7 @@ export interface Invoice {
   id: string;
   ownerId: string;
   status: InvoiceStatus;
+  paymentCondition: PaymentCondition | null;
   total: number;
   dueDate: string;
   paidAt: string | null;
