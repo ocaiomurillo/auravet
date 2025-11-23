@@ -276,7 +276,7 @@ const ProductsPage = () => {
     });
 
     downloadBlob(blob, `auravet-produtos-${Date.now()}.xlsx`);
-    toast.success('Exportação em XLSX preparada.');
+    toast.success('Exportação para Excel preparada.');
   };
 
   const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -305,7 +305,7 @@ const ProductsPage = () => {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" onClick={handleExportXlsx} disabled={isLoading}>
-              Exportar XLSX
+              Exportar para excel
             </Button>
             <Button variant="ghost" onClick={handleFiltersReset} disabled={isLoading}>
               Limpar filtros
