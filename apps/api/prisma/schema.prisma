@@ -270,7 +270,7 @@ model Invoice {
   dueDate        DateTime
   paidAt         DateTime?
   paymentMethod  PaymentMethod?
-   paymentConditionType PaymentConditionType?
+  paymentConditionType PaymentConditionType?
   paymentNotes   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
