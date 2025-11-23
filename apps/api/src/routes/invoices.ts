@@ -159,6 +159,26 @@ invoicesRouter.get(
 );
 
 const escapeCsv = (value: string) => `"${value.replace(/"/gu, '""')}"`;
+const escapeXml = (value: string) =>
+  value
+    .replace(/&/gu, '&amp;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;')
+    .replace(/"/gu, '&quot;')
+    .replace(/'/gu, '&apos;');
+
+const buildSpreadsheetXml = (header: string[], rows: Array<Array<string | number>>) => {
+  const xmlRows = [header, ...rows]
+    .map(
+      (row) =>
+        `<Row>${row
+          .map((cell) => `<Cell><Data ss:Type="String">${escapeXml(String(cell))}</Data></Cell>`)
+          .join('')}</Row>`,
+    )
+    .join('');
+
+  return `<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Contas"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
+};
 
 invoicesRouter.get(
   '/export',
@@ -182,6 +202,16 @@ invoicesRouter.get(
       invoice.paidAt ? invoice.paidAt.toISOString() : '',
       invoice.responsible?.nome ?? '',
     ]);
+
+    if (filters.format === 'xlsx') {
+      const xmlContent = buildSpreadsheetXml(header, rows);
+      const buffer = Buffer.from(xmlContent, 'utf-8');
+
+      res.setHeader('Content-Type', 'application/vnd.ms-excel');
+      res.setHeader('Content-Disposition', 'attachment; filename="invoices.xlsx"');
+      res.send(buffer);
+      return;
+    }
 
     const csv = [header, ...rows]
       .map((row) => row.map((value) => escapeCsv(String(value))).join(','))

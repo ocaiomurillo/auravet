@@ -53,7 +53,7 @@ export const ensureApiConfigured = (): void => {
 async function request<T>(
   path: string,
   options: RequestInit = {},
-  responseType: 'json' | 'text' = 'json',
+  responseType: 'json' | 'text' | 'blob' = 'json',
 ): Promise<T> {
   const token = authStorage.getToken();
 
@@ -95,12 +95,17 @@ async function request<T>(
     return (await response.text()) as T;
   }
 
+  if (responseType === 'blob') {
+    return (await response.blob()) as T;
+  }
+
   return (await response.json()) as T;
 }
 
 export const apiClient = {
   get: <T>(path: string) => request<T>(path),
   getText: (path: string) => request<string>(path, {}, 'text'),
+  getBlob: (path: string) => request<Blob>(path, {}, 'blob'),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, {
       method: 'POST',
@@ -214,13 +219,17 @@ export interface InvoiceFilters {
   to?: string;
 }
 
-const buildInvoiceQuery = (filters: InvoiceFilters = {}) => {
+const buildInvoiceParams = (filters: InvoiceFilters = {}) => {
   const params = new URLSearchParams();
   if (filters.ownerId) params.set('ownerId', filters.ownerId);
   if (filters.status) params.set('status', filters.status);
   if (filters.from) params.set('from', filters.from);
   if (filters.to) params.set('to', filters.to);
-  const queryString = params.toString();
+  return params;
+};
+
+const buildInvoiceQuery = (filters: InvoiceFilters = {}) => {
+  const queryString = buildInvoiceParams(filters).toString();
   return queryString ? `?${queryString}` : '';
 };
 
@@ -238,11 +247,12 @@ export const invoicesApi = {
   ) => apiClient.post<Invoice>(`/invoices/${invoiceId}/items`, payload),
   removeManualItem: (invoiceId: string, itemId: string) =>
     apiClient.delete<Invoice>(`/invoices/${invoiceId}/items/${itemId}`),
-  exportCsv: (filters: InvoiceFilters = {}) =>
-    (() => {
-      const query = buildInvoiceQuery(filters);
-      const separator = query ? '&' : '?';
-      return apiClient.getText(`/invoices/export${query}${separator}format=csv`);
-    })(),
+  exportFile: (filters: InvoiceFilters = {}, format: 'csv' | 'xlsx' = 'xlsx') => {
+    const params = buildInvoiceParams(filters);
+    params.set('format', format);
+    const queryString = params.toString();
+    const suffix = queryString ? `?${queryString}` : '';
+    return apiClient.getBlob(`/invoices/export${suffix}`);
+  },
   print: (id: string) => apiClient.getText(`/invoices/${id}/print`),
 };
