@@ -595,6 +595,17 @@ const NewServicePage = () => {
       navigate(`/animals`, { state: { highlight: service.animalId } });
     },
     onError: (err: unknown) => {
+      const normalizedErrorMessage =
+        err instanceof Error ? err.message.trim().toLowerCase() : undefined;
+
+      if (normalizedErrorMessage?.includes('atendimento em andamento')) {
+        const friendlyMessage =
+          'Já existe um atendimento em andamento para este pet. Acesse ou conclua o atendimento aberto antes de criar outro.';
+        setSubmitError(friendlyMessage);
+        toast.error(friendlyMessage);
+        return;
+      }
+
       const message = formatErrorMessage(err, 'Não foi possível registrar o atendimento.');
       setSubmitError(message);
       toast.error(message);
