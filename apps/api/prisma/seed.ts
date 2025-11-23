@@ -1222,49 +1222,62 @@ await Promise.all(
     where: { isActive: true },
   });
 
+  const products = await prisma.product.findMany();
+
   const pickRandom = <T,>(arr: T[]): T | null =>
     arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
 
   const now = new Date();
 
-  const TOTAL_FUTURE_APPOINTMENTS = 50;
+// Alguns agendamentos futuros (AGENDADO / CONFIRMADO), sem atendimento ainda
+const TOTAL_FUTURE_APPOINTMENTS = 50;
 
-  // Alguns agendamentos futuros (AGENDADO / CONFIRMADO), sem atendimento ainda
-  for (let i = 0; i < TOTAL_FUTURE_APPOINTMENTS; i++) {
-    const animal = animals[i];
-    const vet = pickRandom(veterinarians);
-    const assistant = pickRandom(nurses);
+for (let i = 0; i < TOTAL_FUTURE_APPOINTMENTS; i++) {
+  const animal = pickRandom(animals);
+  const vet = pickRandom(veterinarians);
+  const assistant = pickRandom(nurses);
 
-    if (!vet) break;
+  if (!animal || !vet) continue;
 
-    const daysAhead = i + 1;
-    const start = new Date(now);
-    start.setDate(now.getDate() + daysAhead);
-    start.setHours(9 + i, 0, 0, 0);
+  // Espalha entre os próximos 15 dias
+  const daysAhead = 1 + (i % 15);
+  const start = new Date(now);
+  start.setDate(now.getDate() + daysAhead);
 
-    const end = new Date(start);
-    end.setHours(start.getHours() + 1);
+  // Janelas de horário entre 9h e 17h
+  const baseHour = 9;
+  const hourSlot = i % 9; // 0..8 → 9h..17h
+  start.setHours(baseHour + hourSlot, 0, 0, 0);
 
-    await prisma.appointment.create({
-      data: {
-        animalId: animal.id,
-        ownerId: animal.ownerId,
-        veterinarianId: vet.id,
-        assistantId: assistant?.id ?? null,
-        status: i % 2 === 0 ? AppointmentStatus.AGENDADO : AppointmentStatus.CONFIRMADO,
-        scheduledStart: start,
-        scheduledEnd: end,
-        confirmedAt: i % 2 === 0 ? null : now,
-        notes:
-          i % 2 === 0
-            ? 'Agendamento criado via seed (check-up / consulta rotineira).'
-            : 'Agendamento confirmado via seed (consulta já confirmada com tutor).',
-      },
-    });
-  }
+  const end = new Date(start);
+  end.setHours(start.getHours() + 1);
 
-  // Alguns atendimentos concluídos, com agendamento já finalizado + serviço vinculado
-  for (let i = 0; i < Math.min(animals.length, 5); i++) {
+  const isConfirmed = i % 2 === 1;
+
+  await prisma.appointment.create({
+    data: {
+      animalId: animal.id,
+      ownerId: animal.ownerId,
+      veterinarianId: vet.id,
+      assistantId: assistant?.id ?? null,
+      status: isConfirmed ? AppointmentStatus.CONFIRMADO : AppointmentStatus.AGENDADO,
+      scheduledStart: start,
+      scheduledEnd: end,
+      confirmedAt: isConfirmed ? start : null,
+      notes: isConfirmed
+        ? 'Agendamento confirmado via seed (consulta já confirmada com tutor).'
+        : 'Agendamento criado via seed (check-up / consulta rotineira).',
+    },
+  });
+}
+
+// Alguns atendimentos concluídos, com agendamento já finalizado + serviço vinculado
+if (animals.length && serviceDefs.length) {
+  const products = await prisma.product.findMany({
+    where: { isActive: true },
+  });
+
+  for (let i = 0; i < Math.min(animals.length, 50); i++) {
     const animal = animals[animals.length - 1 - i];
     const vet = pickRandom(veterinarians);
     const assistant = pickRandom(nurses);
@@ -1280,6 +1293,7 @@ await Promise.all(
     const end = new Date(start);
     end.setHours(start.getHours() + 1);
 
+    // Cria o agendamento já concluído
     const appointment = await prisma.appointment.create({
       data: {
         animalId: animal.id,
@@ -1295,7 +1309,8 @@ await Promise.all(
       },
     });
 
-    await prisma.servico.create({
+    // Cria o serviço vinculado ao agendamento
+    const service = await prisma.servico.create({
       data: {
         animalId: animal.id,
         tipo: def.tipo,
@@ -1306,7 +1321,41 @@ await Promise.all(
         appointmentId: appointment.id, // vínculo Servico -> Appointment
       },
     });
+
+    // Vincula alguns produtos usados nesse atendimento (1 a 3 itens diferentes)
+    if (products.length > 0) {
+      const usedProducts = new Set<string>();
+      const productsToUse = 1 + (i % 3); // 1, 2 ou 3 produtos
+
+      for (let j = 0; j < productsToUse; j++) {
+        const product = pickRandom(products);
+
+        // >>> AQUI está a proteção que faltava
+        if (!product) continue;
+        if (usedProducts.has(product.id)) continue;
+
+        usedProducts.add(product.id);
+
+        const quantity = 1 + ((i + j) % 3); // 1 a 3 unidades
+        const unitPrice = new Prisma.Decimal(product.precoVenda);
+        const totalPrice = unitPrice.mul(quantity);
+
+        await prisma.serviceProductUsage.create({
+          data: {
+            servicoId: service.id,
+            productId: product.id,
+            quantidade: quantity,
+            valorUnitario: unitPrice,
+            valorTotal: totalPrice,
+          },
+        });
+      }
+    }
   }
+}
+
+
+
 
   const statusMap = new Map(invoiceStatuses.map((status) => [status.slug, status]));
   const openStatus = statusMap.get('ABERTA');
