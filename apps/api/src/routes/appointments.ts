@@ -349,7 +349,23 @@ appointmentsRouter.get(
       where.scheduledStart = dateFilter;
     }
 
-    const appointments = await fetchAppointmentsWithAvailability(where, { scheduledStart: 'asc' });
+    const conflictFilters: Array<keyof AppointmentAvailability> = [];
+
+    if (filters.veterinarianConflict) {
+      conflictFilters.push('veterinarianConflict');
+    }
+
+    if (filters.assistantConflict) {
+      conflictFilters.push('assistantConflict');
+    }
+
+    let appointments = await fetchAppointmentsWithAvailability(where, { scheduledStart: 'asc' });
+
+    if (conflictFilters.length > 0) {
+      appointments = appointments.filter((appointment) =>
+        conflictFilters.some((key) => appointment.availability[key]),
+      );
+    }
 
     res.json({ appointments });
   }),

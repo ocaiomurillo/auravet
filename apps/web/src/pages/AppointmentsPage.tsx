@@ -65,6 +65,8 @@ interface AppointmentFilters {
   animalId: string;
   from: string;
   to: string;
+  veterinarianConflict: boolean;
+  assistantConflict: boolean;
 }
 
 interface RescheduleFormState {
@@ -100,6 +102,8 @@ const AppointmentsPage = () => {
     animalId: '',
     from: '',
     to: '',
+    veterinarianConflict: false,
+    assistantConflict: false,
   });
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<AppointmentFormState>({
@@ -163,6 +167,8 @@ const AppointmentsPage = () => {
     if (filters.animalId) params.set('animalId', filters.animalId);
     if (filters.from) params.set('from', filters.from);
     if (filters.to) params.set('to', filters.to);
+    if (filters.veterinarianConflict) params.set('veterinarianConflict', 'true');
+    if (filters.assistantConflict) params.set('assistantConflict', 'true');
     return params.toString() ? `?${params.toString()}` : '';
   }, [filters]);
 
@@ -284,7 +290,16 @@ const AppointmentsPage = () => {
   };
 
   const handleResetFilters = () => {
-    setFilters({ status: '', collaboratorId: '', ownerId: '', animalId: '', from: '', to: '' });
+    setFilters({
+      status: '',
+      collaboratorId: '',
+      ownerId: '',
+      animalId: '',
+      from: '',
+      to: '',
+      veterinarianConflict: false,
+      assistantConflict: false,
+    });
   };
 
   const handleRegisterAttendance = (appointmentId: string) => {
@@ -396,6 +411,17 @@ const AppointmentsPage = () => {
     });
   };
 
+  const isFilteringConflicts = filters.veterinarianConflict || filters.assistantConflict;
+  const conflictFilterSummary = [
+    filters.veterinarianConflict ? 'conflito do veterinário' : '',
+    filters.assistantConflict ? 'conflito da assistência' : '',
+  ]
+    .filter(Boolean)
+    .join(' e ');
+  const agendaDescription = isFilteringConflicts
+    ? 'Exibindo apenas horários com conflito, destacados pelos chips de disponibilidade.'
+    : 'Confirme, reagende ou finalize consultas com indicadores de disponibilidade.';
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -415,7 +441,10 @@ const AppointmentsPage = () => {
         </Button>
       </div>
 
-      <Card title="Filtrar agenda" description="Personalize a visão por status, tutor, pet ou responsável clínico.">
+      <Card
+        title="Filtrar agenda"
+        description="Personalize a visão por status, tutor, pet, responsável clínico ou conflitos de agenda."
+      >
         <form className="grid gap-4 md:grid-cols-6" onSubmit={handleSubmitFilters}>
           <SelectField
             label="Status"
@@ -487,6 +516,38 @@ const AppointmentsPage = () => {
             onChange={(event) => setFilters((prev) => ({ ...prev, to: event.target.value }))}
           />
 
+          <div className="space-y-2 rounded-2xl border border-brand-azul/30 bg-white/60 p-4 md:col-span-6">
+            <div>
+              <p className="text-sm font-semibold text-brand-escuro">Conflitos de agenda</p>
+              <p className="text-xs text-brand-grafite/70">
+                Marque as opções para visualizar apenas horários com sobreposição de compromissos e confira os chips de
+                disponibilidade destacados na lista.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm text-brand-escuro">
+              <label className="flex items-center gap-2 rounded-xl border border-brand-azul/30 bg-white/80 px-3 py-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-brand-escuro"
+                  checked={filters.veterinarianConflict}
+                  onChange={(event) =>
+                    setFilters((prev) => ({ ...prev, veterinarianConflict: event.target.checked }))
+                  }
+                />
+                Conflito do veterinário
+              </label>
+              <label className="flex items-center gap-2 rounded-xl border border-brand-azul/30 bg-white/80 px-3 py-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-brand-escuro"
+                  checked={filters.assistantConflict}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, assistantConflict: event.target.checked }))}
+                />
+                Conflito da assistência
+              </label>
+            </div>
+          </div>
+
           <div className="flex gap-3 md:col-span-6">
             <Button type="submit">Aplicar filtros</Button>
             <Button type="button" variant="ghost" onClick={handleResetFilters}>
@@ -496,12 +557,14 @@ const AppointmentsPage = () => {
         </form>
       </Card>
 
-      <Card
-        title="Agenda clínica"
-        description="Confirme, reagende ou finalize consultas com indicadores de disponibilidade."
-      >
+      <Card title="Agenda clínica" description={agendaDescription}>
         {isLoading ? <p>Carregando agendamentos...</p> : null}
         {error ? <p className="text-red-500">Não foi possível carregar os agendamentos.</p> : null}
+        {isFilteringConflicts ? (
+          <p className="text-xs font-medium text-brand-grafite/80">
+            Filtro ativo: exibindo agendamentos com {conflictFilterSummary}.
+          </p>
+        ) : null}
         {!isLoading && !appointments.length ? (
           <p className="text-sm text-brand-grafite/70">
             Ainda não existem consultas neste filtro. Experimente ajustar os critérios ou agendar uma nova avaliação.

@@ -99,6 +99,8 @@ export const appointmentFilterSchema = z.object({
   assistantId: cuidSchema('Colaborador inválido').optional(),
   ownerId: cuidSchema('Tutor inválido').optional(),
   animalId: cuidSchema('Animal inválido').optional(),
+  veterinarianConflict: z.coerce.boolean().optional(),
+  assistantConflict: z.coerce.boolean().optional(),
 });
 
 export const appointmentConfirmSchema = z.object({
