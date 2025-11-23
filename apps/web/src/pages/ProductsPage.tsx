@@ -305,7 +305,7 @@ const ProductsPage = () => {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" onClick={handleExportXlsx} disabled={isLoading}>
-              Exportar para excel
+              Exportar para Excel
             </Button>
             <Button variant="ghost" onClick={handleFiltersReset} disabled={isLoading}>
               Limpar filtros
