@@ -230,6 +230,7 @@ const CashierPage = () => {
   const [extraItemUnitPrice, setExtraItemUnitPrice] = useState('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const adjustedInvoiceItemIdsRef = useRef<Set<string>>(new Set());
 
   const { data: owners } = useQuery({
@@ -436,6 +437,32 @@ const CashierPage = () => {
 
   const handleFiltersReset = () => {
     setFilters({ ownerId: '', status: '', from: '', to: '' });
+  };
+
+  const handleExportXlsx = async () => {
+    if (!invoices.length) {
+      toast.error('Nenhuma conta encontrada para exportação.');
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const blob = await invoicesApi.exportFile(filters, 'xlsx');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `auravet-contas-${Date.now()}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Exportação em XLSX preparada.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível exportar as contas.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleOpenInvoice = (invoice: Invoice) => {
@@ -674,6 +701,14 @@ const CashierPage = () => {
 
           <div className="flex gap-3 md:col-span-4">
             <Button type="submit">Aplicar filtros</Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleExportXlsx}
+              disabled={isExporting}
+            >
+              {isExporting ? 'Gerando XLSX...' : 'Exportar XLSX'}
+            </Button>
             <Button type="button" variant="ghost" onClick={handleFiltersReset}>
               Limpar
             </Button>

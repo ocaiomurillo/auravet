@@ -40,5 +40,5 @@ export const invoiceItemPathSchema = z.object({
 });
 
 export const invoiceExportSchema = invoiceFilterSchema.extend({
-  format: z.enum(['csv']).default('csv'),
+  format: z.enum(['csv', 'xlsx']).default('csv'),
 });
