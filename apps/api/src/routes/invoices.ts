@@ -462,6 +462,14 @@ invoicesRouter.post(
         throw new HttpError(400, 'Esta conta já está quitada.');
       }
 
+      const paymentCondition = payload.paymentConditionId
+        ? await tx.paymentCondition.findUnique({ where: { id: payload.paymentConditionId } })
+        : null;
+
+      if (payload.paymentConditionId && !paymentCondition) {
+        throw new HttpError(404, 'Condição de pagamento não encontrada.');
+      }
+
       const installments = payload.installments.map((installment, index) => ({
         amount: new Prisma.Decimal(installment.amount),
         dueDate: parseDate(installment.dueDate, `vencimento da parcela ${index + 1}`),
@@ -502,7 +510,8 @@ invoicesRouter.post(
           paidAt: latestPayment,
           paymentNotes: payload.paymentNotes ?? null,
           paymentMethod: payload.paymentMethod,
-          paymentConditionType: payload.paymentCondition,
+          paymentConditionType: payload.paymentCondition ?? existing.paymentConditionType ?? null,
+          paymentConditionId: paymentCondition?.id ?? existing.paymentConditionId ?? null,
           responsibleId: req.user?.id ?? existing.responsibleId,
           dueDate: earliestDueDate,
           installments: {
