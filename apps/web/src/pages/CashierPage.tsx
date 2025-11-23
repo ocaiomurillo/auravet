@@ -13,11 +13,12 @@ import type {
   InvoiceItem,
   InvoiceListResponse,
   OwnerSummary,
+  PaymentConditionDetails,
   PaymentConditionType,
   PaymentMethod,
   Product,
 } from '../types/api';
-import { apiClient, invoicesApi, productsApi } from '../lib/apiClient';
+import { apiClient, invoicesApi, paymentConditionsApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 import { JsPDFInstance, applyPdfBrandFont, loadJsPdf, loadLogoDataUrl } from '../utils/pdf';
 
@@ -87,25 +88,64 @@ const paymentMethodOptions: Array<{ value: PaymentMethod; label: string }> = [
   { value: 'OUTROS', label: 'Outros' },
 ];
 
-const paymentConditionOptions: Array<{
-  value: PaymentConditionType;
-  label: string;
-  installments: number;
-  startOffset: number;
-  interval: number;
-}> = [
-  { value: 'A_VISTA', label: 'À vista', installments: 1, startOffset: 0, interval: 0 },
-  { value: 'DIAS_30', label: '30 dias', installments: 1, startOffset: 30, interval: 0 },
-  { value: 'DIAS_60', label: '60 dias', installments: 1, startOffset: 60, interval: 0 },
-  { value: 'CARTAO_2X', label: '2x cartão', installments: 2, startOffset: 0, interval: 30 },
-  { value: 'CARTAO_3X', label: '3x cartão', installments: 3, startOffset: 0, interval: 30 },
-];
-
 const paymentMethodLabel = (method: PaymentMethod | null | undefined) =>
   paymentMethodOptions.find((option) => option.value === method)?.label ?? 'Não definido';
 
-const paymentConditionLabel = (condition: PaymentConditionType | null | undefined) =>
-  paymentConditionOptions.find((option) => option.value === condition)?.label ?? 'Não definido';
+const fallbackPaymentConditions: PaymentConditionDetails[] = [
+  { id: 'A_VISTA', nome: 'À vista', parcelas: 1, prazoDias: 0, observacoes: null, createdAt: '', updatedAt: '' },
+  {
+    id: 'DIAS_30',
+    nome: '30 dias',
+    parcelas: 1,
+    prazoDias: 30,
+    observacoes: 'Vencimento em 30 dias.',
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'DIAS_60',
+    nome: '60 dias',
+    parcelas: 1,
+    prazoDias: 60,
+    observacoes: 'Vencimento em 60 dias.',
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'CARTAO_2X',
+    nome: '2x cartão',
+    parcelas: 2,
+    prazoDias: 30,
+    observacoes: 'Parcelas a cada 30 dias.',
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'CARTAO_3X',
+    nome: '3x cartão',
+    parcelas: 3,
+    prazoDias: 30,
+    observacoes: 'Parcelas a cada 30 dias.',
+    createdAt: '',
+    updatedAt: '',
+  },
+];
+
+const paymentConditionLabel = (conditionId: string | null | undefined, conditions: PaymentConditionDetails[]) => {
+  if (!conditionId) return 'Não definido';
+
+  const condition = conditions.find((item) => item.id === conditionId);
+  if (!condition) return 'Não definido';
+
+  return condition.observacoes ? `${condition.nome} • ${condition.observacoes}` : condition.nome;
+};
+
+const paymentConditionTypeValues: PaymentConditionType[] = ['A_VISTA', 'DIAS_30', 'DIAS_60', 'CARTAO_2X', 'CARTAO_3X'];
+
+const resolvePaymentConditionType = (conditionId: string): PaymentConditionType =>
+  paymentConditionTypeValues.includes(conditionId as PaymentConditionType)
+    ? (conditionId as PaymentConditionType)
+    : 'A_VISTA';
 
 const normalizeDateInput = (value: string) => value.split('T')[0];
 
@@ -116,24 +156,24 @@ const addDays = (date: Date, days: number) => {
 };
 
 const buildInstallmentSchedule = (
-  condition: PaymentConditionType,
+  conditionId: string,
+  conditions: PaymentConditionDetails[],
   total: number,
   anchorDateIso: string,
 ): InstallmentFormState[] => {
-  const conditionConfig =
-    paymentConditionOptions.find((option) => option.value === condition) ?? paymentConditionOptions[0];
+  const condition = conditions.find((option) => option.id === conditionId) ?? conditions[0];
   const anchorDate = new Date(anchorDateIso);
-  const baseAmount = Number((total / conditionConfig.installments).toFixed(2));
+  const baseAmount = Number((total / condition.parcelas).toFixed(2));
   let accumulated = 0;
 
-  return Array.from({ length: conditionConfig.installments }).map((_, index) => {
-    const isLast = index === conditionConfig.installments - 1;
+  return Array.from({ length: condition.parcelas }).map((_, index) => {
+    const isLast = index === condition.parcelas - 1;
     const amount = isLast ? Number((total - accumulated).toFixed(2)) : baseAmount;
     accumulated += amount;
-    const dueDate = addDays(anchorDate, conditionConfig.startOffset + conditionConfig.interval * index);
+    const dueDate = addDays(anchorDate, condition.prazoDias * index);
 
     return {
-      id: `installment-${index}-${condition}-${anchorDate.getTime()}`,
+      id: `installment-${index}-${condition.id}-${anchorDate.getTime()}`,
       amount: amount.toFixed(2),
       dueDate: normalizeDateInput(dueDate.toISOString()),
       paidAt: null,
@@ -141,7 +181,11 @@ const buildInstallmentSchedule = (
   });
 };
 
-const resolveInvoiceInstallmentsForDisplay = (invoice: Invoice, fallbackCondition?: PaymentConditionType) => {
+const resolveInvoiceInstallmentsForDisplay = (
+  invoice: Invoice,
+  conditions: PaymentConditionDetails[],
+  fallbackCondition?: string,
+) => {
   if (invoice.installments.length) {
     return [...invoice.installments].sort(
       (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
@@ -149,7 +193,8 @@ const resolveInvoiceInstallmentsForDisplay = (invoice: Invoice, fallbackConditio
   }
 
   const schedule = buildInstallmentSchedule(
-    fallbackCondition ?? invoice.paymentCondition ?? 'A_VISTA',
+    fallbackCondition ?? invoice.paymentConditionDetails?.id ?? invoice.paymentCondition ?? conditions[0].id,
+    conditions,
     invoice.total,
     invoice.dueDate,
   );
@@ -162,12 +207,15 @@ const resolveInvoiceInstallmentsForDisplay = (invoice: Invoice, fallbackConditio
   }));
 };
 
-const buildInvoicePdf = async (invoice: Invoice) => {
+const buildInvoicePdf = async (invoice: Invoice, conditions: PaymentConditionDetails[]) => {
   const JsPdf = await loadJsPdf();
   const doc = new JsPdf();
   const fontName = await applyPdfBrandFont(doc);
   const logo = await loadLogoDataUrl();
-  const installmentsForPdf = resolveInvoiceInstallmentsForDisplay(invoice);
+  const installmentsForPdf = resolveInvoiceInstallmentsForDisplay(
+    invoice,
+    conditions.length ? conditions : fallbackPaymentConditions,
+  );
   const dueDate = new Date(installmentsForPdf[0]?.dueDate ?? invoice.dueDate);
   const createdAt = new Date(invoice.createdAt);
   const paidInstallments = installmentsForPdf.filter((installment) => installment.paidAt);
@@ -335,7 +383,17 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   currentY += 8;
   appendKeyValue(doc, 'Forma', paymentMethodLabel(invoice.paymentMethod), currentY, brandColors.text, fontName);
   currentY += 6;
-  appendKeyValue(doc, 'Condição', paymentConditionLabel(invoice.paymentCondition), currentY, brandColors.text, fontName);
+  appendKeyValue(
+    doc,
+    'Condição',
+    paymentConditionLabel(
+      invoice.paymentConditionDetails?.id ?? invoice.paymentCondition,
+      conditions.length ? conditions : fallbackPaymentConditions,
+    ),
+    currentY,
+    brandColors.text,
+    fontName,
+  );
   currentY += 10;
 
   addSectionTitle(doc, 'Parcelas', currentY, fontName);
@@ -402,7 +460,7 @@ const CashierPage = () => {
   const selectedInvoiceOwnerCpf = selectedInvoice ? formatCpf(selectedInvoice.owner.cpf) : null;
   const selectedInvoiceOwnerAddress = selectedInvoice ? buildOwnerAddress(selectedInvoice.owner) : null;
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('DINHEIRO');
-  const [paymentCondition, setPaymentCondition] = useState<PaymentConditionType>('A_VISTA');
+  const [paymentConditionId, setPaymentConditionId] = useState('A_VISTA');
   const [installments, setInstallments] = useState<InstallmentFormState[]>([]);
   const [isExtraItemFormOpen, setIsExtraItemFormOpen] = useState(false);
   const [extraItemMode, setExtraItemMode] = useState<'product' | 'custom'>('product');
@@ -415,8 +473,31 @@ const CashierPage = () => {
   const [isExporting, setIsExporting] = useState(false);
   const adjustedInvoiceItemIdsRef = useRef<Set<string>>(new Set());
 
+  const paymentConditionsQuery = useQuery<PaymentConditionDetails[]>({
+    queryKey: ['payment-conditions'],
+    queryFn: paymentConditionsApi.list,
+  });
+
+  const paymentConditions = useMemo(() => {
+    const backendConditions = paymentConditionsQuery.data?.length
+      ? paymentConditionsQuery.data
+      : fallbackPaymentConditions;
+
+    if (selectedInvoice?.paymentConditionDetails) {
+      const hasCondition = backendConditions.some(
+        (condition) => condition.id === selectedInvoice.paymentConditionDetails?.id,
+      );
+
+      if (!hasCondition) {
+        return [...backendConditions, selectedInvoice.paymentConditionDetails];
+      }
+    }
+
+    return backendConditions;
+  }, [paymentConditionsQuery.data, selectedInvoice?.paymentConditionDetails]);
+
   const buildInstallmentsFromInvoice = useCallback(
-    (invoice: Invoice, conditionOverride?: PaymentConditionType) => {
+    (invoice: Invoice, conditionOverride?: string) => {
       if (invoice.installments.length) {
         return invoice.installments.map((installment, index) => ({
           id: installment.id ?? `${invoice.id}-installment-${index}`,
@@ -426,20 +507,22 @@ const CashierPage = () => {
         }));
       }
 
-      const condition = conditionOverride ?? invoice.paymentCondition ?? paymentCondition;
-      return buildInstallmentSchedule(condition, invoice.total, invoice.dueDate);
+      const condition =
+        conditionOverride ?? invoice.paymentConditionDetails?.id ?? invoice.paymentCondition ?? paymentConditionId;
+      return buildInstallmentSchedule(condition, paymentConditions, invoice.total, invoice.dueDate);
     },
-    [paymentCondition],
+    [paymentConditions, paymentConditionId],
   );
 
   const applyPaymentStateFromInvoice = useCallback(
     (invoice: Invoice) => {
-      const condition = invoice.paymentCondition ?? paymentCondition;
+      const conditionId =
+        invoice.paymentConditionDetails?.id ?? invoice.paymentCondition ?? paymentConditions[0]?.id ?? 'A_VISTA';
       setPaymentMethod(invoice.paymentMethod ?? 'DINHEIRO');
-      setPaymentCondition(condition);
-      setInstallments(buildInstallmentsFromInvoice(invoice, condition));
+      setPaymentConditionId(conditionId);
+      setInstallments(buildInstallmentsFromInvoice(invoice, conditionId));
     },
-    [buildInstallmentsFromInvoice, paymentCondition],
+    [buildInstallmentsFromInvoice, paymentConditions],
   );
 
   const updateInvoiceState = useCallback(
@@ -450,6 +533,12 @@ const CashierPage = () => {
     [applyPaymentStateFromInvoice],
   );
 
+  useEffect(() => {
+    if (selectedInvoice) {
+      applyPaymentStateFromInvoice(selectedInvoice);
+    }
+  }, [applyPaymentStateFromInvoice, selectedInvoice]);
+
   const resolveInvoiceInstallments = useCallback(
     (invoice: Invoice) => {
       if (invoice.installments.length) {
@@ -457,7 +546,8 @@ const CashierPage = () => {
       }
 
       const schedule = buildInstallmentSchedule(
-        invoice.paymentCondition ?? paymentCondition,
+        invoice.paymentConditionDetails?.id ?? invoice.paymentCondition ?? paymentConditions[0].id,
+        paymentConditions,
         invoice.total,
         invoice.dueDate,
       );
@@ -469,7 +559,7 @@ const CashierPage = () => {
         paidAt: installment.paidAt,
       }));
     },
-    [paymentCondition],
+    [paymentConditions],
   );
 
   const summarizeInvoicePayments = useCallback(
@@ -522,12 +612,12 @@ const CashierPage = () => {
     mutationFn: (payload: {
       id: string;
       paymentMethod: PaymentMethod;
-      paymentCondition: PaymentConditionType;
+      paymentConditionId: string;
       installments: { amount: number; dueDate: string; paidAt?: string }[];
     }) =>
       invoicesApi.markAsPaid(payload.id, {
         paymentMethod: payload.paymentMethod,
-        paymentCondition: payload.paymentCondition,
+        paymentCondition: resolvePaymentConditionType(payload.paymentConditionId),
         installments: payload.installments,
       }),
     onSuccess: async (invoice) => {
@@ -655,7 +745,7 @@ const CashierPage = () => {
       applyPaymentStateFromInvoice(selectedInvoice);
     } else {
       setPaymentMethod('DINHEIRO');
-      setPaymentCondition('A_VISTA');
+      setPaymentConditionId('A_VISTA');
       setInstallments([]);
     }
 
@@ -781,15 +871,15 @@ const CashierPage = () => {
     markPaidMutation.mutate({
       id: selectedInvoice.id,
       paymentMethod,
-      paymentCondition,
+      paymentConditionId,
       installments: installmentsPayload,
     });
   };
 
-  const handlePaymentConditionChange = (condition: PaymentConditionType) => {
-    setPaymentCondition(condition);
+  const handlePaymentConditionChange = (conditionId: string) => {
+    setPaymentConditionId(conditionId);
     if (selectedInvoice) {
-      setInstallments(buildInstallmentsFromInvoice(selectedInvoice, condition));
+      setInstallments(buildInstallmentsFromInvoice(selectedInvoice, conditionId));
     }
   };
 
@@ -907,7 +997,7 @@ const CashierPage = () => {
 
     try {
       setIsGeneratingPdf(true);
-      const doc = await buildInvoicePdf(selectedInvoice);
+      const doc = await buildInvoicePdf(selectedInvoice, paymentConditions);
       const ownerSlug = slugify(selectedInvoice.owner.nome || 'tutor');
       const fileDate = new Date(selectedInvoice.dueDate).toISOString().split('T')[0];
       const fileName = `auravet-fatura-${ownerSlug || 'tutor'}-${fileDate}.pdf`;
@@ -1090,7 +1180,12 @@ const CashierPage = () => {
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold text-brand-escuro">{paymentMethodLabel(invoice.paymentMethod)}</p>
-                        <p className="text-xs text-brand-grafite/60">{paymentConditionLabel(invoice.paymentCondition)}</p>
+                        <p className="text-xs text-brand-grafite/60">
+                          {paymentConditionLabel(
+                            invoice.paymentConditionDetails?.id ?? invoice.paymentCondition,
+                            paymentConditions,
+                          )}
+                        </p>
                         <p className="text-xs text-brand-grafite/60">
                           {paymentSummary.totalInstallments > 0
                             ? `${paymentSummary.paidCount}/${paymentSummary.totalInstallments} parcelas pagas`
@@ -1215,7 +1310,12 @@ const CashierPage = () => {
                   <p className="font-semibold text-brand-escuro">
                     {paymentMethodLabel(selectedInvoice.paymentMethod)}
                   </p>
-                  <p className="text-xs text-brand-grafite/60">{paymentConditionLabel(selectedInvoice.paymentCondition)}</p>
+                  <p className="text-xs text-brand-grafite/60">
+                    {paymentConditionLabel(
+                      selectedInvoice.paymentConditionDetails?.id ?? selectedInvoice.paymentCondition,
+                      paymentConditions,
+                    )}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Responsável</p>
@@ -1446,13 +1546,14 @@ const CashierPage = () => {
 
                 <SelectField
                   label="Condição"
-                  value={paymentCondition}
-                  onChange={(event) => handlePaymentConditionChange(event.target.value as PaymentConditionType)}
+                  value={paymentConditionId}
+                  onChange={(event) => handlePaymentConditionChange(event.target.value)}
                   disabled={isSelectedInvoicePaid}
                 >
-                  {paymentConditionOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  {paymentConditions.map((condition) => (
+                    <option key={condition.id} value={condition.id}>
+                      {condition.nome} ({condition.parcelas}x • {condition.prazoDias} dias)
+                      {condition.observacoes ? ` • ${condition.observacoes}` : ''}
                     </option>
                   ))}
                 </SelectField>
