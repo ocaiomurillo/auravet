@@ -64,6 +64,7 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
   const conditionSummary = condition
     ? `${condition.parcelas} parcela(s) • ${condition.prazoDias} dia(s) para vencimento`
     : null;
+  const paymentConditionLabel = condition?.nome ?? formatPaymentCondition(invoice.paymentCondition);
 
   const itemsRows = invoice.items
     .map((item, index) => {
@@ -157,7 +158,7 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
         <small>Próximo vencimento: ${formatDate(nextDueDate ?? invoice.dueDate)}</small>
         <small>Último pagamento: ${formatDate(latestPayment)}</small>
         <small>Forma: ${escapeHtml(formatPaymentMethod(invoice.paymentMethod))}</small>
-        <small>Condição: ${escapeHtml(formatPaymentCondition(invoice.paymentCondition))}</small>
+        <small>Condição: ${escapeHtml(paymentConditionLabel)}</small>
       </div>
       <div class="card">
         <strong>Responsável</strong>
