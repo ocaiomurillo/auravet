@@ -6,6 +6,7 @@ import {
   TipoServico,
   Especie,
   AppointmentStatus,
+  PaymentConditionType,
 } from '@prisma/client';
 
 
@@ -383,6 +384,50 @@ const DEFAULT_INVOICE_STATUSES = [
   { slug: 'ABERTA', name: 'Aberta' },
   { slug: 'QUITADA', name: 'Quitada' },
 ] as const;
+
+const DEFAULT_PAYMENT_CONDITIONS: Array<{
+  id: PaymentConditionType;
+  nome: string;
+  prazoDias: number;
+  parcelas?: number;
+  observacoes?: string;
+}> = [
+  {
+    id: PaymentConditionType.A_VISTA,
+    nome: 'À vista',
+    prazoDias: 0,
+    parcelas: 1,
+    observacoes: 'Pagamento imediato',
+  },
+  {
+    id: PaymentConditionType.DIAS_30,
+    nome: '30 dias',
+    prazoDias: 30,
+    parcelas: 1,
+    observacoes: 'Vencimento em 30 dias',
+  },
+  {
+    id: PaymentConditionType.DIAS_60,
+    nome: '60 dias',
+    prazoDias: 60,
+    parcelas: 1,
+    observacoes: 'Vencimento em 60 dias',
+  },
+  {
+    id: PaymentConditionType.CARTAO_2X,
+    nome: 'Cartão 2x',
+    prazoDias: 30,
+    parcelas: 2,
+    observacoes: 'Parcelado em 2x com intervalos de 30 dias',
+  },
+  {
+    id: PaymentConditionType.CARTAO_3X,
+    nome: 'Cartão 3x',
+    prazoDias: 30,
+    parcelas: 3,
+    observacoes: 'Parcelado em 3x com intervalos de 30 dias',
+  },
+];
 
 const DEFAULT_OWNERS: Array<{
   nome: string;
@@ -1203,6 +1248,31 @@ await Promise.all(
     ),
   );
 
+  const paymentConditions = await Promise.all(
+    DEFAULT_PAYMENT_CONDITIONS.map((condition) =>
+      prisma.paymentCondition.upsert({
+        where: { id: condition.id },
+        update: {
+          nome: condition.nome,
+          prazoDias: condition.prazoDias,
+          parcelas: condition.parcelas ?? 1,
+          observacoes: condition.observacoes ?? null,
+        },
+        create: {
+          id: condition.id,
+          nome: condition.nome,
+          prazoDias: condition.prazoDias,
+          parcelas: condition.parcelas ?? 1,
+          observacoes: condition.observacoes ?? null,
+        },
+      }),
+    ),
+  );
+
+  const defaultPaymentCondition = paymentConditions.find(
+    (condition) => condition.id === PaymentConditionType.A_VISTA,
+  );
+
     // -----------------------------
   // Seed de agendamentos e atendimentos
   // -----------------------------
@@ -1383,6 +1453,8 @@ if (animals.length && serviceDefs.length) {
         data: {
           ownerId: service.animal.ownerId,
           statusId: openStatus.id,
+          paymentConditionId: defaultPaymentCondition?.id ?? null,
+          paymentConditionType: defaultPaymentCondition ? PaymentConditionType.A_VISTA : null,
           total,
           dueDate,
           items: {
