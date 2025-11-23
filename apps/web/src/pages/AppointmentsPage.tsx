@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import Button from '../components/Button';
@@ -176,6 +177,7 @@ const AppointmentsPage = () => {
   });
 
   const appointments = appointmentsResponse?.appointments ?? [];
+  const navigate = useNavigate();
   const [pdfServiceId, setPdfServiceId] = useState<string | null>(null);
 
   const confirmMutation = useMutation({
@@ -222,19 +224,6 @@ const AppointmentsPage = () => {
       );
     },
     onSettled: () => setPdfServiceId(null),
-  });
-
-  const completeMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiClient.patch<{ appointment: Appointment }>(`/appointments/${id}/complete`, {}),
-    onSuccess: () => {
-      toast.success('Atendimento finalizado e registrado no histórico.');
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['attendances'] });
-    },
-    onError: () => {
-      toast.error('Não foi possível finalizar o agendamento.');
-    },
   });
 
   const createMutation = useMutation({
@@ -296,6 +285,11 @@ const AppointmentsPage = () => {
 
   const handleResetFilters = () => {
     setFilters({ status: '', collaboratorId: '', ownerId: '', animalId: '', from: '', to: '' });
+  };
+
+  const handleRegisterAttendance = (appointmentId: string) => {
+    const searchParams = new URLSearchParams({ appointmentId });
+    navigate(`/new-service?${searchParams.toString()}`);
   };
 
   const openRescheduleForm = (appointment: Appointment) => {
@@ -508,8 +502,12 @@ const AppointmentsPage = () => {
         <ul className="space-y-4">
           {appointments.map((appointment) => {
             const isRescheduling = rescheduleForm.id === appointment.id;
-            const canConfirm = appointment.status === 'AGENDADO';
-            const canComplete = appointment.status !== 'CONCLUIDO' && appointment.status !== 'CANCELADO';
+            const isConcluded = appointment.status === 'CONCLUIDO';
+            const isCancelled = appointment.status === 'CANCELADO';
+            const isConfirmed = appointment.status === 'CONFIRMADO';
+            const canConfirm = !isConfirmed && !isConcluded && !isCancelled;
+            const canReschedule = !isConcluded && !isCancelled;
+            const canRegisterAttendance = !isConcluded && !isCancelled;
             const isGeneratingPdf =
               appointment.service?.id && pdfServiceId === appointment.service.id && attendancePdf.isPending;
 
@@ -576,20 +574,24 @@ const AppointmentsPage = () => {
                     ) : null}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Button
-                      variant="secondary"
-                      disabled={!canConfirm || confirmMutation.isPending}
-                      onClick={() => confirmMutation.mutate(appointment.id)}
-                    >
-                      Confirmar presença
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={rescheduleMutation.isPending}
-                      onClick={() => openRescheduleForm(appointment)}
-                    >
-                      Reagendar
-                    </Button>
+                    {canConfirm ? (
+                      <Button
+                        variant="secondary"
+                        disabled={confirmMutation.isPending}
+                        onClick={() => confirmMutation.mutate(appointment.id)}
+                      >
+                        Confirmar presença
+                      </Button>
+                    ) : null}
+                    {canReschedule ? (
+                      <Button
+                        variant="ghost"
+                        disabled={rescheduleMutation.isPending}
+                        onClick={() => openRescheduleForm(appointment)}
+                      >
+                        Reagendar
+                      </Button>
+                    ) : null}
                     {appointment.service?.id ? (
                       <Button
                         variant="ghost"
@@ -598,16 +600,14 @@ const AppointmentsPage = () => {
                           attendancePdf.mutate({ serviceId: appointment.service?.id ?? '', appointment })
                         }
                       >
-                        {isGeneratingPdf ? 'Gerando PDF...' : 'Gerar PDF do atendimento'}
+                        {isGeneratingPdf ? 'Gerando PDF...' : 'Imprimir PDF'}
                       </Button>
                     ) : null}
-                    <Button
-                      variant="primary"
-                      disabled={!canComplete || completeMutation.isPending}
-                      onClick={() => completeMutation.mutate(appointment.id)}
-                    >
-                      Finalizar atendimento
-                    </Button>
+                    {canRegisterAttendance ? (
+                      <Button variant="primary" onClick={() => handleRegisterAttendance(appointment.id)}>
+                        Registrar atendimento
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
 
