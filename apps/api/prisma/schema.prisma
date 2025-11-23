@@ -50,7 +50,7 @@ enum PaymentMethod {
   OUTROS
 }
 
-enum PaymentCondition {
+enum PaymentConditionType {
   A_VISTA
   DIAS_30
   DIAS_60
@@ -270,7 +270,7 @@ model Invoice {
   dueDate        DateTime
   paidAt         DateTime?
   paymentMethod  PaymentMethod?
-  paymentCondition PaymentCondition?
+   paymentConditionType PaymentConditionType?
   paymentNotes   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -318,6 +318,8 @@ model PaymentCondition {
   updatedAt   DateTime @updatedAt
 
   invoices Invoice[]
+}
+
 model InvoiceInstallment {
   id        String   @id @default(cuid())
   invoiceId String

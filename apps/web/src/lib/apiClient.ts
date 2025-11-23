@@ -7,12 +7,12 @@ import type {
   Invoice,
   InvoiceListResponse,
   InvoiceStatus,
-  PaymentCondition,
+  PaymentConditionDetails,
+  PaymentConditionType,
   PaymentMethod,
   Product,
   ServiceProfessional,
   ServiceDefinition,
-  PaymentCondition,
 } from '../types/api';
 import { UNAUTHORIZED_EVENT, authStorage } from './authStorage';
 
@@ -251,11 +251,21 @@ export const invoicesApi = {
     id: string,
     payload: {
       paymentMethod: PaymentMethod;
-      paymentCondition: PaymentCondition;
+      paymentCondition: PaymentConditionType;
       installments: { amount: number; dueDate: string; paidAt?: string }[];
       paymentNotes?: string;
     },
   ) => apiClient.post<Invoice>(`/invoices/${id}/pay`, payload),
+  adjust: (
+    id: string,
+    payload: {
+      dueDate: string;
+      paymentMethod?: PaymentMethod | null;
+      paymentConditionId?: string | null;
+      interestPercent?: number;
+      installments?: { amount: number; dueDate: string }[];
+    },
+  ) => apiClient.patch<Invoice>(`/invoices/${id}/adjust`, payload),
   addManualItem: (
     invoiceId: string,
     payload: { description: string; quantity: number; unitPrice: number; productId?: string },
@@ -278,9 +288,9 @@ export interface PaymentConditionPayload {
 }
 
 export const paymentConditionsApi = {
-  list: () => apiClient.get<PaymentCondition[]>('/payment-conditions'),
-  create: (payload: PaymentConditionPayload) => apiClient.post<PaymentCondition>('/payment-conditions', payload),
+  list: () => apiClient.get<PaymentConditionDetails[]>('/payment-conditions'),
+  create: (payload: PaymentConditionPayload) => apiClient.post<PaymentConditionDetails>('/payment-conditions', payload),
   update: (id: string, payload: PaymentConditionPayload) =>
-    apiClient.put<PaymentCondition>(`/payment-conditions/${id}`, payload),
+    apiClient.put<PaymentConditionDetails>(`/payment-conditions/${id}`, payload),
   remove: (id: string) => apiClient.delete<void>(`/payment-conditions/${id}`),
 };
