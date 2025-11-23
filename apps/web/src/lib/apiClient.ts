@@ -247,10 +247,8 @@ export const invoicesApi = {
   ) => apiClient.post<Invoice>(`/invoices/${invoiceId}/items`, payload),
   removeManualItem: (invoiceId: string, itemId: string) =>
     apiClient.delete<Invoice>(`/invoices/${invoiceId}/items/${itemId}`),
-  exportFile: (filters: InvoiceFilters = {}, format: 'csv' | 'xlsx' = 'xlsx') => {
-    const params = buildInvoiceParams(filters);
-    params.set('format', format);
-    const queryString = params.toString();
+  exportFile: (filters: InvoiceFilters = {}) => {
+    const queryString = buildInvoiceParams(filters).toString();
     const suffix = queryString ? `?${queryString}` : '';
     return apiClient.getBlob(`/invoices/export${suffix}`);
   },
