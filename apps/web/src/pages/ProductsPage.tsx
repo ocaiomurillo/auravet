@@ -15,6 +15,7 @@ import {
   productsApi,
 } from '../lib/apiClient';
 import type { Product } from '../types/api';
+import { createXlsxBlob, downloadBlob } from '../utils/xlsxExport';
 
 interface ProductFormValues {
   nome: string;
@@ -47,6 +48,9 @@ const defaultProductValues: ProductFormValues = {
   isActive: 'true',
   isSellable: 'true',
 };
+
+const exportHeaders = ['Nome', 'Preço de venda', 'Estoque atual', 'Status', 'Disponibilidade'] as const;
+type ExportHeader = (typeof exportHeaders)[number];
 
 const ProductsPage = () => {
   const { hasModule } = useAuth();
@@ -249,7 +253,7 @@ const ProductsPage = () => {
     setFilters({ search: '', status: 'all', sellable: 'all' });
   };
 
-  const buildExportRows = () =>
+  const buildExportRows = (): Record<ExportHeader, string | number>[] =>
     filteredProducts.map((product) => ({
       Nome: product.nome,
       'Preço de venda': product.precoVenda.toFixed(2),
@@ -258,66 +262,20 @@ const ProductsPage = () => {
       Disponibilidade: product.isSellable ? 'Disponível para venda' : 'Indisponível para venda',
     }));
 
-  const handleExportCsv = () => {
-    if (!filteredProducts.length) {
-      toast.error('Nenhum produto encontrado para exportação.');
-      return;
-    }
-
-    const exportHeaders = ['Nome', 'Preço de venda', 'Estoque atual', 'Status', 'Disponibilidade'] as const;
-    const rows = buildExportRows().map((row) => exportHeaders.map((header) => row[header]));
-    const csvContent = [exportHeaders, ...rows]
-      .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `auravet-produtos-${Date.now()}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success('Exportação em CSV preparada.');
-  };
-
   const handleExportXlsx = () => {
     if (!filteredProducts.length) {
       toast.error('Nenhum produto encontrado para exportação.');
       return;
     }
 
-    const exportHeaders = ['Nome', 'Preço de venda', 'Estoque atual', 'Status', 'Disponibilidade'] as const;
-    const rows = [exportHeaders, ...buildExportRows().map((row) => exportHeaders.map((header) => row[header]))];
-    const escapeXml = (value: string | number) =>
-      String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-    const xmlRows = rows
-      .map(
-        (row) =>
-          `<Row>${row
-            .map((cell) => `<Cell><Data ss:Type="String">${escapeXml(cell)}</Data></Cell>`)
-            .join('')}</Row>`,
-      )
-      .join('');
-    const xmlContent = `<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Produtos"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
-
-    const blob = new Blob([xmlContent], {
-      type: 'application/vnd.ms-excel',
+    const rows = buildExportRows().map((row) => exportHeaders.map((header) => row[header]));
+    const blob = createXlsxBlob({
+      sheetName: 'Produtos',
+      headers: exportHeaders,
+      rows,
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `auravet-produtos-${Date.now()}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+
+    downloadBlob(blob, `auravet-produtos-${Date.now()}.xlsx`);
     toast.success('Exportação em XLSX preparada.');
   };
 
@@ -346,9 +304,6 @@ const ProductsPage = () => {
         description="Busque produtos por nome, status e disponibilidade."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" onClick={handleExportCsv} disabled={isLoading}>
-              Exportar CSV
-            </Button>
             <Button variant="secondary" onClick={handleExportXlsx} disabled={isLoading}>
               Exportar XLSX
             </Button>
