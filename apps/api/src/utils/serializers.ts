@@ -288,6 +288,7 @@ type AppointmentWithRelations = Appointment & {
   veterinarian: User & { role: Role; collaboratorProfile?: CollaboratorProfile | null };
   assistant?: (User & { role: Role; collaboratorProfile?: CollaboratorProfile | null }) | null;
   service?: Servico | null;
+  serviceRecord?: Servico | null;
 };
 
 export type AppointmentAvailability = {
@@ -350,13 +351,18 @@ export const serializeAppointmentUser = (
 export const serializeAppointment = (
   appointment: AppointmentWithRelations,
   availability: AppointmentAvailability,
-): SerializedAppointment => ({
+): SerializedAppointment => {
+  const service = (appointment.service ?? appointment.serviceRecord ?? null) as
+    | ServiceWithOptionalRelations
+    | null;
+
+  return {
   id: appointment.id,
   animalId: appointment.animalId,
   ownerId: appointment.ownerId,
   veterinarianId: appointment.veterinarianId,
   assistantId: appointment.assistantId ?? null,
-  serviceId: appointment.serviceId ?? null,
+  serviceId: appointment.serviceId ?? service?.id ?? null,
   status: appointment.status,
   scheduledStart: appointment.scheduledStart.toISOString(),
   scheduledEnd: appointment.scheduledEnd.toISOString(),
@@ -374,10 +380,9 @@ export const serializeAppointment = (
   owner: serializeOwner({ ...appointment.owner, animals: undefined, appointments: undefined }),
   veterinarian: serializeAppointmentUser(appointment.veterinarian),
   assistant: appointment.assistant ? serializeAppointmentUser(appointment.assistant) : null,
-  service: appointment.service
-    ? serializeService({ ...appointment.service, animal: undefined, items: undefined, appointment: undefined })
-    : null,
-});
+  service: service ? serializeService(service) : null,
+  };
+};
 
 export type SerializedProduct = {
   id: string;
