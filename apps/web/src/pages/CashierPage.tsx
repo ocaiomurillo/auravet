@@ -448,7 +448,7 @@ const CashierPage = () => {
     setIsExporting(true);
 
     try {
-      const blob = await invoicesApi.exportFile(filters, 'xlsx');
+      const blob = await invoicesApi.exportFile(filters);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

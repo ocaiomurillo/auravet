@@ -158,7 +158,6 @@ invoicesRouter.get(
   }),
 );
 
-const escapeCsv = (value: string) => `"${value.replace(/"/gu, '""')}"`;
 const escapeXml = (value: string) =>
   value
     .replace(/&/gu, '&amp;')
@@ -167,17 +166,153 @@ const escapeXml = (value: string) =>
     .replace(/"/gu, '&quot;')
     .replace(/'/gu, '&apos;');
 
-const buildSpreadsheetXml = (header: string[], rows: Array<Array<string | number>>) => {
-  const xmlRows = [header, ...rows]
-    .map(
-      (row) =>
-        `<Row>${row
-          .map((cell) => `<Cell><Data ss:Type="String">${escapeXml(String(cell))}</Data></Cell>`)
-          .join('')}</Row>`,
-    )
+type WorksheetCell =
+  | { type: 'string'; value: string }
+  | { type: 'number'; value: string }
+  | { type: 'date'; value: string }
+  | { type: 'empty' };
+
+const buildWorksheetXml = (rows: WorksheetCell[][]) => {
+  const rowsXml = rows
+    .map((row, rowIndex) => {
+      const cells = row
+        .map((cell) => {
+          if (cell.type === 'string') {
+            return `<c t="inlineStr"><is><t>${escapeXml(cell.value)}</t></is></c>`;
+          }
+
+          if (cell.type === 'number') {
+            return `<c><v>${cell.value}</v></c>`;
+          }
+
+          if (cell.type === 'date') {
+            return `<c t="d"><v>${cell.value}</v></c>`;
+          }
+
+          return '<c/>';
+        })
+        .join('');
+
+      return `<row r="${rowIndex + 1}">${cells}</row>`;
+    })
     .join('');
 
-  return `<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Contas"><Table>${xmlRows}</Table></Worksheet></Workbook>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`;
+};
+
+const crcTable = (() => {
+  const table = new Uint32Array(256);
+
+  for (let i = 0; i < 256; i += 1) {
+    let c = i;
+
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+
+    table[i] = c >>> 0;
+  }
+
+  return table;
+})();
+
+const crc32 = (buffer: Buffer) => {
+  let crc = 0 ^ -1;
+
+  for (let offset = 0; offset < buffer.length; offset += 1) {
+    const byte = buffer[offset];
+    crc = (crc >>> 8) ^ crcTable[(crc ^ byte) & 0xff];
+  }
+
+  return (crc ^ -1) >>> 0;
+};
+
+const buildZipArchive = (entries: Array<{ filename: string; data: Buffer | string }>) => {
+  const fileParts: Buffer[] = [];
+  const centralDirectoryParts: Buffer[] = [];
+  let offset = 0;
+
+  entries.forEach((entry) => {
+    const dataBuffer = Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(entry.data);
+    const fileNameBuffer = Buffer.from(entry.filename);
+    const crc = crc32(dataBuffer);
+
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt16LE(0, 10);
+    localHeader.writeUInt16LE(0, 12);
+    localHeader.writeUInt32LE(crc, 14);
+    localHeader.writeUInt32LE(dataBuffer.length, 18);
+    localHeader.writeUInt32LE(dataBuffer.length, 22);
+    localHeader.writeUInt16LE(fileNameBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    fileParts.push(localHeader, fileNameBuffer, dataBuffer);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt16LE(0, 12);
+    centralHeader.writeUInt16LE(0, 14);
+    centralHeader.writeUInt32LE(crc, 16);
+    centralHeader.writeUInt32LE(dataBuffer.length, 20);
+    centralHeader.writeUInt32LE(dataBuffer.length, 24);
+    centralHeader.writeUInt16LE(fileNameBuffer.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+
+    centralDirectoryParts.push(Buffer.concat([centralHeader, fileNameBuffer]));
+
+    offset += localHeader.length + fileNameBuffer.length + dataBuffer.length;
+  });
+
+  const centralDirectory = Buffer.concat(centralDirectoryParts);
+
+  const endOfCentralDirectory = Buffer.alloc(22);
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(0, 4);
+  endOfCentralDirectory.writeUInt16LE(0, 6);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 8);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
+  endOfCentralDirectory.writeUInt32LE(offset, 16);
+  endOfCentralDirectory.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...fileParts, centralDirectory, endOfCentralDirectory]);
+};
+
+const buildXlsxBuffer = (rows: WorksheetCell[][]) => {
+  const worksheetXml = buildWorksheetXml(rows);
+
+  const contentTypesXml =
+    '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>';
+
+  const relsXml =
+    '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+
+  const workbookXml =
+    '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Contas" sheetId="1" r:id="rId1"/></sheets></workbook>';
+
+  const workbookRelsXml =
+    '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>';
+
+  return buildZipArchive([
+    { filename: '[Content_Types].xml', data: contentTypesXml },
+    { filename: '_rels/.rels', data: relsXml },
+    { filename: 'xl/workbook.xml', data: workbookXml },
+    { filename: 'xl/_rels/workbook.xml.rels', data: workbookRelsXml },
+    { filename: 'xl/worksheets/sheet1.xml', data: worksheetXml },
+  ]);
 };
 
 invoicesRouter.get(
@@ -193,33 +328,28 @@ invoicesRouter.get(
     });
 
     const header = ['ID', 'Tutor', 'Status', 'Total', 'Vencimento', 'Pago em', 'Responsável'];
-    const rows = invoices.map((invoice) => [
-      invoice.id,
-      invoice.owner.nome,
-      invoice.status.name,
-      invoice.total.toFixed(2),
-      invoice.dueDate.toISOString(),
-      invoice.paidAt ? invoice.paidAt.toISOString() : '',
-      invoice.responsible?.nome ?? '',
-    ]);
 
-    if (filters.format === 'xlsx') {
-      const xmlContent = buildSpreadsheetXml(header, rows);
-      const buffer = Buffer.from(xmlContent, 'utf-8');
+    const xlsxRows: WorksheetCell[][] = [
+      header.map((title) => ({ type: 'string', value: title })),
+      ...invoices.map<WorksheetCell[]>((invoice) => [
+        { type: 'string', value: invoice.id },
+        { type: 'string', value: invoice.owner.nome },
+        { type: 'string', value: invoice.status.name },
+        { type: 'number', value: invoice.total.toString() },
+        { type: 'date', value: invoice.dueDate.toISOString() },
+        invoice.paidAt ? { type: 'date', value: invoice.paidAt.toISOString() } : { type: 'empty' },
+        { type: 'string', value: invoice.responsible?.nome ?? '' },
+      ]),
+    ];
 
-      res.setHeader('Content-Type', 'application/vnd.ms-excel');
-      res.setHeader('Content-Disposition', 'attachment; filename="invoices.xlsx"');
-      res.send(buffer);
-      return;
-    }
+    const buffer = buildXlsxBuffer(xlsxRows);
 
-    const csv = [header, ...rows]
-      .map((row) => row.map((value) => escapeCsv(String(value))).join(','))
-      .join('\n');
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="invoices.csv"');
-    res.send(`\ufeff${csv}`);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="invoices.xlsx"');
+    res.send(buffer);
   }),
 );
 
