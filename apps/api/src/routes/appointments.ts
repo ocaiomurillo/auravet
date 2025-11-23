@@ -29,6 +29,32 @@ export const appointmentsRouter = Router();
 
 appointmentsRouter.use(authenticate);
 
+const appointmentServiceInclude = {
+  animal: {
+    include: {
+      owner: true,
+    },
+  },
+  appointment: true,
+  items: {
+    include: {
+      product: true,
+    },
+  },
+  catalogItems: {
+    include: {
+      definition: true,
+    },
+  },
+  responsavel: {
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+    },
+  },
+} as const;
+
 const appointmentInclude = {
   animal: {
     include: {
@@ -48,15 +74,8 @@ const appointmentInclude = {
       collaboratorProfile: true,
     },
   },
-  service: {
-    include: {
-      items: {
-        include: {
-          product: true,
-        },
-      },
-    },
-  },
+  service: { include: appointmentServiceInclude },
+  serviceRecord: { include: appointmentServiceInclude },
 } as const;
 
 type AppointmentWithAllRelations = Prisma.AppointmentGetPayload<{
@@ -795,6 +814,8 @@ appointmentsRouter.patch(
           where: { id: serviceId },
           data: { appointment: { connect: { id } } },
         });
+
+        data.service = { connect: { id: serviceId } };
       }
 
       const updated = await tx.appointment.update({
