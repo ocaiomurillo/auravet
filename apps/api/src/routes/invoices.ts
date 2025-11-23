@@ -361,6 +361,7 @@ invoicesRouter.post(
 
     const dueDate = payload.dueDate ? parseDate(payload.dueDate, 'vencimento') : undefined;
     const responsibleId = req.user?.id ?? null;
+    const paymentConditionId = payload.paymentConditionId ?? null;
 
     const invoice = await prisma.$transaction(async (tx) => {
       const serviceId = await resolveServiceIdForInvoice(tx, payload);
@@ -368,6 +369,7 @@ invoicesRouter.post(
       return syncInvoiceForService(tx, serviceId, {
         dueDate,
         responsibleId,
+        paymentConditionId,
       });
     });
 

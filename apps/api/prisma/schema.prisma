@@ -248,6 +248,7 @@ model Invoice {
   ownerId        String
   statusId       String
   responsibleId  String?
+  paymentConditionId String?
   total          Decimal  @db.Decimal(10, 2)
   dueDate        DateTime
   paidAt         DateTime?
@@ -258,6 +259,7 @@ model Invoice {
   owner        Owner         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   status       InvoiceStatus @relation(fields: [statusId], references: [id])
   responsible  User?         @relation("InvoiceResponsible", fields: [responsibleId], references: [id])
+  paymentCondition PaymentCondition? @relation(fields: [paymentConditionId], references: [id])
   items        InvoiceItem[]
 }
 
@@ -284,4 +286,16 @@ model InvoiceItem {
   invoice  Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   service  Servico? @relation(fields: [servicoId], references: [id])
   product  Product? @relation(fields: [productId], references: [id])
+}
+
+model PaymentCondition {
+  id          String   @id @default(cuid())
+  nome        String   @unique
+  prazoDias   Int
+  parcelas    Int      @default(1)
+  observacoes String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoices Invoice[]
 }

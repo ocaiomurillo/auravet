@@ -18,6 +18,7 @@ import { productsRouter } from './routes/products';
 import { invoicesRouter } from './routes/invoices';
 import { dashboardRouter } from './routes/dashboard';
 import { serviceDefinitionsRouter } from './routes/service-definitions';
+import { paymentConditionsRouter } from './routes/payment-conditions';
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use('/animals', animalsRouter);
 app.use('/appointments', appointmentsRouter);
 app.use('/services', servicesRouter);
 app.use('/service-definitions', serviceDefinitionsRouter);
+app.use('/payment-conditions', paymentConditionsRouter);
 app.use('/invoices', invoicesRouter);
 app.use('/users', usersRouter);
 app.use('/roles', rolesRouter);

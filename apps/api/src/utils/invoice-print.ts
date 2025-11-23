@@ -37,6 +37,10 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
   const ownerAddress = buildOwnerAddress(invoice);
   const responsibleName = invoice.responsible?.nome ?? null;
   const responsibleEmail = invoice.responsible?.email ?? null;
+  const condition = invoice.paymentCondition;
+  const conditionSummary = condition
+    ? `${condition.parcelas} parcela(s) • ${condition.prazoDias} dia(s) para vencimento`
+    : null;
 
   const itemsRows = invoice.items
     .map((item, index) => {
@@ -116,6 +120,20 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
         <p>${responsibleName ? escapeHtml(responsibleName) : '—'}</p>
         ${responsibleEmail ? `<small>${escapeHtml(responsibleEmail)}</small>` : ''}
       </div>
+      ${
+        condition
+          ? `<div class="card">
+        <strong>Condição de pagamento</strong>
+        <p>${escapeHtml(condition.nome)}</p>
+        ${conditionSummary ? `<small>${escapeHtml(conditionSummary)}</small>` : ''}
+        ${
+          condition.observacoes
+            ? `<small>${escapeHtml(condition.observacoes)}</small>`
+            : ''
+        }
+      </div>`
+          : ''
+      }
     </div>
 
     <table>

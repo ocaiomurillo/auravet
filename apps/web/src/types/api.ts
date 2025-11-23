@@ -144,6 +144,16 @@ export interface InvoiceStatus {
   name: string;
 }
 
+export interface PaymentCondition {
+  id: string;
+  nome: string;
+  prazoDias: number;
+  parcelas: number;
+  observacoes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface InvoiceItemProductSummary {
   id: string;
   nome: string;
@@ -178,6 +188,7 @@ export interface Invoice {
   id: string;
   ownerId: string;
   status: InvoiceStatus;
+  paymentCondition: PaymentCondition | null;
   total: number;
   dueDate: string;
   paidAt: string | null;

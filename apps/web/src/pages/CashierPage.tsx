@@ -73,6 +73,10 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   const primaryPet = invoice.items.find((item) => item.service?.animal?.nome)?.service?.animal?.nome;
   const primaryServiceDate = invoice.items.find((item) => item.service?.data)?.service?.data;
   const referenceDate = primaryServiceDate ? new Date(primaryServiceDate) : null;
+  const paymentCondition = invoice.paymentCondition;
+  const paymentConditionSummary = paymentCondition
+    ? `${paymentCondition.parcelas} parcela(s) • ${paymentCondition.prazoDias} dia(s) para vencimento`
+    : null;
 
   if (logo) {
     doc.addImage(logo, 'PNG', 15, 6, 32, 20);
@@ -204,6 +208,25 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   currentY += 6;
   appendKeyValue(doc, 'Total da fatura', currencyFormatter.format(invoice.total), currentY, brandColors.primary, fontName);
   currentY += 12;
+
+  if (paymentCondition) {
+    appendKeyValue(doc, 'Condição de pagamento', paymentCondition.nome, currentY, brandColors.text, fontName);
+    currentY += 6;
+    if (paymentConditionSummary) {
+      appendKeyValue(doc, 'Condições', paymentConditionSummary, currentY, brandColors.muted, fontName);
+      currentY += 6;
+    }
+    if (paymentCondition.observacoes) {
+      const wrapped = doc.splitTextToSize(paymentCondition.observacoes, 175);
+      appendKeyValue(doc, 'Observações', wrapped.shift() ?? '', currentY, brandColors.muted, fontName);
+      if (wrapped.length > 0) {
+        doc.text(wrapped, 30, currentY + 6);
+        currentY += wrapped.length * 6;
+      }
+      currentY += 6;
+    }
+    currentY += 6;
+  }
 
   currentY = ensureSpace(doc, currentY, 20);
   addSectionTitle(doc, 'Notas de pagamento', currentY, fontName);
@@ -879,6 +902,25 @@ const CashierPage = () => {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Responsável</p>
                   <p>{selectedInvoice.responsible?.nome ?? 'Ainda não definido'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">
+                    Condição de pagamento
+                  </p>
+                  <p className="font-semibold text-brand-escuro">
+                    {selectedInvoice.paymentCondition?.nome ?? 'Não definida'}
+                  </p>
+                  {selectedInvoice.paymentCondition ? (
+                    <p className="text-xs text-brand-grafite/60">
+                      {selectedInvoice.paymentCondition.parcelas} parcela(s) •{' '}
+                      {selectedInvoice.paymentCondition.prazoDias} dia(s) para vencimento
+                    </p>
+                  ) : null}
+                  {selectedInvoice.paymentCondition?.observacoes ? (
+                    <p className="text-xs text-brand-grafite/60">
+                      {selectedInvoice.paymentCondition.observacoes}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
