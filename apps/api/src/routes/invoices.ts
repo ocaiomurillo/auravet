@@ -1,4 +1,4 @@
-import { AppointmentStatus, Prisma } from '@prisma/client';
+import { AppointmentStatus, Prisma, PaymentCondition } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -12,6 +12,7 @@ import {
   invoiceIdSchema,
   invoiceItemPathSchema,
   invoiceManualItemSchema,
+  invoiceAdjustmentSchema,
   invoicePaymentSchema,
 } from '../schema/invoice';
 import { asyncHandler } from '../utils/async-handler';
@@ -37,6 +38,12 @@ const parseDate = (value: string, label: string) => {
     throw new HttpError(422, `Data inválida para ${label}. Utilize o formato ISO (YYYY-MM-DD).`);
   }
   return date;
+};
+
+const addDays = (date: Date, days: number) => {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
 };
 
 const endOfDay = (date: Date) => {
@@ -144,6 +151,53 @@ const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof
     openCount,
     paidCount,
   };
+};
+
+const reconcileInstallmentsAmounts = (
+  installments: Array<{ amount: Prisma.Decimal; dueDate: Date }>,
+  total: Prisma.Decimal,
+) => {
+  const sum = installments.reduce((acc, installment) => acc.add(installment.amount), new Prisma.Decimal(0));
+  const difference = total.sub(sum);
+
+  if (!difference.equals(new Prisma.Decimal(0)) && installments.length > 0) {
+    const last = installments[installments.length - 1];
+    installments[installments.length - 1] = { ...last, amount: last.amount.add(difference) };
+  }
+
+  return installments;
+};
+
+const buildInstallmentsForAdjustment = (
+  total: Prisma.Decimal,
+  paymentCondition: PaymentCondition | null,
+  dueDate: Date,
+  provided?: { amount: number; dueDate: string }[],
+) => {
+  if (provided && provided.length) {
+    const base = provided.map((installment, index) => ({
+      amount: new Prisma.Decimal(installment.amount),
+      dueDate: parseDate(installment.dueDate, `vencimento da parcela ${index + 1}`),
+    }));
+
+    return reconcileInstallmentsAmounts(base, total);
+  }
+
+  const installments = paymentCondition?.parcelas ?? 1;
+  const interval = paymentCondition?.prazoDias ?? 0;
+  const amountPerInstallment = total.div(installments);
+  const baseAmount = new Prisma.Decimal(amountPerInstallment.toFixed(2));
+
+  const schedule = Array.from({ length: installments }).map((_, index) => {
+    const isLast = index === installments - 1;
+    const amount = isLast ? total : baseAmount;
+    return {
+      amount,
+      dueDate: addDays(dueDate, interval * index),
+    };
+  });
+
+  return reconcileInstallmentsAmounts(schedule, total);
 };
 
 invoicesRouter.get(
@@ -448,7 +502,7 @@ invoicesRouter.post(
           paidAt: latestPayment,
           paymentNotes: payload.paymentNotes ?? null,
           paymentMethod: payload.paymentMethod,
-          paymentCondition: payload.paymentCondition,
+          paymentConditionType: payload.paymentCondition,
           responsibleId: req.user?.id ?? existing.responsibleId,
           dueDate: earliestDueDate,
           installments: {
@@ -458,6 +512,71 @@ invoicesRouter.post(
               paidAt: installment.paidAt,
             })),
           },
+        },
+        include: invoiceInclude,
+      });
+    });
+
+    res.json(serializeInvoice(invoice));
+  }),
+);
+
+invoicesRouter.patch(
+  '/:id/adjust',
+  requirePermission('cashier:access'),
+  asyncHandler(async (req, res) => {
+    const { id } = invoiceIdSchema.parse(req.params);
+    const payload = invoiceAdjustmentSchema.parse(req.body);
+
+    const existing = await prisma.invoice.findUnique({ where: { id }, include: invoiceInclude });
+
+    if (!existing) {
+      throw new HttpError(404, 'Conta não encontrada.');
+    }
+
+    if (existing.status.slug === 'QUITADA') {
+      throw new HttpError(400, 'Faturas quitadas não podem ser ajustadas.');
+    }
+
+    const dueDate = parseDate(payload.dueDate, 'vencimento');
+
+    const paymentCondition = payload.paymentConditionId
+      ? await prisma.paymentCondition.findUnique({ where: { id: payload.paymentConditionId } })
+      : existing.paymentCondition;
+
+    if (payload.paymentConditionId && !paymentCondition) {
+      throw new HttpError(404, 'Condição de pagamento não encontrada.');
+    }
+
+    const interestPercent = payload.interestPercent ?? 0;
+    const interestMultiplier = new Prisma.Decimal(1).add(new Prisma.Decimal(interestPercent).div(100));
+    const adjustedTotal = existing.total.mul(interestMultiplier);
+
+    const installments = buildInstallmentsForAdjustment(
+      adjustedTotal,
+      paymentCondition ?? null,
+      dueDate,
+      payload.installments,
+    );
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      await tx.invoiceInstallment.deleteMany({ where: { invoiceId: id } });
+
+      await tx.invoiceInstallment.createMany({
+        data: installments.map((installment) => ({
+          invoiceId: id,
+          amount: installment.amount,
+          dueDate: installment.dueDate,
+        })),
+      });
+
+      return tx.invoice.update({
+        where: { id },
+        data: {
+          dueDate,
+          paymentMethod: payload.paymentMethod ?? existing.paymentMethod ?? null,
+          paymentConditionId: paymentCondition?.id ?? null,
+          total: adjustedTotal,
         },
         include: invoiceInclude,
       });

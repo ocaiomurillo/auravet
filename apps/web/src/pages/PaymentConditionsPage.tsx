@@ -7,7 +7,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Field from '../components/Field';
 import Modal from '../components/Modal';
-import type { PaymentCondition } from '../types/api';
+import type { PaymentConditionDetails } from '../types/api';
 import { paymentConditionsApi, type PaymentConditionPayload } from '../lib/apiClient';
 
 interface PaymentConditionFormValues {
@@ -27,9 +27,9 @@ const defaultValues: PaymentConditionFormValues = {
 const PaymentConditionsPage = () => {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCondition, setEditingCondition] = useState<PaymentCondition | null>(null);
+  const [editingCondition, setEditingCondition] = useState<PaymentConditionDetails | null>(null);
 
-  const { data: conditions, isLoading, error } = useQuery<PaymentCondition[], Error>({
+  const { data: conditions, isLoading, error } = useQuery<PaymentConditionDetails[], Error>({
     queryKey: ['payment-conditions'],
     queryFn: paymentConditionsApi.list,
   });
@@ -54,7 +54,7 @@ const PaymentConditionsPage = () => {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (condition: PaymentCondition) => {
+  const openEditModal = (condition: PaymentConditionDetails) => {
     setEditingCondition(condition);
     reset({
       nome: condition.nome,
@@ -136,7 +136,7 @@ const PaymentConditionsPage = () => {
     }
   });
 
-  const handleDelete = async (condition: PaymentCondition) => {
+  const handleDelete = async (condition: PaymentConditionDetails) => {
     const confirmed = window.confirm(
       'Tem certeza que deseja remover esta condição? Se já tiver sido usada em faturas ela não poderá ser excluída.',
     );

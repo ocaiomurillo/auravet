@@ -7,7 +7,7 @@ import type {
   Prisma,
   Product,
   PaymentMethod,
-  PaymentCondition,
+  PaymentConditionType,
   Role,
   ServiceCatalogUsage,
   ServiceDefinition,
@@ -151,7 +151,7 @@ export type SerializedInvoice = {
   id: string;
   ownerId: string;
   status: { id: string; slug: string; name: string };
-  paymentCondition: {
+  paymentConditionDetails: {
     id: string;
     nome: string;
     prazoDias: number;
@@ -162,7 +162,7 @@ export type SerializedInvoice = {
   dueDate: string;
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
-  paymentCondition: PaymentCondition | null;
+  paymentCondition: PaymentConditionType | null;
   paymentNotes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -683,7 +683,7 @@ export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoi
       slug: invoice.status.slug,
       name: invoice.status.name,
     },
-    paymentCondition: invoice.paymentCondition
+    paymentConditionDetails: invoice.paymentCondition
       ? {
           id: invoice.paymentCondition.id,
           nome: invoice.paymentCondition.nome,
@@ -696,7 +696,7 @@ export const serializeInvoice = (invoice: InvoiceWithRelations): SerializedInvoi
     dueDate: invoice.dueDate.toISOString(),
     paidAt: invoice.paidAt ? invoice.paidAt.toISOString() : null,
     paymentMethod: invoice.paymentMethod ?? null,
-    paymentCondition: invoice.paymentCondition ?? null,
+    paymentCondition: invoice.paymentConditionType ?? null,
     paymentNotes: invoice.paymentNotes ?? null,
     createdAt: invoice.createdAt.toISOString(),
     updatedAt: invoice.updatedAt.toISOString(),

@@ -60,7 +60,7 @@ export const buildInvoicePrintHtml = (invoice: SerializedInvoice) => {
   const ownerAddress = buildOwnerAddress(invoice);
   const responsibleName = invoice.responsible?.nome ?? null;
   const responsibleEmail = invoice.responsible?.email ?? null;
-  const condition = invoice.paymentCondition;
+  const condition = invoice.paymentConditionDetails;
   const conditionSummary = condition
     ? `${condition.parcelas} parcela(s) • ${condition.prazoDias} dia(s) para vencimento`
     : null;

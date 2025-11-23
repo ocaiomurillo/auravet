@@ -53,6 +53,14 @@ export const invoicePaymentSchema = z.object({
   paymentNotes: z.string().max(500).optional(),
 });
 
+export const invoiceAdjustmentSchema = z.object({
+  dueDate: z.string(),
+  paymentMethod: paymentMethodSchema.optional(),
+  paymentConditionId: z.string().cuid().nullish(),
+  interestPercent: z.number().min(0).max(100).default(0),
+  installments: z.array(invoiceInstallmentSchema.omit({ paidAt: true })).optional(),
+});
+
 export const invoiceManualItemSchema = z.object({
   description: z.string().trim().min(1, 'Informe uma descrição para o item.').max(200),
   quantity: z.number().int().positive('Informe uma quantidade válida.'),
