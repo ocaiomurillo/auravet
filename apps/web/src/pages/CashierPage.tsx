@@ -11,7 +11,7 @@ import SelectField from '../components/SelectField';
 import type { Invoice, InvoiceItem, InvoiceListResponse, OwnerSummary, Product } from '../types/api';
 import { apiClient, invoicesApi, productsApi } from '../lib/apiClient';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
-import { JsPDFInstance, loadJsPdf, loadLogoDataUrl } from '../utils/pdf';
+import { JsPDFInstance, applyPdfBrandFont, loadJsPdf, loadLogoDataUrl } from '../utils/pdf';
 
 const brandColors = {
   primary: [61, 102, 85] as [number, number, number],
@@ -20,7 +20,8 @@ const brandColors = {
   subtle: [100, 116, 139] as [number, number, number],
 };
 
-const addSectionTitle = (doc: JsPDFInstance, title: string, y: number) => {
+const addSectionTitle = (doc: JsPDFInstance, title: string, y: number, fontName: string) => {
+  doc.setFont(fontName, 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...brandColors.text);
   doc.text(title, 15, y);
@@ -44,7 +45,11 @@ const appendKeyValue = (
   value: string,
   y: number,
   color: [number, number, number] = brandColors.text,
+  fontName?: string,
 ) => {
+  if (fontName) {
+    doc.setFont(fontName, 'normal');
+  }
   doc.setFontSize(10);
   doc.setTextColor(...color);
   doc.text(`${label}: ${value}`, 15, y);
@@ -61,6 +66,7 @@ const slugify = (value: string) =>
 const buildInvoicePdf = async (invoice: Invoice) => {
   const JsPdf = await loadJsPdf();
   const doc = new JsPdf();
+  const fontName = await applyPdfBrandFont(doc);
   const logo = await loadLogoDataUrl();
   const dueDate = new Date(invoice.dueDate);
   const createdAt = new Date(invoice.createdAt);
@@ -68,16 +74,16 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   const primaryServiceDate = invoice.items.find((item) => item.service?.data)?.service?.data;
   const referenceDate = primaryServiceDate ? new Date(primaryServiceDate) : null;
 
-  doc.setFillColor(...brandColors.primary);
-  doc.rect(0, 0, 210, 36, 'F');
-
   if (logo) {
     doc.addImage(logo, 'PNG', 15, 6, 32, 20);
   }
 
-  doc.setTextColor(255, 255, 255);
+  doc.setFont(fontName, 'bold');
+  doc.setTextColor(...brandColors.primary);
   doc.setFontSize(16);
   doc.text('Auravet', 52, 16);
+  doc.setFont(fontName, 'normal');
+  doc.setTextColor(...brandColors.muted);
   doc.setFontSize(11);
   doc.text('Detalhamento da cobrança', 52, 24);
 
@@ -88,39 +94,44 @@ const buildInvoicePdf = async (invoice: Invoice) => {
     : null;
   const statusLine = `Status: ${invoice.status.name}`;
 
-  doc.setFillColor(248, 250, 249);
-  doc.roundedRect(15, 40, 180, 28, 3, 3, 'F');
+  doc.setFont(fontName, 'bold');
   doc.setTextColor(...brandColors.text);
-  doc.setFontSize(11);
-  doc.text(invoiceHeadline, 22, 54);
+  doc.setFontSize(12);
+  doc.text(invoiceHeadline, 15, 38);
+  doc.setFont(fontName, 'normal');
   doc.setTextColor(...brandColors.muted);
   doc.setFontSize(10);
-  doc.text(billingSummary, 22, 62);
+  doc.text(billingSummary, 15, 45);
   if (referenceSummary) {
-    doc.text(referenceSummary, 22, 70);
+    doc.text(referenceSummary, 15, 52);
   }
   doc.setFontSize(9);
-  doc.setTextColor(...brandColors.text);
-  const statusY = referenceSummary ? 78 : 70;
-  doc.text(statusLine, 22, statusY);
+  doc.setFont(fontName, 'bold');
+  doc.setTextColor(...brandColors.primary);
+  const statusPositionY = referenceSummary ? 60 : 52;
+  doc.text(statusLine, 15, statusPositionY);
 
-  let currentY = referenceSummary ? 90 : 82;
+  let currentY = referenceSummary ? 70 : 62;
+  doc.setDrawColor(...brandColors.subtle);
+  doc.setLineWidth(0.2);
+  doc.line(15, currentY, 195, currentY);
+  currentY += 12;
 
-  addSectionTitle(doc, 'Tutor', currentY);
+  addSectionTitle(doc, 'Tutor', currentY, fontName);
   currentY += 8;
-  appendKeyValue(doc, 'Nome', invoice.owner.nome, currentY);
+  appendKeyValue(doc, 'Nome', invoice.owner.nome, currentY, brandColors.text, fontName);
   currentY += 6;
   if (invoice.owner.email) {
-    appendKeyValue(doc, 'E-mail', invoice.owner.email, currentY);
+    appendKeyValue(doc, 'E-mail', invoice.owner.email, currentY, brandColors.text, fontName);
     currentY += 6;
   }
   if (invoice.owner.telefone) {
-    appendKeyValue(doc, 'Telefone', invoice.owner.telefone, currentY);
+    appendKeyValue(doc, 'Telefone', invoice.owner.telefone, currentY, brandColors.text, fontName);
     currentY += 6;
   }
   const ownerCpf = formatCpf(invoice.owner.cpf);
   if (ownerCpf) {
-    appendKeyValue(doc, 'CPF', ownerCpf, currentY);
+    appendKeyValue(doc, 'CPF', ownerCpf, currentY, brandColors.text, fontName);
     currentY += 6;
   }
   const ownerAddress = buildOwnerAddress(invoice.owner);
@@ -135,8 +146,9 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   }
 
   currentY += 4;
-  addSectionTitle(doc, 'Itens faturados', currentY);
+  addSectionTitle(doc, 'Itens faturados', currentY, fontName);
   currentY += 8;
+  doc.setFont(fontName, 'bold');
   doc.setFontSize(10);
   doc.setTextColor(...brandColors.text);
   doc.text('Descrição', 15, currentY);
@@ -152,6 +164,7 @@ const buildInvoicePdf = async (invoice: Invoice) => {
     currentY = ensureSpace(doc, currentY, 18);
     const descriptionLines = doc.splitTextToSize(item.description, 90);
 
+    doc.setFont(fontName, 'normal');
     doc.setTextColor(30, 41, 59);
     doc.text(descriptionLines, 15, currentY);
     doc.text(String(item.quantity), 120, currentY, { align: 'right' as const });
@@ -175,6 +188,7 @@ const buildInvoicePdf = async (invoice: Invoice) => {
     }
 
     if (subInfo.length > 0) {
+      doc.setFont(fontName, 'normal');
       doc.setFontSize(9);
       doc.setTextColor(100, 116, 139);
       doc.text(subInfo.join(' • '), 15, currentY + 4);
@@ -183,19 +197,20 @@ const buildInvoicePdf = async (invoice: Invoice) => {
   });
 
   currentY = ensureSpace(doc, currentY, 16);
-  addSectionTitle(doc, 'Totais', currentY);
+  addSectionTitle(doc, 'Totais', currentY, fontName);
   currentY += 10;
   const subtotal = invoice.items.reduce((acc, item) => acc + item.total, 0);
-  appendKeyValue(doc, 'Subtotal', currencyFormatter.format(subtotal), currentY);
+  appendKeyValue(doc, 'Subtotal', currencyFormatter.format(subtotal), currentY, brandColors.text, fontName);
   currentY += 6;
-  appendKeyValue(doc, 'Total da fatura', currencyFormatter.format(invoice.total), currentY, brandColors.primary);
+  appendKeyValue(doc, 'Total da fatura', currencyFormatter.format(invoice.total), currentY, brandColors.primary, fontName);
   currentY += 12;
 
   currentY = ensureSpace(doc, currentY, 20);
-  addSectionTitle(doc, 'Notas de pagamento', currentY);
+  addSectionTitle(doc, 'Notas de pagamento', currentY, fontName);
   currentY += 8;
   const notes = invoice.paymentNotes?.trim() || 'Nenhuma observação registrada.';
   const wrappedNotes = doc.splitTextToSize(notes, 175);
+  doc.setFont(fontName, 'normal');
   doc.setFontSize(10);
   doc.setTextColor(30, 41, 59);
   doc.text(wrappedNotes, 15, currentY);
