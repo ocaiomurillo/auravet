@@ -24,7 +24,7 @@ export type NavItem = {
 export const navItems: NavItem[] = [
   { to: '/', label: 'Início', icon: HomeIcon },
   { to: '/owners', label: 'Tutores', module: 'owners:read', icon: UserGroupIcon },
-  { to: '/animals', label: 'Animais', module: 'animals:read', icon: HeartIcon },
+  { to: '/animals', label: 'Pets', module: 'animals:read', icon: HeartIcon },
   { to: '/appointments', label: 'Agendamentos', module: 'services:read', icon: CalendarDaysIcon },
   { to: '/calendar', label: 'Agenda', module: 'services:read', icon: CalendarIcon },
   { to: '/services', label: 'Serviços', module: 'services:read', icon: ClipboardDocumentCheckIcon },

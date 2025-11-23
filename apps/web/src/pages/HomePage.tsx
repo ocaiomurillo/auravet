@@ -105,7 +105,7 @@ const HomePage = () => {
 
       {canViewAnimals ? (
         <Card
-          title="Animais"
+          title="Pets"
           description="Visualize prontuários, histórico e datas importantes."
           actions={
             <Button variant="secondary" asChild>

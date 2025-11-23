@@ -256,7 +256,7 @@ const AnimalsPage = () => {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Animais</h1>
+          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">Pets</h1>
           <p className="text-sm text-brand-grafite/70">
             Cada pet carrega uma história. Visualize tutores, espécie e histórico de atendimentos em um só lugar.
           </p>
@@ -267,7 +267,7 @@ const AnimalsPage = () => {
               <Link to="/new-service">Registrar Atendimento</Link>
             </Button>
           ) : null}
-          {canManageAnimals ? <Button onClick={openCreateModal}>Novo animal</Button> : null}
+          {canManageAnimals ? <Button onClick={openCreateModal}>Novo Pet</Button> : null}
         </div>
       </div>
 
@@ -309,8 +309,8 @@ const AnimalsPage = () => {
               ))}
             </SelectField>
           </div>
-          {isLoading ? <p>Carregando animais...</p> : null}
-          {error ? <p className="text-red-500">Não foi possível carregar os animais.</p> : null}
+          {isLoading ? <p>Carregando pets...</p> : null}
+          {error ? <p className="text-red-500">Não foi possível carregar os pets.</p> : null}
           {filteredAnimals.length ? (
             <ul className="space-y-3">
               {filteredAnimals.map((animal) => (
@@ -357,7 +357,7 @@ const AnimalsPage = () => {
           ) : null}
           {!isLoading && !filteredAnimals.length ? (
             <p className="text-sm text-brand-grafite/70">
-              Comece cadastrando os animais dos tutores para ativar acompanhamentos personalizados.
+              Comece cadastrando os pets dos tutores para ativar acompanhamentos personalizados.
             </p>
           ) : null}
         </Card>
