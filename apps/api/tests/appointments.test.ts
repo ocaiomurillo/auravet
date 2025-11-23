@@ -4,6 +4,8 @@ import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 
+import type { PaymentMethod } from '@prisma/client';
+import { PaymentConditionType } from '@prisma/client';
 import * as PrismaModule from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -90,6 +92,9 @@ type InvoiceRecord = {
   ownerId: string;
   statusId: string;
   responsibleId: string | null;
+  paymentMethod: PaymentMethod | null;
+  paymentConditionId: string | null;
+  paymentConditionType: PaymentConditionType | null;
   total: Decimal;
   dueDate: Date;
   paidAt: Date | null;
@@ -97,6 +102,24 @@ type InvoiceRecord = {
   createdAt: Date;
   updatedAt: Date;
   itemIds: string[];
+};
+
+type PaymentConditionRecord = {
+  id: string;
+  nome: string;
+  prazoDias: number;
+  parcelas: number;
+  observacoes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type InvoiceInstallmentRecord = {
+  id: string;
+  invoiceId: string;
+  dueDate: Date;
+  amount: Decimal;
+  paidAt: Date | null;
 };
 
 type InvoiceItemRecord = {
@@ -122,6 +145,8 @@ const services: ServiceRecord[] = [];
 const appointments: AppointmentRecord[] = [];
 const invoices: InvoiceRecord[] = [];
 const invoiceItems: InvoiceItemRecord[] = [];
+const invoiceInstallments: InvoiceInstallmentRecord[] = [];
+const paymentConditions: PaymentConditionRecord[] = [];
 const invoiceStatuses: InvoiceStatusRecord[] = [];
 
 const generateId = () => `c${randomUUID().replace(/-/g, '').slice(0, 24)}`;
@@ -340,6 +365,8 @@ prismaMock.reset = () => {
   appointments.length = 0;
   invoices.length = 0;
   invoiceItems.length = 0;
+  invoiceInstallments.length = 0;
+  paymentConditions.length = 0;
   invoiceStatuses.splice(0, invoiceStatuses.length, ...baseInvoiceStatuses.map((status) => ({ ...status })));
 };
 
@@ -483,6 +510,12 @@ const buildInvoice = async (invoice: InvoiceRecord, include: any) => {
     result.status = invoiceStatuses.find((status) => status.id === invoice.statusId) ?? null;
   }
 
+  if (include?.paymentCondition) {
+    result.paymentCondition = invoice.paymentConditionId
+      ? paymentConditions.find((condition) => condition.id === invoice.paymentConditionId) ?? null
+      : null;
+  }
+
   if (include?.responsible) {
     result.responsible = invoice.responsibleId
       ? await prismaMock.user.findUnique({ where: { id: invoice.responsibleId } })
@@ -511,6 +544,17 @@ const buildInvoice = async (invoice: InvoiceRecord, include: any) => {
         return itemClone;
       }),
     ).then((items) => items.filter((item): item is Record<string, unknown> => item !== null));
+  }
+
+  if (include?.installments) {
+    result.installments = invoiceInstallments
+      .filter((installment) => installment.invoiceId === invoice.id)
+      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+      .map((installment) => ({
+        ...installment,
+        amount: new Decimal(installment.amount),
+        dueDate: new Date(installment.dueDate),
+      }));
   }
 
   return result;
@@ -692,6 +736,34 @@ const buildInvoice = async (invoice: InvoiceRecord, include: any) => {
   },
 } as any;
 
+(prismaMock as any).paymentCondition = {
+  async create({ data }: any) {
+    const now = new Date();
+    const record: PaymentConditionRecord = {
+      id: data.id ?? generateId(),
+      nome: data.nome,
+      prazoDias: data.prazoDias,
+      parcelas: data.parcelas ?? 1,
+      observacoes: data.observacoes ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    paymentConditions.push(record);
+    return { ...record };
+  },
+  async findUnique({ where }: any) {
+    if (!where) return null;
+    const record = paymentConditions.find((condition) =>
+      where.id ? condition.id === where.id : false,
+    );
+    return record ? { ...record } : null;
+  },
+  async findMany() {
+    return paymentConditions.map((condition) => ({ ...condition }));
+  },
+} as any;
+
 (prismaMock as any).invoice = {
   async create({ data, include }: any) {
     const now = new Date();
@@ -700,6 +772,9 @@ const buildInvoice = async (invoice: InvoiceRecord, include: any) => {
       ownerId: data.ownerId,
       statusId: data.statusId,
       responsibleId: data.responsibleId ?? null,
+      paymentMethod: data.paymentMethod ?? null,
+      paymentConditionId: data.paymentConditionId ?? null,
+      paymentConditionType: data.paymentConditionType ?? null,
       total: toDecimal(data.total),
       dueDate: data.dueDate instanceof Date ? data.dueDate : new Date(data.dueDate),
       paidAt: data.paidAt ?? null,
@@ -748,6 +823,15 @@ const buildInvoice = async (invoice: InvoiceRecord, include: any) => {
     }
     if (data.responsibleId !== undefined) {
       record.responsibleId = data.responsibleId ?? null;
+    }
+    if (data.paymentMethod !== undefined) {
+      record.paymentMethod = data.paymentMethod ?? null;
+    }
+    if (data.paymentConditionId !== undefined) {
+      record.paymentConditionId = data.paymentConditionId ?? null;
+    }
+    if (data.paymentConditionType !== undefined) {
+      record.paymentConditionType = data.paymentConditionType ?? null;
     }
     if (data.total !== undefined) {
       record.total = toDecimal(data.total);
@@ -863,6 +947,81 @@ const buildInvoice = async (invoice: InvoiceRecord, include: any) => {
       }
     }
     return { _sum: { total: _sum?.total ? total : null } };
+  },
+} as any;
+
+  (prismaMock as any).invoiceInstallment = {
+    async deleteMany({ where }: any) {
+      const toRemove = invoiceInstallments.filter((installment) =>
+        where.invoiceId ? installment.invoiceId === where.invoiceId : true,
+      );
+
+    for (const installment of toRemove) {
+      const index = invoiceInstallments.findIndex((entry) => entry.id === installment.id);
+      if (index >= 0) {
+        invoiceInstallments.splice(index, 1);
+      }
+    }
+  },
+    async createMany({ data }: any) {
+      const now = new Date();
+      for (const item of data) {
+        const record: InvoiceInstallmentRecord = {
+          id: generateId(),
+        invoiceId: item.invoiceId,
+        dueDate: item.dueDate instanceof Date ? item.dueDate : new Date(item.dueDate ?? now),
+        amount: toDecimal(item.amount),
+        paidAt: item.paidAt ?? null,
+      };
+
+        invoiceInstallments.push(record);
+      }
+    },
+    async create({ data }: any) {
+      const now = new Date();
+      const record: InvoiceInstallmentRecord = {
+        id: generateId(),
+        invoiceId: data.invoiceId,
+        dueDate: data.dueDate instanceof Date ? data.dueDate : new Date(data.dueDate ?? now),
+        amount: toDecimal(data.amount),
+        paidAt: data.paidAt ?? null,
+      };
+
+      invoiceInstallments.push(record);
+      return { ...record };
+    },
+    async update({ where, data }: any) {
+      const record = invoiceInstallments.find((installment) => installment.id === where.id);
+      if (!record) {
+        throw new Error('Invoice installment not found');
+      }
+
+      if (data.amount !== undefined) {
+        record.amount = toDecimal(data.amount);
+      }
+      if (data.dueDate !== undefined) {
+        record.dueDate = data.dueDate instanceof Date ? data.dueDate : new Date(data.dueDate);
+      }
+      if (data.paidAt !== undefined) {
+        record.paidAt = data.paidAt ?? null;
+      }
+
+      return { ...record };
+    },
+  async findMany({ where, orderBy }: any = {}) {
+    const filtered = invoiceInstallments.filter((installment) =>
+      where?.invoiceId ? installment.invoiceId === where.invoiceId : true,
+    );
+
+    const sorted = orderBy?.dueDate === 'asc'
+      ? [...filtered].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+      : [...filtered];
+
+    return sorted.map((installment) => ({
+      ...installment,
+      amount: new Decimal(installment.amount),
+      dueDate: new Date(installment.dueDate),
+    }));
   },
 } as any;
 
@@ -1073,5 +1232,64 @@ describe('PATCH /appointments/:id/complete', () => {
     const invoice = invoices.find((entry) => entry.id === invoiceItem.invoiceId);
     assert.ok(invoice);
     assert.equal(Number(invoice.total), updatedPrice);
+  });
+});
+
+describe('PATCH /invoices/:id/adjust', () => {
+  it('synchronizes paymentConditionType with the selected paymentConditionId', async () => {
+    const login = await post('/auth/login', {
+      email: 'admin@auravet.com',
+      password: 'Admin123!',
+    });
+
+    assert.equal(login.response.status, 200);
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const owner = await prisma.owner.create({
+      data: {
+        nome: 'Marina Duarte',
+        email: 'marina.duarte@example.com',
+      },
+    });
+
+    const conditionId = generateId();
+
+    const condition = await prisma.paymentCondition.create({
+      data: {
+        id: conditionId,
+        nome: '60 dias',
+        prazoDias: 60,
+        parcelas: 1,
+      },
+    });
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        ownerId: owner.id,
+        statusId: baseInvoiceStatuses[0].id,
+        total: new Prisma.Decimal(100),
+        dueDate: new Date('2024-01-10T00:00:00.000Z'),
+        paymentConditionType: PaymentConditionType.A_VISTA,
+      },
+    });
+
+    const payload = {
+      dueDate: '2024-02-10',
+      paymentConditionId: condition.id,
+      installments: [
+        {
+          dueDate: '2024-02-10',
+          amount: 100,
+        },
+      ],
+    };
+
+    const adjustment = await patch(`/invoices/${invoice.id}/adjust`, payload, token);
+
+    assert.equal(adjustment.response.status, 200);
+    assert.equal(adjustment.data?.paymentConditionId, condition.id);
+    assert.equal(adjustment.data?.paymentCondition, null);
+    assert.equal(adjustment.data?.paymentConditionDetails?.id, condition.id);
   });
 });

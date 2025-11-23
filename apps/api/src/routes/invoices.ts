@@ -1,4 +1,4 @@
-import { AppointmentStatus, Prisma, PaymentCondition } from '@prisma/client';
+import { AppointmentStatus, Prisma, PaymentCondition, PaymentConditionType } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -557,6 +557,20 @@ invoicesRouter.patch(
       throw new HttpError(404, 'Condição de pagamento não encontrada.');
     }
 
+    const paymentConditionType = (() => {
+      if (payload.paymentConditionId === undefined) {
+        return existing.paymentConditionType ?? null;
+      }
+
+      if (!paymentCondition) {
+        return null;
+      }
+
+      return Object.values(PaymentConditionType).includes(paymentCondition.id as PaymentConditionType)
+        ? (paymentCondition.id as PaymentConditionType)
+        : null;
+    })();
+
     const interestPercent = payload.interestPercent ?? 0;
     const interestMultiplier = new Prisma.Decimal(1).add(new Prisma.Decimal(interestPercent).div(100));
     const adjustedTotal = existing.total.mul(interestMultiplier);
@@ -585,6 +599,7 @@ invoicesRouter.patch(
           dueDate,
           paymentMethod: payload.paymentMethod ?? existing.paymentMethod ?? null,
           paymentConditionId: paymentCondition?.id ?? null,
+          paymentConditionType,
           total: adjustedTotal,
         },
         include: invoiceInclude,
