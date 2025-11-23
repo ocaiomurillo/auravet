@@ -301,6 +301,15 @@ const AppointmentsPage = () => {
     });
   };
 
+  const handleGenerateAttendancePdf = (appointment: Appointment) => {
+    if (!appointment.service?.id) {
+      toast.error('Atendimento não encontrado para gerar o PDF.');
+      return;
+    }
+
+    attendancePdf.mutate({ serviceId: appointment.service.id, appointment });
+  };
+
   const resetCreateForm = () => {
     setCreateForm({
       ownerId: '',
@@ -574,40 +583,41 @@ const AppointmentsPage = () => {
                     ) : null}
                   </div>
                   <div className="flex flex-col gap-2">
-                    {canConfirm ? (
-                      <Button
-                        variant="secondary"
-                        disabled={confirmMutation.isPending}
-                        onClick={() => confirmMutation.mutate(appointment.id)}
-                      >
-                        Confirmar presença
-                      </Button>
-                    ) : null}
-                    {canReschedule ? (
+                    {isConcluded ? (
                       <Button
                         variant="ghost"
-                        disabled={rescheduleMutation.isPending}
-                        onClick={() => openRescheduleForm(appointment)}
+                        disabled={!appointment.service?.id || attendancePdf.isPending}
+                        onClick={() => handleGenerateAttendancePdf(appointment)}
                       >
-                        Reagendar
+                        {isGeneratingPdf ? 'Gerando PDF...' : 'Gerar PDF do atendimento'}
                       </Button>
-                    ) : null}
-                    {appointment.service?.id ? (
-                      <Button
-                        variant="ghost"
-                        disabled={attendancePdf.isPending}
-                        onClick={() =>
-                          attendancePdf.mutate({ serviceId: appointment.service?.id ?? '', appointment })
-                        }
-                      >
-                        {isGeneratingPdf ? 'Gerando PDF...' : 'Imprimir PDF'}
-                      </Button>
-                    ) : null}
-                    {canRegisterAttendance ? (
-                      <Button variant="primary" onClick={() => handleRegisterAttendance(appointment.id)}>
-                        Registrar atendimento
-                      </Button>
-                    ) : null}
+                    ) : (
+                      <>
+                        {canConfirm ? (
+                          <Button
+                            variant="secondary"
+                            disabled={confirmMutation.isPending}
+                            onClick={() => confirmMutation.mutate(appointment.id)}
+                          >
+                            Confirmar presença
+                          </Button>
+                        ) : null}
+                        {canReschedule ? (
+                          <Button
+                            variant="ghost"
+                            disabled={rescheduleMutation.isPending}
+                            onClick={() => openRescheduleForm(appointment)}
+                          >
+                            Reagendar
+                          </Button>
+                        ) : null}
+                        {canRegisterAttendance ? (
+                          <Button variant="primary" onClick={() => handleRegisterAttendance(appointment.id)}>
+                            Registrar atendimento
+                          </Button>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 </div>
 
