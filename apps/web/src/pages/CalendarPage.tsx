@@ -326,7 +326,7 @@ const CalendarPage = () => {
                               attendancePdf.mutate({ serviceId: appointment.service?.id ?? '', appointment })
                             }
                           >
-                            {isGeneratingPdf ? 'Gerando PDF...' : 'Imprimir atendimento'}
+                            {isGeneratingPdf ? 'Gerando PDF...' : 'Gerar PDF do atendimento'}
                           </Button>
                         ) : null}
                         {canRegisterAttendance ? (
