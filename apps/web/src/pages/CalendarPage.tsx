@@ -1,18 +1,21 @@
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Field from '../components/Field';
 import SelectField from '../components/SelectField';
-import { apiClient } from '../lib/apiClient';
+import { apiClient, servicesApi } from '../lib/apiClient';
 import type {
   Appointment,
   AppointmentCalendarResponse,
   CollaboratorSummary,
 } from '../types/api';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
+import { buildAttendancePdf } from '../utils/attendancePdf';
 
 const statusLabels: Record<Appointment['status'], string> = {
   AGENDADO: 'Agendado',
@@ -59,11 +62,30 @@ const getDayKey = (appointment: Appointment) => {
 };
 
 const CalendarPage = () => {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<CalendarFilters>({
     view: 'week',
     date: todayISO,
     collaboratorId: '',
     status: '',
+  });
+  const [pdfServiceId, setPdfServiceId] = useState<string | null>(null);
+
+  const attendancePdf = useMutation({
+    mutationFn: async ({ serviceId, appointment }: { serviceId: string; appointment: Appointment }) => {
+      const service = await servicesApi.getById(serviceId);
+      await buildAttendancePdf(service, appointment);
+    },
+    onMutate: ({ serviceId }) => setPdfServiceId(serviceId),
+    onSuccess: () => {
+      toast.success('PDF do atendimento gerado.');
+    },
+    onError: (err: unknown) => {
+      toast.error(
+        err instanceof Error ? err.message : 'Não foi possível gerar o PDF do atendimento. Tente novamente.',
+      );
+    },
+    onSettled: () => setPdfServiceId(null),
   });
 
   const { data: collaborators } = useQuery({
@@ -108,6 +130,11 @@ const CalendarPage = () => {
 
   const handleToday = () => {
     setFilters((prev) => ({ ...prev, date: todayISO }));
+  };
+
+  const handleRegisterAttendance = (appointmentId: string) => {
+    const searchParams = new URLSearchParams({ appointmentId });
+    navigate(`/new-service?${searchParams.toString()}`);
   };
 
   return (
@@ -253,6 +280,11 @@ const CalendarPage = () => {
                 {dayAppointments.map((appointment) => {
                   const ownerCpf = formatCpf(appointment.owner.cpf);
                   const ownerAddress = buildOwnerAddress(appointment.owner);
+                  const isConcluded = appointment.status === 'CONCLUIDO';
+                  const isCancelled = appointment.status === 'CANCELADO';
+                  const canRegisterAttendance = !isConcluded && !isCancelled;
+                  const isGeneratingPdf =
+                    appointment.service?.id && pdfServiceId === appointment.service.id && attendancePdf.isPending;
 
                   return (
                     <li key={appointment.id} className="rounded-xl bg-brand-azul/5 p-3">
@@ -285,6 +317,24 @@ const CalendarPage = () => {
                       {appointment.notes ? (
                         <p className="mt-1 text-xs text-brand-grafite/70">Notas: {appointment.notes}</p>
                       ) : null}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {appointment.service?.id ? (
+                          <Button
+                            variant="ghost"
+                            disabled={attendancePdf.isPending}
+                            onClick={() =>
+                              attendancePdf.mutate({ serviceId: appointment.service?.id ?? '', appointment })
+                            }
+                          >
+                            {isGeneratingPdf ? 'Gerando PDF...' : 'Imprimir atendimento'}
+                          </Button>
+                        ) : null}
+                        {canRegisterAttendance ? (
+                          <Button variant="primary" onClick={() => handleRegisterAttendance(appointment.id)}>
+                            Registrar atendimento
+                          </Button>
+                        ) : null}
+                      </div>
                     </li>
                   );
                 })}
