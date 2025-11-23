@@ -1,5 +1,6 @@
 export type JsPDFInstance = {
   setFontSize: (size: number) => void;
+  setFont: (fontName: string, fontStyle?: string) => void;
   setTextColor: (r: number, g?: number, b?: number) => void;
   setDrawColor: (r: number, g?: number, b?: number) => void;
   setFillColor: (r: number, g?: number, b?: number) => void;
@@ -17,6 +18,8 @@ export type JsPDFInstance = {
   ) => void;
   text: (text: string | string[], x: number, y: number, options?: unknown) => void;
   splitTextToSize: (text: string, maxWidth: number) => string[];
+  addFileToVFS: (fileName: string, data: string) => void;
+  addFont: (fileName: string, fontName: string, fontStyle?: string) => void;
   addImage: (
     imageData: string | HTMLImageElement,
     format: string,
@@ -42,6 +45,39 @@ declare global {
 
 let cachedLogoDataUrl: string | null = null;
 let cachedJsPdf: JsPDFConstructor | null = null;
+let cachedFontName: string | null = null;
+let isFontLoaded = false;
+
+const nunitoFontSources = {
+  regular: ['/fonts/NunitoSans-Regular.ttf',
+    'https://unpkg.com/@fontsource/nunito-sans@latest/files/nunito-sans-latin-400-normal.ttf'],
+  bold: ['/fonts/NunitoSans-Bold.ttf',
+    'https://unpkg.com/@fontsource/nunito-sans@latest/files/nunito-sans-latin-700-normal.ttf'],
+};
+
+const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return window.btoa(binary);
+};
+
+const fetchFontFromSources = async (sources: string[]): Promise<string | null> => {
+  for (const source of sources) {
+    try {
+      const response = await fetch(source);
+      if (!response.ok) continue;
+      const buffer = await response.arrayBuffer();
+      return arrayBufferToBase64(buffer);
+    } catch (err) {
+      void err;
+    }
+  }
+
+  return null;
+};
 
 const generateFallbackLogo = (): string => {
   const canvas = document.createElement('canvas');
@@ -128,4 +164,30 @@ export const loadLogoDataUrl = async (): Promise<string> => {
 
   cachedLogoDataUrl = generateFallbackLogo();
   return cachedLogoDataUrl;
+};
+
+export const applyPdfBrandFont = async (doc: JsPDFInstance): Promise<string> => {
+  if (isFontLoaded && cachedFontName) {
+    doc.setFont(cachedFontName, 'normal');
+    return cachedFontName;
+  }
+
+  const [regularFont, boldFont] = await Promise.all([
+    fetchFontFromSources(nunitoFontSources.regular),
+    fetchFontFromSources(nunitoFontSources.bold),
+  ]);
+
+  if (regularFont && boldFont) {
+    doc.addFileToVFS('NunitoSans-Regular.ttf', regularFont);
+    doc.addFont('NunitoSans-Regular.ttf', 'NunitoSans', 'normal');
+    doc.addFileToVFS('NunitoSans-Bold.ttf', boldFont);
+    doc.addFont('NunitoSans-Bold.ttf', 'NunitoSans', 'bold');
+    cachedFontName = 'NunitoSans';
+  } else {
+    cachedFontName = 'helvetica';
+  }
+
+  isFontLoaded = cachedFontName === 'NunitoSans';
+  doc.setFont(cachedFontName, 'normal');
+  return cachedFontName;
 };
