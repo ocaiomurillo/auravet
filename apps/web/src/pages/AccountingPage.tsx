@@ -8,6 +8,7 @@ import Field from '../components/Field';
 import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
 import { invoicesApi, paymentConditionsApi } from '../lib/apiClient';
+import { buildInvoicePdf } from '../utils/invoicePdf';
 import type {
   Invoice,
   InvoiceInstallment,
@@ -27,6 +28,14 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
 });
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 const paymentMethodOptions: Array<{ value: PaymentMethod; label: string }> = [
   { value: 'DINHEIRO', label: 'Dinheiro' },
@@ -138,6 +147,7 @@ const AccountingPage = () => {
     Array<{ amount: number; dueDate: string }>
   >([]);
   const [adjustedTotal, setAdjustedTotal] = useState(0);
+  const [generatingInvoiceId, setGeneratingInvoiceId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: statuses } = useQuery<InvoiceStatus[]>({
@@ -229,6 +239,29 @@ const AccountingPage = () => {
   const handleReset = () => {
     setDraftFilters({ status: 'ABERTA', from: '', to: '' });
     setFilters({ status: 'ABERTA', from: '', to: '' });
+  };
+
+  const handleGeneratePdf = async (invoice: Invoice) => {
+    try {
+      setGeneratingInvoiceId(invoice.id);
+      const doc = await buildInvoicePdf(invoice, paymentConditionsQuery.data ?? []);
+      const ownerSlug = slugify(invoice.owner.nome || 'tutor');
+      const fileDate = new Date(invoice.dueDate).toISOString().split('T')[0];
+      const fileName = `auravet-fatura-${ownerSlug || 'tutor'}-${fileDate}.pdf`;
+      const blobUrl = doc.output('bloburl');
+      const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      doc.save(fileName);
+
+      if (newWindow) {
+        toast.success('PDF da fatura gerado. Abrimos em nova aba e iniciamos o download.');
+      } else {
+        toast.success('PDF da fatura gerado. O download foi iniciado; permita pop-ups para visualizar.');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível gerar o PDF desta fatura.');
+    } finally {
+      setGeneratingInvoiceId(null);
+    }
   };
 
   useEffect(() => {
@@ -513,6 +546,14 @@ const AccountingPage = () => {
                   </div>
 
                   <div className="mt-4 flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={generatingInvoiceId === invoice.id}
+                      onClick={() => handleGeneratePdf(invoice)}
+                    >
+                      {generatingInvoiceId === invoice.id ? 'Gerando...' : 'Gerar PDF'}
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
