@@ -500,10 +500,14 @@ const CashierPage = () => {
       }
 
       const condition =
-        conditionOverride ?? invoice.paymentConditionDetails?.id ?? invoice.paymentCondition ?? paymentConditionId;
+        conditionOverride ??
+        invoice.paymentConditionDetails?.id ??
+        invoice.paymentCondition ??
+        paymentConditions[0]?.id ??
+        'A_VISTA';
       return buildInstallmentSchedule(condition, paymentConditions, invoice.total, invoice.dueDate);
     },
-    [paymentConditions, paymentConditionId],
+    [paymentConditions],
   );
 
   const applyPaymentStateFromInvoice = useCallback(
@@ -524,12 +528,6 @@ const CashierPage = () => {
     },
     [applyPaymentStateFromInvoice],
   );
-
-  useEffect(() => {
-    if (selectedInvoice) {
-      applyPaymentStateFromInvoice(selectedInvoice);
-    }
-  }, [applyPaymentStateFromInvoice, selectedInvoice]);
 
   const resolveInvoiceInstallments = useCallback(
     (invoice: Invoice) => {
