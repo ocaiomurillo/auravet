@@ -470,23 +470,7 @@ invoicesRouter.post(
         throw new HttpError(404, 'Condição de pagamento não encontrada.');
       }
 
-      const paymentConditionType = (() => {
-        if (payload.paymentCondition !== undefined) {
-          return payload.paymentCondition;
-        }
-
-        if (payload.paymentConditionId === undefined) {
-          return existing.paymentConditionType ?? null;
-        }
-
-        if (!paymentCondition) {
-          return null;
-        }
-
-        return Object.values(PaymentConditionType).includes(paymentCondition.id as PaymentConditionType)
-          ? (paymentCondition.id as PaymentConditionType)
-          : null;
-      })();
+      const paymentConditionType = payload.paymentCondition ?? existing.paymentConditionType ?? null;
 
       const installments = payload.installments.map((installment, index) => ({
         amount: new Prisma.Decimal(installment.amount),
@@ -575,19 +559,10 @@ invoicesRouter.patch(
       throw new HttpError(404, 'Condição de pagamento não encontrada.');
     }
 
-    const paymentConditionType = (() => {
-      if (payload.paymentConditionId === undefined) {
-        return existing.paymentConditionType ?? null;
-      }
-
-      if (!paymentCondition) {
-        return null;
-      }
-
-      return Object.values(PaymentConditionType).includes(paymentCondition.id as PaymentConditionType)
-        ? (paymentCondition.id as PaymentConditionType)
-        : null;
-    })();
+    const paymentConditionType =
+      (payload as { paymentCondition?: PaymentConditionType | null }).paymentCondition ??
+      existing.paymentConditionType ??
+      null;
 
     const interestPercent = payload.interestPercent ?? 0;
     const interestMultiplier = new Prisma.Decimal(1).add(new Prisma.Decimal(interestPercent).div(100));

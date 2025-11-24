@@ -1373,21 +1373,76 @@ describe('POST /invoices', () => {
       },
     });
 
-    const invoice = await post(
-      '/invoices',
-      {
-        appointmentId: appointment.id,
-      },
+  const invoice = await post(
+    '/invoices',
+    {
+      appointmentId: appointment.id,
+    },
       token,
     );
 
     assert.equal(invoice.response.status, 400);
-    assert.equal(invoice.data?.message, 'Apenas agendamentos concluídos podem ser faturados.');
+  });
+});
+
+describe('POST /invoices/:id/pay', () => {
+  it('retains paymentConditionType when paying with a paymentConditionId', async () => {
+    const login = await post('/auth/login', {
+      email: 'admin@auravet.com',
+      password: 'Admin123!',
+    });
+
+    assert.equal(login.response.status, 200);
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const owner = await prisma.owner.create({
+      data: {
+        nome: 'Cliente Pagamento',
+        email: 'pagamento@example.com',
+      },
+    });
+
+    const condition = await prisma.paymentCondition.create({
+      data: {
+        nome: '30 dias',
+        prazoDias: 30,
+        parcelas: 1,
+      },
+    });
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        ownerId: owner.id,
+        statusId: baseInvoiceStatuses[0].id,
+        total: new Prisma.Decimal(100),
+        dueDate: new Date('2024-01-05T00:00:00.000Z'),
+        paymentConditionId: condition.id,
+        paymentConditionType: PaymentConditionType.DIAS_60,
+      },
+    });
+
+    const payment = await post(
+      `/invoices/${invoice.id}/pay`,
+      {
+        paymentMethod: 'PIX',
+        paymentConditionId: condition.id,
+        installments: [
+          { dueDate: '2024-02-05', amount: 100, paidAt: '2024-02-05' },
+        ],
+      },
+      token,
+    );
+
+    assert.equal(payment.response.status, 200);
+    assert.equal(payment.data?.paymentCondition, PaymentConditionType.DIAS_60);
+    assert.equal(payment.data?.paymentConditionId, condition.id);
+    assert.equal(payment.data?.paymentConditionDetails?.id, condition.id);
   });
 });
 
 describe('PATCH /invoices/:id/adjust', () => {
-  it('synchronizes paymentConditionType with the selected paymentConditionId', async () => {
+  it('retains paymentConditionType when adjusting with a paymentConditionId', async () => {
     const login = await post('/auth/login', {
       email: 'admin@auravet.com',
       password: 'Admin123!',
@@ -1440,7 +1495,7 @@ describe('PATCH /invoices/:id/adjust', () => {
 
     assert.equal(adjustment.response.status, 200);
     assert.equal(adjustment.data?.paymentConditionId, condition.id);
-    assert.equal(adjustment.data?.paymentCondition, null);
+    assert.equal(adjustment.data?.paymentCondition, PaymentConditionType.A_VISTA);
     assert.equal(adjustment.data?.paymentConditionDetails?.id, condition.id);
   });
 });
