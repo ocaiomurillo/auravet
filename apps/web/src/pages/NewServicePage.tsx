@@ -643,6 +643,21 @@ const NewServicePage = () => {
     },
   });
 
+  const concludeAttendance = useMutation({
+    mutationFn: (appointmentId: string) =>
+      appointmentsApi.update(appointmentId, { status: 'CONCLUIDO' }),
+    onSuccess: (_, appointmentId) => {
+      toast.success('Atendimento encerrado e marcado como concluído.');
+      queryClient.invalidateQueries({ queryKey: ['attendance', serviceId] });
+      queryClient.invalidateQueries({ queryKey: ['appointment', appointmentId] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+    onError: (err: unknown) => {
+      const message = formatErrorMessage(err, 'Não foi possível encerrar o atendimento agora.');
+      toast.error(message);
+    },
+  });
+
   const attendancePdf = useMutation({
     mutationFn: async () => {
       if (!serviceId) {
@@ -857,6 +872,17 @@ const NewServicePage = () => {
       createAttendance.mutate(payload);
     }
   });
+
+  const handleConcludeAttendance = () => {
+    const appointmentId = attendance?.appointmentId ?? null;
+
+    if (!appointmentId) {
+      toast.error('Vincule um agendamento para encerrar o atendimento.');
+      return;
+    }
+
+    concludeAttendance.mutate(appointmentId);
+  };
 
   const pageTitle = isViewing
     ? 'Visualizar atendimento'
@@ -1385,6 +1411,24 @@ const NewServicePage = () => {
           ) : null}
 
           <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
+            {isExistingAttendance && attendance?.appointmentId ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={
+                  isFormReadOnly ||
+                  concludeAttendance.isPending ||
+                  attendance?.appointment?.status === 'CONCLUIDO'
+                }
+                onClick={handleConcludeAttendance}
+              >
+                {attendance?.appointment?.status === 'CONCLUIDO'
+                  ? 'Atendimento concluído'
+                  : concludeAttendance.isPending
+                    ? 'Encerrando atendimento...'
+                    : 'Encerrar atendimento'}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="secondary"

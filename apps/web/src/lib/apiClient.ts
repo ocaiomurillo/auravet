@@ -142,9 +142,13 @@ export type CreateAppointmentPayload = {
   notes?: string;
 };
 
+export type UpdateAppointmentPayload = Partial<Omit<CreateAppointmentPayload, 'tipo'>>;
+
 export const appointmentsApi = {
   create: (payload: CreateAppointmentPayload) =>
     apiClient.post<{ appointment: Appointment }>('/appointments', payload),
+  update: (id: string, payload: UpdateAppointmentPayload) =>
+    apiClient.put<{ appointment: Appointment }>(`/appointments/${id}`, payload),
   list: (filters: { status?: string } = {}) => {
     const params = new URLSearchParams();
     if (filters.status) params.set('status', filters.status);
