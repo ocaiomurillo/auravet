@@ -1068,6 +1068,18 @@ const stopServer = async () =>
     });
   });
 
+const get = async (path: string, token?: string) => {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: 'GET',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  const contentType = response.headers.get('content-type');
+  const data = contentType?.includes('application/json') ? await response.json() : null;
+  return { response, data } as const;
+};
+
 const post = async (path: string, body: unknown, token?: string) => {
   const response = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
@@ -1166,6 +1178,85 @@ describe('appointmentUpdateSchema', () => {
   });
 });
 
+describe('GET /appointments/billable', () => {
+  it('returns only concluded appointments eligible for billing', async () => {
+    const login = await post('/auth/login', {
+      email: 'admin@auravet.com',
+      password: 'Admin123!',
+    });
+
+    assert.equal(login.response.status, 200);
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const owner = await prisma.owner.create({
+      data: {
+        nome: 'Cliente Faturamento',
+        email: 'faturamento@example.com',
+      },
+    });
+
+    const animal = await prismaMock.animal.create({
+      data: {
+        nome: 'Thor',
+        especie: 'CACHORRO',
+        ownerId: owner.id,
+      },
+    });
+
+    const concludedService = await prismaMock.servico.create({
+      data: {
+        animalId: animal.id,
+        tipo: 'CONSULTA',
+        data: new Date('2024-02-01T12:00:00.000Z'),
+        preco: 200,
+      },
+    });
+
+    const confirmedService = await prismaMock.servico.create({
+      data: {
+        animalId: animal.id,
+        tipo: 'CONSULTA',
+        data: new Date('2024-02-02T12:00:00.000Z'),
+        preco: 200,
+      },
+    });
+
+    const concludedAppointment = await (prismaMock.appointment as any).create({
+      data: {
+        animalId: animal.id,
+        ownerId: owner.id,
+        veterinarianId,
+        status: 'CONCLUIDO',
+        scheduledStart: new Date('2024-02-01T12:00:00.000Z'),
+        scheduledEnd: new Date('2024-02-01T12:30:00.000Z'),
+        service: { connect: { id: concludedService.id } },
+      },
+    });
+
+    await (prismaMock.appointment as any).create({
+      data: {
+        animalId: animal.id,
+        ownerId: owner.id,
+        veterinarianId,
+        status: 'CONFIRMADO',
+        scheduledStart: new Date('2024-02-02T12:00:00.000Z'),
+        scheduledEnd: new Date('2024-02-02T12:30:00.000Z'),
+        service: { connect: { id: confirmedService.id } },
+      },
+    });
+
+    const billable = await get('/appointments/billable', token);
+
+    assert.equal(billable.response.status, 200);
+    assert.ok(Array.isArray(billable.data));
+    assert.deepEqual(
+      (billable.data as Array<{ id: string }>).map((appointment) => appointment.id),
+      [concludedAppointment.id],
+    );
+  });
+});
+
 describe('PATCH /appointments/:id/complete', () => {
   it('updates invoices when completing an appointment with an existing service invoice', async () => {
     const login = await post('/auth/login', {
@@ -1232,6 +1323,66 @@ describe('PATCH /appointments/:id/complete', () => {
     const invoice = invoices.find((entry) => entry.id === invoiceItem.invoiceId);
     assert.ok(invoice);
     assert.equal(Number(invoice.total), updatedPrice);
+  });
+});
+
+describe('POST /invoices', () => {
+  it('rejects invoicing confirmed appointments', async () => {
+    const login = await post('/auth/login', {
+      email: 'admin@auravet.com',
+      password: 'Admin123!',
+    });
+
+    assert.equal(login.response.status, 200);
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const owner = await prisma.owner.create({
+      data: {
+        nome: 'Cliente Confirmado',
+        email: 'confirmado@example.com',
+      },
+    });
+
+    const animal = await prismaMock.animal.create({
+      data: {
+        nome: 'Mia',
+        especie: 'GATO',
+        ownerId: owner.id,
+      },
+    });
+
+    const service = await prismaMock.servico.create({
+      data: {
+        animalId: animal.id,
+        tipo: 'CONSULTA',
+        data: new Date('2024-03-01T15:00:00.000Z'),
+        preco: 180,
+      },
+    });
+
+    const appointment = await (prismaMock.appointment as any).create({
+      data: {
+        animalId: animal.id,
+        ownerId: owner.id,
+        veterinarianId,
+        status: 'CONFIRMADO',
+        scheduledStart: new Date('2024-03-01T15:00:00.000Z'),
+        scheduledEnd: new Date('2024-03-01T15:45:00.000Z'),
+        service: { connect: { id: service.id } },
+      },
+    });
+
+    const invoice = await post(
+      '/invoices',
+      {
+        appointmentId: appointment.id,
+      },
+      token,
+    );
+
+    assert.equal(invoice.response.status, 400);
+    assert.equal(invoice.data?.message, 'Apenas agendamentos concluídos podem ser faturados.');
   });
 });
 
