@@ -290,6 +290,11 @@ const AccountingPage = () => {
     const intervalDays = condition?.prazoDias ?? 0;
     const baseAmount = Number((totalWithInterest / installmentsCount).toFixed(2));
 
+    const firstDueDate = new Date(baseDueDate);
+    if (condition) {
+      firstDueDate.setDate(firstDueDate.getDate() + (condition.prazoDias ?? 0));
+    }
+
     let accumulated = 0;
     const schedule = Array.from({ length: installmentsCount }).map((_, index) => {
       const isLast = index === installmentsCount - 1;
@@ -298,7 +303,7 @@ const AccountingPage = () => {
         : baseAmount;
       accumulated += amount;
 
-      const dueDate = new Date(baseDueDate);
+      const dueDate = new Date(firstDueDate);
       dueDate.setDate(dueDate.getDate() + intervalDays * index);
 
       return {
@@ -344,11 +349,13 @@ const AccountingPage = () => {
     if (!adjustingInvoice) return;
 
     const interestPercent = Number(adjustInterestPercent) || 0;
+    const recalculatedDueDate =
+      adjustedInstallments[0]?.dueDate || adjustDueDate || normalizeDateInput(adjustingInvoice.dueDate);
 
     adjustInvoiceMutation.mutate({
       invoiceId: adjustingInvoice.id,
       payload: {
-        dueDate: adjustDueDate || normalizeDateInput(adjustingInvoice.dueDate),
+        dueDate: recalculatedDueDate,
         paymentMethod: adjustPaymentMethod || null,
         paymentConditionId: adjustPaymentConditionId || null,
         interestPercent,
