@@ -623,6 +623,30 @@ const CashierPage = () => {
     },
   });
 
+  const adjustInvoiceMutation = useMutation({
+    mutationFn: (payload: {
+      id: string;
+      dueDate: string;
+      paymentMethod: PaymentMethod;
+      paymentConditionId: string;
+      installments: { amount: number; dueDate: string }[];
+    }) =>
+      invoicesApi.adjust(payload.id, {
+        dueDate: payload.dueDate,
+        paymentMethod: payload.paymentMethod,
+        paymentConditionId: payload.paymentConditionId,
+        installments: payload.installments,
+      }),
+    onSuccess: (invoice) => {
+      toast.success('Fatura atualizada com sucesso.');
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      updateInvoiceState(invoice);
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível atualizar a fatura.');
+    },
+  });
+
   const addManualItemMutation = useMutation({
     mutationFn: (params: {
       invoiceId: string;
@@ -830,19 +854,19 @@ const CashierPage = () => {
     setInstallments([]);
   };
 
-  const handleMarkAsPaid = () => {
-    if (!selectedInvoice) return;
+  const prepareInstallmentsForSubmission = (includePaidAt: boolean) => {
+    if (!selectedInvoice) return null;
 
     if (!installments.length) {
       setInstallments(buildInstallmentsFromInvoice(selectedInvoice));
       toast.error('Configure as parcelas antes de registrar o pagamento.');
-      return;
+      return null;
     }
 
     const installmentsPayload = installments.map((installment) => ({
       amount: Number(installment.amount),
       dueDate: installment.dueDate,
-      paidAt: installment.paidAt || undefined,
+      ...(includePaidAt ? { paidAt: installment.paidAt || undefined } : {}),
     }));
 
     const hasInvalidInstallment = installmentsPayload.some(
@@ -851,20 +875,49 @@ const CashierPage = () => {
 
     if (hasInvalidInstallment) {
       toast.error('Revise valores e vencimentos das parcelas antes de salvar.');
-      return;
+      return null;
     }
 
     const totalFromInstallments = installmentsPayload.reduce((acc, installment) => acc + installment.amount, 0);
     if (Math.abs(totalFromInstallments - selectedInvoice.total) > 0.01) {
       toast.error('A soma das parcelas deve ser igual ao total da conta.');
-      return;
+      return null;
     }
+
+    return installmentsPayload;
+  };
+
+  const handleMarkAsPaid = () => {
+    if (!selectedInvoice) return;
+
+    const installmentsPayload = prepareInstallmentsForSubmission(true);
+    if (!installmentsPayload) return;
 
     markPaidMutation.mutate({
       id: selectedInvoice.id,
       paymentMethod,
       paymentConditionId,
       installments: installmentsPayload,
+    });
+  };
+
+  const handleSaveInvoice = () => {
+    if (!selectedInvoice) return;
+
+    const installmentsPayload = prepareInstallmentsForSubmission(false);
+    if (!installmentsPayload) return;
+
+    const dueDate = installmentsPayload[0]?.dueDate ?? selectedInvoice.dueDate;
+
+    adjustInvoiceMutation.mutate({
+      id: selectedInvoice.id,
+      dueDate,
+      paymentMethod,
+      paymentConditionId,
+      installments: installmentsPayload.map((installment) => ({
+        amount: installment.amount,
+        dueDate: installment.dueDate,
+      })),
     });
   };
 
@@ -1242,9 +1295,21 @@ const CashierPage = () => {
               Fechar
             </Button>
             {!isSelectedInvoicePaid ? (
-              <Button onClick={handleMarkAsPaid} disabled={markPaidMutation.isPending}>
-                {markPaidMutation.isPending ? 'Registrando...' : 'Registrar pagamento'}
-              </Button>
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={handleSaveInvoice}
+                  disabled={adjustInvoiceMutation.isPending || markPaidMutation.isPending}
+                >
+                  {adjustInvoiceMutation.isPending ? 'Salvando...' : 'Salvar fatura'}
+                </Button>
+                <Button
+                  onClick={handleMarkAsPaid}
+                  disabled={markPaidMutation.isPending || adjustInvoiceMutation.isPending}
+                >
+                  {markPaidMutation.isPending ? 'Registrando...' : 'Registrar pagamento'}
+                </Button>
+              </>
             ) : null}
           </>
         }
