@@ -204,6 +204,7 @@ export interface Invoice {
   id: string;
   ownerId: string;
   status: InvoiceStatus;
+  paymentConditionId: string | null;
   paymentCondition: PaymentConditionType | null;
   paymentConditionDetails: PaymentConditionDetails | null;
   total: number;
