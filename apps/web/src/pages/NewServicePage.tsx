@@ -644,13 +644,26 @@ const NewServicePage = () => {
   });
 
   const concludeAttendance = useMutation({
-    mutationFn: (appointmentId: string) =>
-      appointmentsApi.update(appointmentId, { status: 'CONCLUIDO' }),
+    mutationFn: (appointmentId: string) => {
+      const normalizedNotes = selectedAppointment?.notes?.trim() ?? attendance?.observacoes?.trim();
+
+      return appointmentsApi.complete(appointmentId, {
+        notes: normalizedNotes && normalizedNotes.length > 0 ? normalizedNotes : undefined,
+        service: attendance
+          ? {
+              tipo: attendance.tipo,
+              preco: attendance.preco,
+              observacoes: attendance.observacoes?.trim() || normalizedNotes || undefined,
+            }
+          : undefined,
+      });
+    },
     onSuccess: (_, appointmentId) => {
-      toast.success('Atendimento encerrado e marcado como concluído.');
+      toast.success('Agendamento concluído e sincronizado com sucesso.');
       queryClient.invalidateQueries({ queryKey: ['attendance', serviceId] });
       queryClient.invalidateQueries({ queryKey: ['appointment', appointmentId] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'billable'] });
     },
     onError: (err: unknown) => {
       const message = formatErrorMessage(err, 'Não foi possível encerrar o atendimento agora.');
@@ -1423,10 +1436,10 @@ const NewServicePage = () => {
                 onClick={handleConcludeAttendance}
               >
                 {attendance?.appointment?.status === 'CONCLUIDO'
-                  ? 'Atendimento concluído'
+                  ? 'Agendamento concluído'
                   : concludeAttendance.isPending
-                    ? 'Encerrando atendimento...'
-                    : 'Encerrar atendimento'}
+                    ? 'Concluindo agendamento...'
+                    : 'Concluir agendamento'}
               </Button>
             ) : null}
             <Button
