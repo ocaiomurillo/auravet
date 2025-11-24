@@ -21,6 +21,7 @@ interface FilterState {
   status: string;
   from: string;
   to: string;
+  dueStatus: 'all' | 'overdue' | 'onTime';
 }
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -123,11 +124,17 @@ const indicatorClasses: Record<'success' | 'warning' | 'danger' | 'info', string
 };
 
 const AccountingPage = () => {
-  const [filters, setFilters] = useState<FilterState>({ status: 'ABERTA', from: '', to: '' });
+  const [filters, setFilters] = useState<FilterState>({
+    status: 'ABERTA',
+    from: '',
+    to: '',
+    dueStatus: 'all',
+  });
   const [draftFilters, setDraftFilters] = useState<FilterState>({
     status: 'ABERTA',
     from: '',
     to: '',
+    dueStatus: 'all',
   });
   const [adjustingInvoice, setAdjustingInvoice] = useState<Invoice | null>(null);
   const [adjustDueDate, setAdjustDueDate] = useState('');
@@ -190,16 +197,22 @@ const AccountingPage = () => {
   );
 
   const filteredInvoiceSummaries = useMemo(() => {
-    const filtered = filters.status
+    const filteredByStatus = filters.status
       ? invoiceSummaries.filter(({ invoice }) => invoice.status.slug === filters.status)
       : invoiceSummaries;
+
+    const filtered = filteredByStatus.filter(({ summary }) => {
+      if (filters.dueStatus === 'all') return true;
+      if (filters.dueStatus === 'overdue') return summary.overdue;
+      return !summary.overdue;
+    });
 
     return [...filtered].sort((a, b) => {
       const dateA = new Date(a.summary.nextDueDate).getTime();
       const dateB = new Date(b.summary.nextDueDate).getTime();
       return dateA - dateB;
     });
-  }, [filters.status, invoiceSummaries]);
+  }, [filters.dueStatus, filters.status, invoiceSummaries]);
 
   const nextDueDate = useMemo(() => {
     const dates = openInvoiceSummaries
@@ -227,8 +240,8 @@ const AccountingPage = () => {
   };
 
   const handleReset = () => {
-    setDraftFilters({ status: 'ABERTA', from: '', to: '' });
-    setFilters({ status: 'ABERTA', from: '', to: '' });
+    setDraftFilters({ status: 'ABERTA', from: '', to: '', dueStatus: 'all' });
+    setFilters({ status: 'ABERTA', from: '', to: '', dueStatus: 'all' });
   };
 
   useEffect(() => {
@@ -316,6 +329,11 @@ const AccountingPage = () => {
     setFilters((prev) => ({ ...prev, status }));
   };
 
+  const handleQuickDueStatusFilter = (dueStatus: FilterState['dueStatus']) => {
+    setDraftFilters((prev) => ({ ...prev, dueStatus }));
+    setFilters((prev) => ({ ...prev, dueStatus }));
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -381,7 +399,27 @@ const AccountingPage = () => {
             </button>
           ))}
         </div>
-        <form className="grid gap-4 md:grid-cols-4" onSubmit={handleSubmit}>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {([
+            { label: 'Todas', value: 'all' },
+            { label: 'Em dia', value: 'onTime' },
+            { label: 'Vencidas', value: 'overdue' },
+          ] satisfies Array<{ label: string; value: FilterState['dueStatus'] }>).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleQuickDueStatusFilter(option.value)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                draftFilters.dueStatus === option.value
+                  ? 'bg-brand-azul text-white shadow'
+                  : 'bg-brand-azul/10 text-brand-escuro hover:bg-brand-azul/20'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <form className="grid gap-4 md:grid-cols-5" onSubmit={handleSubmit}>
           <SelectField
             label="Status"
             value={draftFilters.status}
@@ -393,6 +431,18 @@ const AccountingPage = () => {
                 {status.name}
               </option>
             ))}
+          </SelectField>
+
+          <SelectField
+            label="Vencimento"
+            value={draftFilters.dueStatus}
+            onChange={(event) =>
+              setDraftFilters((prev) => ({ ...prev, dueStatus: event.target.value as FilterState['dueStatus'] }))
+            }
+          >
+            <option value="all">Todas</option>
+            <option value="onTime">Em dia</option>
+            <option value="overdue">Vencidas</option>
           </SelectField>
 
           <Field
