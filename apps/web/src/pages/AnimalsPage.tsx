@@ -12,6 +12,7 @@ import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Animal, AttendanceStatus, Owner } from '../types/api';
+import { getAttendanceTotal } from '../utils/attendance';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 interface AnimalFormValues {
@@ -219,13 +220,14 @@ const AnimalsPage = () => {
 
     const headers = ['Data', 'Responsável', 'Assistente', 'Valor', 'Notas'];
     const rows = filteredAttendances.map((attendance) => {
+      const attendanceTotal = getAttendanceTotal(attendance);
       const notes = attendance.notes?.map((note) => `${note.author.nome}: ${note.conteudo}`).join(' | ') ?? '';
 
       return [
         new Date(attendance.data).toLocaleDateString('pt-BR'),
         attendance.responsavel?.nome ?? '',
         attendance.assistant?.nome ?? '',
-        `R$ ${attendance.preco.toFixed(2)}`,
+        `R$ ${attendanceTotal.toFixed(2)}`,
         notes || attendance.observacoes || '',
       ];
     });
@@ -440,21 +442,22 @@ const AnimalsPage = () => {
                             <div>
                               <p className="font-semibold text-brand-escuro">{attendance.tipo}</p>
                               <p className="text-sm text-brand-grafite/70">
-                              {new Date(attendance.data).toLocaleDateString('pt-BR')} • R$ {attendance.preco.toFixed(2)}
-                            </p>
-                            {attendance.responsavel ? (
-                              <p className="text-sm text-brand-grafite/70">Responsável: {attendance.responsavel.nome}</p>
-                            ) : null}
-                            {attendance.assistant ? (
-                              <p className="text-sm text-brand-grafite/70">Assistente: {attendance.assistant.nome}</p>
+                                {new Date(attendance.data).toLocaleDateString('pt-BR')} • R${' '}
+                                {getAttendanceTotal(attendance).toFixed(2)}
+                              </p>
+                              {attendance.responsavel ? (
+                                <p className="text-sm text-brand-grafite/70">Responsável: {attendance.responsavel.nome}</p>
+                              ) : null}
+                              {attendance.assistant ? (
+                                <p className="text-sm text-brand-grafite/70">Assistente: {attendance.assistant.nome}</p>
+                              ) : null}
+                            </div>
+                            {canRegisterAttendances ? (
+                              <Button variant="ghost" className="text-sm" asChild>
+                                <Link to={`/services/${attendance.id}/edit`}>Editar</Link>
+                              </Button>
                             ) : null}
                           </div>
-                          {canRegisterAttendances ? (
-                            <Button variant="ghost" className="text-sm" asChild>
-                              <Link to={`/services/${attendance.id}/edit`}>Editar</Link>
-                            </Button>
-                          ) : null}
-                        </div>
                         {(attendance.notes?.length ?? 0) > 0 ? (
                           <ul className="mt-3 space-y-2 text-sm text-brand-grafite/80">
                             {attendance.notes.map((note) => (
