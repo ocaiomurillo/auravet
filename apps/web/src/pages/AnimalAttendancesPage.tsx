@@ -9,6 +9,7 @@ import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { animalsApi } from '../lib/apiClient';
 import type { Attendance, AttendanceStatus, AttendanceType } from '../types/api';
+import { getAttendanceTotal } from '../utils/attendance';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 
 const attendanceTypeLabels: Record<AttendanceType, string> = {
@@ -189,7 +190,9 @@ const AnimalAttendancesPage = () => {
                         </span>
                       </div>
                       <p className="text-sm text-brand-grafite/70">{formatDateTime(attendance.data)}</p>
-                      <p className="text-sm font-semibold text-brand-escuro">{formatCurrency(attendance.preco)}</p>
+                      <p className="text-sm font-semibold text-brand-escuro">
+                        {formatCurrency(getAttendanceTotal(attendance))}
+                      </p>
                       {attendance.responsavel ? (
                         <p className="text-sm text-brand-grafite/80">Responsável: {attendance.responsavel.nome}</p>
                       ) : null}
