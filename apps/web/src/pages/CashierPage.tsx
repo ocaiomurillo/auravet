@@ -727,9 +727,9 @@ const CashierPage = () => {
 
       <Card
         title="Resumo financeiro"
-        description="Visão rápida do que está em aberto e do que já foi quitado."
+        description="Visão rápida do que está em aberto, do que já foi recebido e do que está completamente quitado."
       >
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-5">
           <div className="rounded-2xl bg-brand-azul/10 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Total em aberto</p>
             <p className="text-xl font-semibold text-brand-escuro">
@@ -738,11 +738,23 @@ const CashierPage = () => {
             <p className="text-xs text-brand-grafite/70">{summary?.openCount ?? 0} contas aguardando pagamento</p>
           </div>
           <div className="rounded-2xl bg-emerald-100/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Total recebido</p>
+            <p className="text-xl font-semibold text-emerald-700">
+              {currencyFormatter.format(summary?.receivedTotal ?? 0)}
+            </p>
+            <p className="text-xs text-brand-grafite/70">
+              Somatório das parcelas marcadas como pagas.
+            </p>
+            <p className="text-[11px] text-brand-grafite/60">
+              Quitadas: {currencyFormatter.format(summary?.paidTotal ?? 0)} • {summary?.paidCount ?? 0} faturas
+            </p>
+          </div>
+          <div className="rounded-2xl bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Total quitado</p>
             <p className="text-xl font-semibold text-emerald-700">
               {currencyFormatter.format(summary?.paidTotal ?? 0)}
             </p>
-            <p className="text-xs text-brand-grafite/70">{summary?.paidCount ?? 0} contas recebidas</p>
+            <p className="text-xs text-brand-grafite/70">{summary?.paidCount ?? 0} faturas totalmente liquidadas</p>
           </div>
           <div className="rounded-2xl bg-brand-azul/5 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Próximos vencimentos</p>

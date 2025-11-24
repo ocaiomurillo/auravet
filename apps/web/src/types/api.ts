@@ -227,6 +227,7 @@ export interface Invoice {
 export interface InvoiceSummary {
   openTotal: number;
   paidTotal: number;
+  receivedTotal: number;
   openCount: number;
   paidCount: number;
 }
