@@ -17,8 +17,6 @@ export const servicesRouter = Router();
 servicesRouter.use(authenticate);
 
 const serviceNotesEnabled = env.SERVICE_NOTES_ENABLED;
-const PAID_INVOICE_STATUS = 'QUITADA';
-
 const serviceNotesInclude = serviceNotesEnabled
   ? Prisma.validator<Prisma.ServiceNoteFindManyArgs>()({
       include: {
@@ -197,11 +195,7 @@ const findOngoingServiceForAnimal = async (animalId: string) =>
   prisma.servico.findFirst({
     where: {
       animalId,
-      OR: [
-        { appointment: { status: { not: AppointmentStatus.CONCLUIDO } } },
-        { invoiceItems: { none: {} } },
-        { invoiceItems: { some: { invoice: { status: { slug: { not: PAID_INVOICE_STATUS } } } } } },
-      ],
+      appointment: { status: { not: AppointmentStatus.CONCLUIDO } },
     },
     orderBy: { data: 'desc' },
     select: { id: true },

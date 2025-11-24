@@ -349,6 +349,56 @@ const sortAppointments = (records: AppointmentRecord[], orderBy: any) => {
   });
 };
 
+const matchesServiceWhere = (service: ServiceRecord, where: any = {}): boolean => {
+  const { OR, ...base } = where ?? {};
+
+  if (base.id && service.id !== base.id) {
+    return false;
+  }
+
+  if (base.animalId && service.animalId !== base.animalId) {
+    return false;
+  }
+
+  if (base.appointment) {
+    const appointment = appointments.find((entry) => entry.serviceId === service.id) ?? null;
+
+    if (!appointment) {
+      if (base.appointment === null) {
+        return true;
+      }
+      return false;
+    }
+
+    const statusFilter = base.appointment.status;
+    if (statusFilter?.not && appointment.status === statusFilter.not) {
+      return false;
+    }
+    if (statusFilter?.equals && appointment.status !== statusFilter.equals) {
+      return false;
+    }
+  }
+
+  if (Array.isArray(OR) && OR.length > 0) {
+    return OR.some((clause) => matchesServiceWhere(service, clause));
+  }
+
+  return true;
+};
+
+const sortServices = (records: ServiceRecord[], orderBy: any) => {
+  if (!orderBy || typeof orderBy !== 'object') {
+    return [...records];
+  }
+
+  if (orderBy.data) {
+    const direction = orderBy.data === 'desc' ? -1 : 1;
+    return [...records].sort((a, b) => (a.data.getTime() - b.data.getTime()) * direction);
+  }
+
+  return [...records];
+};
+
 const baseInvoiceStatuses: InvoiceStatusRecord[] = [
   { id: 'status-aberta', slug: 'ABERTA', name: 'Aberta' },
   { id: 'status-quitada', slug: 'QUITADA', name: 'Quitada' },
@@ -401,6 +451,48 @@ const buildService = async (service: ServiceRecord, include: any) => {
       }
       result.animal = animalClone;
     }
+  }
+
+  if (include?.appointment) {
+    const appointment = appointments.find((entry) => entry.serviceId === service.id) ?? null;
+    if (appointment) {
+      const appointmentInclude = include.appointment === true ? undefined : include.appointment.include ?? {};
+      result.appointment = include.appointment === true
+        ? { ...appointment }
+        : await buildAppointment(appointment, appointmentInclude);
+    } else {
+      result.appointment = null;
+    }
+  }
+
+  if (include?.catalogItems) {
+    result.catalogItems = service.catalogItems.map((item) => {
+      const itemClone: any = { ...item };
+      if (include.catalogItems.include?.definition) {
+        itemClone.definition = null;
+      }
+      return itemClone;
+    });
+  }
+
+  if (include?.items) {
+    result.items = service.items.map((item) => {
+      const itemClone: any = { ...item };
+      if (include.items.include?.product) {
+        itemClone.product = null;
+      }
+      return itemClone;
+    });
+  }
+
+  if (include?.responsavel) {
+    result.responsavel = service.responsavelId
+      ? await prismaMock.user.findUnique({ where: { id: service.responsavelId }, select: include.responsavel.select })
+      : null;
+  }
+
+  if (include?.notes) {
+    result.notes = [];
   }
 
   if (include?.invoiceItems) {
@@ -581,22 +673,51 @@ const buildInvoice = async (invoice: InvoiceRecord, include: any) => {
 } as any;
 
 (prismaMock as any).servico = {
-  async create({ data }: any) {
+  async create({ data, include }: any) {
     const record: ServiceRecord = {
       id: data.id ?? generateId(),
-      animalId: data.animalId,
+      animalId: data.animal?.connect?.id ?? data.animalId,
       tipo: data.tipo ?? 'CONSULTA',
       data: data.data instanceof Date ? data.data : new Date(data.data),
       preco: toDecimal(data.preco ?? 0),
       observacoes: data.observacoes ?? null,
-      responsavelId: data.responsavelId ?? null,
+      responsavelId: data.responsavel?.connect?.id ?? data.responsavelId ?? null,
       catalogItems: [],
       items: [],
       invoiceItemIds: [],
       createdAt: data.createdAt ?? new Date(),
     };
+
+    if (data.catalogItems?.create) {
+      for (const item of data.catalogItems.create) {
+        record.catalogItems.push({
+          id: item.id ?? generateId(),
+          servicoId: record.id,
+          serviceDefinitionId: item.serviceDefinitionId,
+          quantidade: item.quantidade,
+          valorUnitario: toDecimal(item.valorUnitario),
+          valorTotal: toDecimal(item.valorTotal),
+          observacoes: item.observacoes ?? null,
+        });
+      }
+    }
+
+    if (data.items?.create) {
+      for (const item of data.items.create) {
+        record.items.push({
+          id: item.id ?? generateId(),
+          servicoId: record.id,
+          productId: item.productId,
+          quantidade: item.quantidade,
+          valorUnitario: toDecimal(item.valorUnitario),
+          valorTotal: toDecimal(item.valorTotal),
+        });
+      }
+    }
+
     services.push(record);
-    return { ...record };
+    if (!include) return { ...record };
+    return buildService(record, include);
   },
   async update({ where, data }: any) {
     const record = services.find((entry) => entry.id === where.id);
@@ -625,6 +746,14 @@ const buildInvoice = async (invoice: InvoiceRecord, include: any) => {
     if (!record) return null;
     if (!include) return { ...record };
     return buildService(record, include);
+  },
+  async findFirst({ where, include, orderBy }: any = {}) {
+    const filtered = services.filter((service) => matchesServiceWhere(service, where));
+    const sorted = sortServices(filtered, orderBy);
+    const [first] = sorted;
+    if (!first) return null;
+    if (!include) return { ...first };
+    return buildService(first, include);
   },
 } as any;
 
@@ -1382,6 +1511,142 @@ describe('POST /invoices', () => {
     );
 
     assert.equal(invoice.response.status, 400);
+  });
+});
+
+describe('POST /services', () => {
+  it('allows creating a new service when the previous one is concluded with a pending invoice', async () => {
+    const login = await post('/auth/login', {
+      email: 'admin@auravet.com',
+      password: 'Admin123!',
+    });
+
+    assert.equal(login.response.status, 200);
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const owner = await prisma.owner.create({
+      data: {
+        nome: 'Cliente Serviços',
+        email: 'cliente.servicos@example.com',
+      },
+    });
+
+    const animal = await prismaMock.animal.create({
+      data: { nome: 'Bolt', especie: 'CACHORRO', ownerId: owner.id },
+    });
+
+    const concludedService = await prismaMock.servico.create({
+      data: {
+        animalId: animal.id,
+        tipo: 'CONSULTA',
+        data: new Date('2024-01-01T10:00:00.000Z'),
+        preco: 200,
+      },
+    });
+
+    await (prismaMock.appointment as any).create({
+      data: {
+        animalId: animal.id,
+        ownerId: owner.id,
+        veterinarianId,
+        status: 'CONCLUIDO',
+        scheduledStart: new Date('2024-01-01T10:00:00.000Z'),
+        scheduledEnd: new Date('2024-01-01T10:30:00.000Z'),
+        service: { connect: { id: concludedService.id } },
+      },
+    });
+
+    await prisma.invoice.create({
+      data: {
+        ownerId: owner.id,
+        statusId: baseInvoiceStatuses[0].id,
+        total: new Prisma.Decimal(200),
+        dueDate: new Date('2024-01-05T00:00:00.000Z'),
+        items: {
+          create: [
+            {
+              servicoId: concludedService.id,
+              description: 'Atendimento concluído',
+              quantity: 1,
+              unitPrice: new Prisma.Decimal(200),
+              total: new Prisma.Decimal(200),
+            },
+          ],
+        },
+      },
+    });
+
+    const newService = await post(
+      '/services',
+      {
+        animalId: animal.id,
+        tipo: 'CONSULTA',
+        data: '2024-02-01',
+        preco: 180,
+        responsavelId: veterinarianId,
+      },
+      token,
+    );
+
+    assert.equal(newService.response.status, 201);
+  });
+
+  it('blocks creating a new service when there is an ongoing appointment for the pet', async () => {
+    const login = await post('/auth/login', {
+      email: 'admin@auravet.com',
+      password: 'Admin123!',
+    });
+
+    assert.equal(login.response.status, 200);
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const owner = await prisma.owner.create({
+      data: {
+        nome: 'Cliente Em Atendimento',
+        email: 'cliente.andamento@example.com',
+      },
+    });
+
+    const animal = await prismaMock.animal.create({
+      data: { nome: 'Nina', especie: 'GATO', ownerId: owner.id },
+    });
+
+    const ongoingService = await prismaMock.servico.create({
+      data: {
+        animalId: animal.id,
+        tipo: 'CONSULTA',
+        data: new Date('2024-03-01T14:00:00.000Z'),
+        preco: 120,
+      },
+    });
+
+    await (prismaMock.appointment as any).create({
+      data: {
+        animalId: animal.id,
+        ownerId: owner.id,
+        veterinarianId,
+        status: 'CONFIRMADO',
+        scheduledStart: new Date('2024-03-01T14:00:00.000Z'),
+        scheduledEnd: new Date('2024-03-01T14:45:00.000Z'),
+        service: { connect: { id: ongoingService.id } },
+      },
+    });
+
+    const blocked = await post(
+      '/services',
+      {
+        animalId: animal.id,
+        tipo: 'CONSULTA',
+        data: '2024-03-02',
+        preco: 150,
+        responsavelId: veterinarianId,
+      },
+      token,
+    );
+
+    assert.equal(blocked.response.status, 400);
   });
 });
 
