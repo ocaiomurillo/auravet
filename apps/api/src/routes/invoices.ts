@@ -470,6 +470,24 @@ invoicesRouter.post(
         throw new HttpError(404, 'Condição de pagamento não encontrada.');
       }
 
+      const paymentConditionType = (() => {
+        if (payload.paymentCondition !== undefined) {
+          return payload.paymentCondition;
+        }
+
+        if (payload.paymentConditionId === undefined) {
+          return existing.paymentConditionType ?? null;
+        }
+
+        if (!paymentCondition) {
+          return null;
+        }
+
+        return Object.values(PaymentConditionType).includes(paymentCondition.id as PaymentConditionType)
+          ? (paymentCondition.id as PaymentConditionType)
+          : null;
+      })();
+
       const installments = payload.installments.map((installment, index) => ({
         amount: new Prisma.Decimal(installment.amount),
         dueDate: parseDate(installment.dueDate, `vencimento da parcela ${index + 1}`),
@@ -510,7 +528,7 @@ invoicesRouter.post(
           paidAt: latestPayment,
           paymentNotes: payload.paymentNotes ?? null,
           paymentMethod: payload.paymentMethod,
-          paymentConditionType: payload.paymentCondition ?? existing.paymentConditionType ?? null,
+          paymentConditionType,
           paymentConditionId: paymentCondition?.id ?? existing.paymentConditionId ?? null,
           responsibleId: req.user?.id ?? existing.responsibleId,
           dueDate: earliestDueDate,

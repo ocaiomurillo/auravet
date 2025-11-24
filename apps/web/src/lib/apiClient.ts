@@ -251,7 +251,8 @@ export const invoicesApi = {
     id: string,
     payload: {
       paymentMethod: PaymentMethod;
-      paymentCondition: PaymentConditionType;
+      paymentCondition?: PaymentConditionType;
+      paymentConditionId?: string;
       installments: { amount: number; dueDate: string; paidAt?: string }[];
       paymentNotes?: string;
     },

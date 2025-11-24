@@ -14,7 +14,6 @@ import type {
   InvoiceListResponse,
   OwnerSummary,
   PaymentConditionDetails,
-  PaymentConditionType,
   PaymentMethod,
   Product,
 } from '../types/api';
@@ -139,13 +138,6 @@ const paymentConditionLabel = (conditionId: string | null | undefined, condition
 
   return condition.observacoes ? `${condition.nome} • ${condition.observacoes}` : condition.nome;
 };
-
-const paymentConditionTypeValues: PaymentConditionType[] = ['A_VISTA', 'DIAS_30', 'DIAS_60', 'CARTAO_2X', 'CARTAO_3X'];
-
-const resolvePaymentConditionType = (conditionId: string): PaymentConditionType =>
-  paymentConditionTypeValues.includes(conditionId as PaymentConditionType)
-    ? (conditionId as PaymentConditionType)
-    : 'A_VISTA';
 
 const normalizeDateInput = (value: string) => value.split('T')[0];
 
@@ -617,7 +609,7 @@ const CashierPage = () => {
     }) =>
       invoicesApi.markAsPaid(payload.id, {
         paymentMethod: payload.paymentMethod,
-        paymentCondition: resolvePaymentConditionType(payload.paymentConditionId),
+        paymentConditionId: payload.paymentConditionId,
         installments: payload.installments,
       }),
     onSuccess: async (invoice) => {
