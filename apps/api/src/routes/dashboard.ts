@@ -7,6 +7,11 @@ import { asyncHandler } from '../utils/async-handler';
 import { hasModule } from '../utils/permissions';
 
 interface DashboardSummary {
+  services?: {
+    total: number;
+    ongoing: number;
+    completed: number;
+  };
   appointments?: {
     scheduled: number;
     confirmed: number;
@@ -18,6 +23,12 @@ interface DashboardSummary {
     critical: number;
     lowStock: number;
     totalActive: number;
+  };
+  invoices?: {
+    blocked: number;
+    open: number;
+    partiallyPaid: number;
+    paid: number;
   };
   owners?: {
     total: number;
@@ -37,6 +48,31 @@ dashboardRouter.get(
     const modules = req.user?.modules ?? [];
     const summary: DashboardSummary = {};
     const jobs: Array<Promise<void>> = [];
+
+    if (hasModule(modules, 'services:read')) {
+      jobs.push(
+        (async () => {
+          const [total, ongoing, completed] = await Promise.all([
+            prisma.servico.count(),
+            prisma.servico.count({
+              where: {
+                OR: [
+                  { appointment: null },
+                  { appointment: { status: { not: AppointmentStatus.CONCLUIDO } } },
+                ],
+              },
+            }),
+            prisma.servico.count({ where: { appointment: { status: AppointmentStatus.CONCLUIDO } } }),
+          ]);
+
+          summary.services = {
+            total,
+            ongoing,
+            completed,
+          };
+        })(),
+      );
+    }
 
     if (hasModule(modules, 'services:read')) {
       jobs.push(
@@ -115,6 +151,26 @@ dashboardRouter.get(
             critical,
             lowStock,
             totalActive: products.length,
+          };
+        })(),
+      );
+    }
+
+    if (hasModule(modules, 'cashier:access')) {
+      jobs.push(
+        (async () => {
+          const [blocked, open, partiallyPaid, paid] = await Promise.all([
+            prisma.invoice.count({ where: { status: { slug: 'BLOQUEADA' } } }),
+            prisma.invoice.count({ where: { status: { slug: 'ABERTA' } } }),
+            prisma.invoice.count({ where: { status: { slug: 'PARCIALMENTE_QUITADA' } } }),
+            prisma.invoice.count({ where: { status: { slug: 'QUITADA' } } }),
+          ]);
+
+          summary.invoices = {
+            blocked,
+            open,
+            partiallyPaid,
+            paid,
           };
         })(),
       );
