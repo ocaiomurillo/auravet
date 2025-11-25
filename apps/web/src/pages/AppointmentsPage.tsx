@@ -198,6 +198,18 @@ const AppointmentsPage = () => {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => appointmentsApi.update(id, { status: 'CANCELADO' }),
+    onSuccess: () => {
+      toast.success('Agendamento cancelado com sucesso.');
+      setRescheduleForm({ id: null, start: '', end: '', notes: '' });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível cancelar o agendamento.');
+    },
+  });
+
   const rescheduleMutation = useMutation({
     mutationFn: ({ id, start, end, notes }: { id: string; start: string; end: string; notes: string }) =>
       apiClient.patch<{ appointment: Appointment }>(`/appointments/${id}/reschedule`, {
@@ -578,6 +590,7 @@ const AppointmentsPage = () => {
             const isCancelled = appointment.status === 'CANCELADO';
             const isConfirmed = appointment.status === 'CONFIRMADO';
             const canConfirm = !isConfirmed && !isConcluded && !isCancelled;
+            const canCancel = !isConcluded && !isCancelled;
             const canReschedule = !isConcluded && !isCancelled;
             const canRegisterAttendance = !isConcluded && !isCancelled;
             const isGeneratingPdf =
@@ -659,7 +672,7 @@ const AppointmentsPage = () => {
                         {canConfirm ? (
                           <Button
                             variant="secondary"
-                            disabled={confirmMutation.isPending}
+                            disabled={confirmMutation.isPending || cancelMutation.isPending}
                             onClick={() => confirmMutation.mutate(appointment.id)}
                           >
                             Confirmar presença
@@ -668,14 +681,27 @@ const AppointmentsPage = () => {
                         {canReschedule ? (
                           <Button
                             variant="ghost"
-                            disabled={rescheduleMutation.isPending}
+                            disabled={rescheduleMutation.isPending || cancelMutation.isPending}
                             onClick={() => openRescheduleForm(appointment)}
                           >
                             Reagendar
                           </Button>
                         ) : null}
+                        {canCancel ? (
+                          <Button
+                            variant="ghost"
+                            disabled={cancelMutation.isPending}
+                            onClick={() => cancelMutation.mutate(appointment.id)}
+                          >
+                            {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar agendamento'}
+                          </Button>
+                        ) : null}
                         {canRegisterAttendance ? (
-                          <Button variant="primary" onClick={() => handleRegisterAttendance(appointment.id)}>
+                          <Button
+                            variant="primary"
+                            disabled={cancelMutation.isPending}
+                            onClick={() => handleRegisterAttendance(appointment.id)}
+                          >
                             Registrar atendimento
                           </Button>
                         ) : null}
