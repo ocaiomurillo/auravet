@@ -15,10 +15,9 @@ import { buildAttendancePdf } from '../utils/attendancePdf';
 import { createXlsxBlob, downloadBlob } from '../utils/xlsxExport';
 
 const statusLabels: Record<AttendanceStatus, string> = {
-  AGENDADO: 'Agendado',
-  CONFIRMADO: 'Confirmado',
-  CONCLUIDO: 'Concluído',
+  EM_ANDAMENTO: 'Em andamento',
   CANCELADO: 'Cancelado',
+  CONCLUIDO: 'Concluído',
 };
 
 const typeLabels: Partial<Record<AttendanceType | string, string>> = {
@@ -179,10 +178,9 @@ const AttendancesPage = () => {
   const buildStatusBadge = (status: AttendanceStatus) => {
     const baseClass = 'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide';
     const variants: Record<AttendanceStatus, string> = {
-      AGENDADO: 'bg-amber-100 text-amber-800',
-      CONFIRMADO: 'bg-brand-savia/70 text-brand-escuro',
-      CONCLUIDO: 'bg-emerald-100 text-emerald-800',
+      EM_ANDAMENTO: 'bg-amber-100 text-amber-800',
       CANCELADO: 'bg-red-100 text-red-700',
+      CONCLUIDO: 'bg-emerald-100 text-emerald-800',
     };
 
     return <span className={`${baseClass} ${variants[status]}`}>{statusLabels[status]}</span>;
