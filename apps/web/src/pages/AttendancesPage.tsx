@@ -123,8 +123,12 @@ const AttendancesPage = () => {
       queryClient.invalidateQueries({ queryKey: ['attendances'] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
-    onError: () => {
-      toast.error('Não foi possível atualizar o status agora.');
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        (error instanceof Error ? error.message : null);
+
+      toast.error(message ?? 'Não foi possível atualizar o status agora.');
     },
   });
 
@@ -138,7 +142,7 @@ const AttendancesPage = () => {
 
     const rows = attendances.map((attendance) => [
       formatDateTime(attendance.data),
-      statusLabels[attendance.status] ?? attendance.status,
+      statusLabels[attendance.status],
       typeLabels[attendance.tipo] ?? attendance.tipo,
       attendance.animal?.nome ?? '—',
       attendance.animal?.owner?.nome ?? '—',
@@ -306,14 +310,18 @@ const AttendancesPage = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        disabled={updateStatus.isPending || attendance.status === 'CONCLUIDO'}
+                        disabled={
+                          updateStatus.isPending || attendance.status !== 'EM_ANDAMENTO'
+                        }
                         onClick={() => updateStatus.mutate({ id: attendance.id, status: 'CONCLUIDO' })}
                       >
                         Concluir
                       </Button>
                       <Button
                         variant="ghost"
-                        disabled={updateStatus.isPending || attendance.status === 'CANCELADO'}
+                        disabled={
+                          updateStatus.isPending || attendance.status !== 'EM_ANDAMENTO'
+                        }
                         onClick={() => updateStatus.mutate({ id: attendance.id, status: 'CANCELADO' })}
                       >
                         Cancelar

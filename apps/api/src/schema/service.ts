@@ -1,3 +1,4 @@
+import { ServiceStatus } from '@prisma/client';
 import { z } from 'zod';
 
 export const tipoServicoValues = ['CONSULTA', 'EXAME', 'VACINACAO', 'CIRURGIA', 'OUTROS'] as const;
@@ -79,6 +80,7 @@ export const serviceCreateSchema = z.object({
 export const serviceUpdateSchema = z.object({
   animalId: z.string().cuid('Animal inválido').optional(),
   appointmentId: z.string().cuid('Agendamento inválido').optional(),
+  status: z.nativeEnum(ServiceStatus).optional(),
   tipo: z
     .enum(tipoServicoValues, {
       errorMap: () => ({ message: 'Tipo de atendimento inválido' }),
