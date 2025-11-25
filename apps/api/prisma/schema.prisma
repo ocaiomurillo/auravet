@@ -273,6 +273,7 @@ model Invoice {
   statusId       String
   responsibleId  String?
   paymentConditionId String?
+  paymentDetailsDefined Boolean @default(false)
   total          Decimal  @db.Decimal(10, 2)
   dueDate        DateTime
   paidAt         DateTime?

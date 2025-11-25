@@ -207,6 +207,7 @@ export interface Invoice {
   ownerId: string;
   status: InvoiceStatus;
   paymentConditionId: string | null;
+  paymentDetailsDefined: boolean;
   paymentCondition: PaymentConditionType | null;
   paymentConditionDetails: PaymentConditionDetails | null;
   total: number;

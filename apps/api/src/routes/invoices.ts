@@ -132,6 +132,8 @@ const buildInvoiceWhere = (filters: z.infer<typeof invoiceFilterSchema>): Prisma
   return where;
 };
 
+const BLOCKED_STATUS_SLUG = 'BLOQUEADA';
+
 const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof invoiceInclude }>>) => {
   let openTotal = new Prisma.Decimal(0);
   let paidTotal = new Prisma.Decimal(0);
@@ -521,6 +523,7 @@ invoicesRouter.post(
         where: { id },
         data: {
           statusId: isFullyPaid ? paidStatus.id : openStatus.id,
+          paymentDetailsDefined: true,
           paidAt: latestPayment,
           paymentNotes: payload.paymentNotes ?? null,
           paymentMethod: payload.paymentMethod,
@@ -576,6 +579,15 @@ invoicesRouter.patch(
       existing.paymentConditionType ??
       null;
 
+    const paymentDetailsDefined = Boolean(
+      payload.paymentMethod ??
+        paymentCondition?.id ??
+        paymentConditionType ??
+        existing.paymentMethod ??
+        existing.paymentConditionId ??
+        existing.paymentConditionType,
+    );
+
     const interestPercent = payload.interestPercent ?? 0;
     const interestMultiplier = new Prisma.Decimal(1).add(new Prisma.Decimal(interestPercent).div(100));
     const adjustedTotal = existing.total.mul(interestMultiplier);
@@ -598,13 +610,18 @@ invoicesRouter.patch(
         })),
       });
 
+      const openStatus =
+        existing.status.slug === BLOCKED_STATUS_SLUG && paymentDetailsDefined ? await getOpenStatus(tx) : null;
+
       return tx.invoice.update({
         where: { id },
         data: {
           dueDate,
+          statusId: openStatus?.id ?? existing.statusId,
           paymentMethod: payload.paymentMethod ?? existing.paymentMethod ?? null,
           paymentConditionId: paymentCondition?.id ?? null,
           paymentConditionType,
+          paymentDetailsDefined,
           total: adjustedTotal,
         },
         include: invoiceInclude,

@@ -102,8 +102,8 @@ const CashierPage = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const selectedInvoiceOwnerCpf = selectedInvoice ? formatCpf(selectedInvoice.owner.cpf) : null;
   const selectedInvoiceOwnerAddress = selectedInvoice ? buildOwnerAddress(selectedInvoice.owner) : null;
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('DINHEIRO');
-  const [paymentConditionId, setPaymentConditionId] = useState('A_VISTA');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
+  const [paymentConditionId, setPaymentConditionId] = useState('');
   const [installments, setInstallments] = useState<InstallmentFormState[]>([]);
   const [isExtraItemFormOpen, setIsExtraItemFormOpen] = useState(false);
   const [extraItemMode, setExtraItemMode] = useState<'product' | 'custom'>('product');
@@ -163,11 +163,14 @@ const CashierPage = () => {
 
   const applyPaymentStateFromInvoice = useCallback(
     (invoice: Invoice) => {
-      const conditionId =
-        invoice.paymentConditionDetails?.id ?? invoice.paymentCondition ?? paymentConditions[0]?.id ?? 'A_VISTA';
-      setPaymentMethod(invoice.paymentMethod ?? 'DINHEIRO');
+      const conditionId = invoice.paymentDetailsDefined
+        ? invoice.paymentConditionDetails?.id ?? invoice.paymentCondition ?? paymentConditions[0]?.id ?? ''
+        : invoice.paymentConditionDetails?.id ?? invoice.paymentCondition ?? '';
+      const method = invoice.paymentDetailsDefined ? invoice.paymentMethod ?? '' : '';
+
+      setPaymentMethod(method as PaymentMethod | '');
       setPaymentConditionId(conditionId);
-      setInstallments(buildInstallmentsFromInvoice(invoice, conditionId));
+      setInstallments(buildInstallmentsFromInvoice(invoice, conditionId || undefined));
     },
     [buildInstallmentsFromInvoice, paymentConditions],
   );
@@ -367,6 +370,10 @@ const CashierPage = () => {
   );
 
   const isSelectedInvoicePaid = selectedInvoiceSummary?.isPaid ?? false;
+  const requiresPaymentSetup =
+    selectedInvoice?.status.slug === 'BLOQUEADA' && !selectedInvoice.paymentDetailsDefined;
+  const hasPaymentSelection = Boolean(paymentMethod && paymentConditionId);
+  const disablePaymentActions = isSelectedInvoicePaid || (requiresPaymentSetup && !hasPaymentSelection);
 
   const adjustStockForItems = async (items: InvoiceItem[]) => {
     const adjustments: InvoiceItem[] = [];
@@ -409,8 +416,8 @@ const CashierPage = () => {
     if (selectedInvoice) {
       applyPaymentStateFromInvoice(selectedInvoice);
     } else {
-      setPaymentMethod('DINHEIRO');
-      setPaymentConditionId('A_VISTA');
+      setPaymentMethod('');
+      setPaymentConditionId('');
       setInstallments([]);
     }
 
@@ -539,12 +546,17 @@ const CashierPage = () => {
   const handleMarkAsPaid = () => {
     if (!selectedInvoice) return;
 
+    if (!hasPaymentSelection) {
+      toast.error('Defina a forma e a condição de pagamento para prosseguir.');
+      return;
+    }
+
     const installmentsPayload = prepareInstallmentsForSubmission(true);
     if (!installmentsPayload) return;
 
     markPaidMutation.mutate({
       id: selectedInvoice.id,
-      paymentMethod,
+      paymentMethod: paymentMethod as PaymentMethod,
       paymentConditionId,
       installments: installmentsPayload,
     });
@@ -552,6 +564,11 @@ const CashierPage = () => {
 
   const handleSaveInvoice = () => {
     if (!selectedInvoice) return;
+
+    if (!hasPaymentSelection) {
+      toast.error('Informe forma e condição de pagamento para desbloquear a conta.');
+      return;
+    }
 
     const installmentsPayload = prepareInstallmentsForSubmission(false);
     if (!installmentsPayload) return;
@@ -561,7 +578,7 @@ const CashierPage = () => {
     adjustInvoiceMutation.mutate({
       id: selectedInvoice.id,
       dueDate,
-      paymentMethod,
+      paymentMethod: paymentMethod as PaymentMethod,
       paymentConditionId,
       installments: installmentsPayload.map((installment) => ({
         amount: installment.amount,
@@ -960,13 +977,15 @@ const CashierPage = () => {
                 <Button
                   variant="secondary"
                   onClick={handleSaveInvoice}
-                  disabled={adjustInvoiceMutation.isPending || markPaidMutation.isPending}
+                  disabled={
+                    disablePaymentActions || adjustInvoiceMutation.isPending || markPaidMutation.isPending
+                  }
                 >
                   {adjustInvoiceMutation.isPending ? 'Salvando...' : 'Salvar fatura'}
                 </Button>
                 <Button
                   onClick={handleMarkAsPaid}
-                  disabled={markPaidMutation.isPending || adjustInvoiceMutation.isPending}
+                  disabled={disablePaymentActions || markPaidMutation.isPending || adjustInvoiceMutation.isPending}
                 >
                   {markPaidMutation.isPending ? 'Registrando...' : 'Registrar pagamento'}
                 </Button>
@@ -1248,13 +1267,23 @@ const CashierPage = () => {
                 </p>
               </div>
 
+              {requiresPaymentSetup ? (
+                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                  Esta fatura foi gerada bloqueada. Informe forma e condição de pagamento para desbloquear
+                  ajustes e recebimentos.
+                </p>
+              ) : null}
+
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <SelectField
                   label="Forma de pagamento"
                   value={paymentMethod}
-                  onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+                  onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod | '')}
                   disabled={isSelectedInvoicePaid}
                 >
+                  <option value="" disabled>
+                    Selecione uma forma
+                  </option>
                   {paymentMethodOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -1268,6 +1297,9 @@ const CashierPage = () => {
                   onChange={(event) => handlePaymentConditionChange(event.target.value)}
                   disabled={isSelectedInvoicePaid}
                 >
+                  <option value="" disabled>
+                    Escolha uma condição
+                  </option>
                   {paymentConditions.map((condition) => (
                     <option key={condition.id} value={condition.id}>
                       {condition.nome} ({condition.parcelas}x • {condition.prazoDias} dias)
