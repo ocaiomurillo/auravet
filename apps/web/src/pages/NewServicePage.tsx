@@ -113,7 +113,6 @@ const NewServicePage = () => {
   const isViewing = searchParams.get('mode') === 'view';
   const isEditing = isExistingAttendance && !isViewing;
   const shouldDisableBaseFields = isExistingAttendance || isViewing;
-  const isFormReadOnly = isViewing;
 
   const { register, handleSubmit, watch, reset, setValue, control, trigger, getValues } =
     useForm<AttendanceFormValues>({
@@ -195,6 +194,9 @@ const NewServicePage = () => {
     queryFn: () => servicesApi.getById(serviceId ?? ''),
     enabled: isExistingAttendance && Boolean(serviceId),
   });
+
+  const isCancelled = attendance?.status === 'CANCELADO';
+  const isFormReadOnly = isViewing || isCancelled;
 
   const selectedAnimal = useMemo(
     () => animals?.find((animal) => animal.id === animalId) ?? null,
@@ -670,6 +672,29 @@ const NewServicePage = () => {
     },
   });
 
+  const cancelAttendance = useMutation({
+    mutationFn: async () => {
+      if (!serviceId) {
+        throw new Error('Atendimento precisa ser salvo antes de cancelar.');
+      }
+
+      return servicesApi.update(serviceId, { status: 'CANCELADO' });
+    },
+    onSuccess: (service) => {
+      toast.success('Atendimento cancelado com sucesso.');
+      queryClient.setQueryData(['attendance', serviceId], service);
+      queryClient.invalidateQueries({ queryKey: ['attendances'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'billable'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      navigate('/services');
+    },
+    onError: (err: unknown) => {
+      const message = formatErrorMessage(err, 'Não foi possível cancelar o atendimento agora.');
+      toast.error(message);
+    },
+  });
+
   const attendancePdf = useMutation({
     mutationFn: async () => {
       if (!serviceId) {
@@ -708,6 +733,7 @@ const NewServicePage = () => {
     createAttendance.isPending ||
     updateAttendance.isPending ||
     isViewing ||
+    isCancelled ||
     (isExistingAttendance && isLoadingAttendance) ||
     insufficientStock ||
     hasDuplicateItems ||
@@ -901,6 +927,29 @@ const NewServicePage = () => {
     }
 
     concludeAttendance.mutate();
+  };
+
+  const handleCancelAttendance = () => {
+    if (!attendance || !serviceId) {
+      toast.error('Salve o atendimento antes de cancelar.');
+      return;
+    }
+
+    if (attendance.status === 'CONCLUIDO') {
+      toast.error('Atendimento já está concluído e não pode ser cancelado.');
+      return;
+    }
+
+    if (attendance.status === 'CANCELADO') {
+      toast.error('Atendimento já está cancelado.');
+      return;
+    }
+
+    if (!window.confirm('Cancelar atendimento? Essa ação não gerará faturamento e desabilita novas edições.')) {
+      return;
+    }
+
+    cancelAttendance.mutate();
   };
 
   const pageTitle = isViewing
@@ -1431,23 +1480,44 @@ const NewServicePage = () => {
 
           <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
             {isExistingAttendance ? (
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={
-                  isFormReadOnly ||
-                  concludeAttendance.isPending ||
-                  attendance?.status === 'CONCLUIDO' ||
-                  attendance?.status === 'CANCELADO'
-                }
-                onClick={handleConcludeAttendance}
-              >
-                {attendance?.status === 'CONCLUIDO'
-                  ? 'Atendimento concluído'
-                  : concludeAttendance.isPending
-                    ? 'Concluindo atendimento...'
-                    : 'Concluir atendimento'}
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="border border-red-200 text-red-700 hover:bg-red-50"
+                  disabled={
+                    isFormReadOnly ||
+                    cancelAttendance.isPending ||
+                    concludeAttendance.isPending ||
+                    attendance?.status === 'CONCLUIDO'
+                  }
+                  onClick={handleCancelAttendance}
+                >
+                  {attendance?.status === 'CANCELADO'
+                    ? 'Atendimento cancelado'
+                    : cancelAttendance.isPending
+                      ? 'Cancelando atendimento...'
+                      : 'Cancelar atendimento'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={
+                    isFormReadOnly ||
+                    concludeAttendance.isPending ||
+                    cancelAttendance.isPending ||
+                    attendance?.status === 'CONCLUIDO' ||
+                    attendance?.status === 'CANCELADO'
+                  }
+                  onClick={handleConcludeAttendance}
+                >
+                  {attendance?.status === 'CONCLUIDO'
+                    ? 'Atendimento concluído'
+                    : concludeAttendance.isPending
+                      ? 'Concluindo atendimento...'
+                      : 'Concluir atendimento'}
+                </Button>
+              </>
             ) : null}
             <Button
               type="button"
