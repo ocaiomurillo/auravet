@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import RequireModules from './components/RequireModules';
 import MainLayout from './layouts/MainLayout';
 import AnimalsPage from './pages/AnimalsPage';
+import AttendancesPage from './pages/AttendancesPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import NewServicePage from './pages/NewServicePage';
@@ -36,6 +37,9 @@ const App = () => {
           </Route>
           <Route element={<RequireModules modules={['services:read']} />}>
             <Route path="services" element={<ServicesPage />} />
+          </Route>
+          <Route element={<RequireModules modules={['services:read', 'animals:read', 'owners:read']} />}>
+            <Route path="attendances" element={<AttendancesPage />} />
           </Route>
           <Route element={<RequireModules modules={['services:read', 'owners:read', 'animals:read']} />}>
             <Route path="appointments" element={<AppointmentsPage />} />
