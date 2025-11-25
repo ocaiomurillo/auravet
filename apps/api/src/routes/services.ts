@@ -516,6 +516,62 @@ servicesRouter.put(
           );
         }
 
+        if (payload.status !== undefined) {
+          if (payload.status === ServiceStatus.CONCLUIDO) {
+            if (existing.status === ServiceStatus.CONCLUIDO) {
+              throw new HttpError(400, 'Atendimento já concluído.');
+            }
+
+            if (existing.status === ServiceStatus.CANCELADO) {
+              throw new HttpError(400, 'Não é possível concluir um atendimento cancelado.');
+            }
+
+            const updated = await tx.servico.update({
+              where: { id },
+              data: { status: ServiceStatus.CONCLUIDO },
+              include: serviceInclude,
+            });
+
+            if (updated.appointment) {
+              await concludeAppointmentForService(tx, updated.appointment, updated.id, {
+                notes: updated.observacoes ?? null,
+                completedAt: updated.data,
+              });
+            }
+
+            await syncInvoiceForService(tx, updated.id, {
+              responsibleId: updated.responsavelId ?? req.user?.id ?? null,
+            });
+
+            return tx.servico.findUniqueOrThrow({ where: { id }, include: serviceInclude });
+          }
+
+          if (payload.status === ServiceStatus.CANCELADO) {
+            if (existing.status === ServiceStatus.CONCLUIDO) {
+              throw new HttpError(400, 'Atendimento já concluído.');
+            }
+
+            if (existing.status === ServiceStatus.CANCELADO) {
+              throw new HttpError(400, 'Atendimento já cancelado.');
+            }
+
+            const updated = await tx.servico.update({
+              where: { id },
+              data: { status: ServiceStatus.CANCELADO },
+              include: serviceInclude,
+            });
+
+            for (const item of existing.items) {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: { estoqueAtual: { increment: item.quantidade } },
+              });
+            }
+
+            return updated;
+          }
+        }
+
         const hasPaidInvoice = existing.invoiceItems?.some(
           (invoiceItem) => invoiceItem.invoice?.status.slug === 'QUITADA',
         );
