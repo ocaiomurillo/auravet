@@ -7,6 +7,12 @@ const BLOCKED_STATUS_SLUG = 'BLOQUEADA';
 const OPEN_STATUS_SLUG = 'ABERTA';
 const PAID_STATUS_SLUG = 'QUITADA';
 
+const hasPaymentDetails = (params: {
+  paymentConditionId?: string | null;
+  paymentMethod?: Prisma.InvoiceUpdateInput['paymentMethod'];
+  paymentConditionType?: Prisma.InvoiceUpdateInput['paymentConditionType'];
+}) => Boolean(params.paymentConditionId ?? params.paymentMethod ?? params.paymentConditionType);
+
 const addDays = (date: Date, days: number) => {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
@@ -261,12 +267,19 @@ export const syncInvoiceForService = async (
     const manualItemsTotal = manualItemsTotalResult._sum.total ?? new Prisma.Decimal(0);
     const total = serviceTotal.add(manualItemsTotal);
 
+    const paymentDetailsDefined = hasPaymentDetails({
+      paymentConditionId: resolvedConditionId,
+      paymentMethod: existingInvoice.paymentMethod,
+      paymentConditionType: existingInvoice.paymentConditionType,
+    });
+
     await tx.invoice.update({
       where: { id: existingInvoice.id },
       data: {
         dueDate: resolvedDueDate,
         paymentConditionId: resolvedConditionId,
         responsibleId: resolvedResponsible,
+        paymentDetailsDefined,
         total,
         items: {
           deleteMany: { invoiceId: existingInvoice.id, servicoId: service.id },
@@ -288,12 +301,15 @@ export const syncInvoiceForService = async (
 
   const blockedStatus = await ensureInvoiceStatus(tx, BLOCKED_STATUS_SLUG);
 
+  const paymentDetailsDefined = hasPaymentDetails({ paymentConditionId: resolvedConditionId });
+
   const created = await tx.invoice.create({
     data: {
       ownerId: service.animal.ownerId,
       statusId: blockedStatus.id,
       responsibleId: resolvedResponsible,
       paymentConditionId: resolvedConditionId,
+      paymentDetailsDefined,
       dueDate: resolvedDueDate,
       total: serviceTotal,
       items: {
