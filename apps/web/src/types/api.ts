@@ -344,10 +344,23 @@ export interface DashboardAppointmentsSummary {
   upcomingWeek: number;
 }
 
+export interface DashboardServicesSummary {
+  total: number;
+  ongoing: number;
+  completed: number;
+}
+
 export interface DashboardProductsSummary {
   critical: number;
   lowStock: number;
   totalActive: number;
+}
+
+export interface DashboardInvoicesSummary {
+  blocked: number;
+  open: number;
+  partiallyPaid: number;
+  paid: number;
 }
 
 export interface DashboardEntitySummary {
@@ -355,8 +368,10 @@ export interface DashboardEntitySummary {
 }
 
 export interface DashboardSummary {
+  services?: DashboardServicesSummary;
   appointments?: DashboardAppointmentsSummary;
   products?: DashboardProductsSummary;
+  invoices?: DashboardInvoicesSummary;
   owners?: DashboardEntitySummary;
   animals?: DashboardEntitySummary;
 }
