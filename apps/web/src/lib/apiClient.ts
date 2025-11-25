@@ -2,6 +2,7 @@ import type {
   Animal,
   Appointment,
   AttendanceType,
+  AttendanceStatus,
   DashboardSummaryResponse,
   Attendance,
   Invoice,
@@ -225,8 +226,28 @@ export const dashboardApi = {
   summary: () => apiClient.get<DashboardSummaryResponse>('/dashboard/summary'),
 };
 
+export interface AttendanceFilters {
+  status?: AttendanceStatus;
+  ownerId?: string;
+  animalId?: string;
+  from?: string;
+  to?: string;
+}
+
+const buildAttendanceQuery = (filters: AttendanceFilters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.ownerId) params.set('ownerId', filters.ownerId);
+  if (filters.animalId) params.set('animalId', filters.animalId);
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
+  const query = params.toString();
+  return query ? `?${query}` : '';
+};
+
 export const servicesApi = {
   create: (payload: unknown) => apiClient.post<Attendance>('/services', payload),
+  list: (filters: AttendanceFilters = {}) => apiClient.get<Attendance[]>(`/services${buildAttendanceQuery(filters)}`),
   getById: (id: string) => apiClient.get<Attendance>(`/services/${id}`),
   conclude: (id: string, payload: unknown) => apiClient.post<Attendance>(`/services/${id}/conclude`, payload),
   update: (id: string, payload: unknown) => apiClient.put<Attendance>(`/services/${id}`, payload),

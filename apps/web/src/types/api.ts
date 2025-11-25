@@ -229,6 +229,7 @@ export interface Invoice {
 export interface InvoiceSummary {
   openTotal: number;
   paidTotal: number;
+  receivedTotal: number;
   openCount: number;
   paidCount: number;
 }
@@ -337,12 +338,44 @@ export interface AppointmentCalendarResponse {
   summary: AppointmentCalendarSummary;
 }
 
+export interface DashboardAppointmentsStatusSummary {
+  scheduled?: number;
+  confirmed?: number;
+  cancelled?: number;
+  completed?: number;
+}
+
+export interface DashboardAppointmentsTimeframeSummary {
+  today?: number;
+  upcomingWeek?: number;
+  upcomingMonth?: number;
+}
+
 export interface DashboardAppointmentsSummary {
-  scheduled: number;
-  confirmed: number;
-  completed: number;
-  today: number;
-  upcomingWeek: number;
+  status?: DashboardAppointmentsStatusSummary;
+  timeframe?: DashboardAppointmentsTimeframeSummary;
+  scheduled?: number;
+  confirmed?: number;
+  completed?: number;
+  cancelled?: number;
+  today?: number;
+  upcomingWeek?: number;
+}
+
+export interface DashboardServicesSummary {
+  total?: number;
+  ongoing?: number;
+  completed?: number;
+  cancelled?: number;
+  status?: {
+    ongoing?: number;
+    completed?: number;
+    cancelled?: number;
+  };
+  performance?: {
+    today?: number;
+    monthToDate?: number;
+  };
 }
 
 export interface DashboardProductsSummary {
@@ -351,13 +384,36 @@ export interface DashboardProductsSummary {
   totalActive: number;
 }
 
+export interface DashboardInvoicesSummary {
+  status?: {
+    blocked?: number;
+    open?: number;
+    partiallyPaid?: number;
+    paid?: number;
+    overdue?: number;
+  };
+  receivables?: {
+    dueToday?: number;
+    dueSoon?: number;
+    receivedTotal?: number;
+  };
+  blocked?: number;
+  open?: number;
+  partiallyPaid?: number;
+  paid?: number;
+  receivedTotal?: number;
+  overdue?: number;
+}
+
 export interface DashboardEntitySummary {
   total: number;
 }
 
 export interface DashboardSummary {
+  services?: DashboardServicesSummary;
   appointments?: DashboardAppointmentsSummary;
   products?: DashboardProductsSummary;
+  invoices?: DashboardInvoicesSummary;
   owners?: DashboardEntitySummary;
   animals?: DashboardEntitySummary;
 }

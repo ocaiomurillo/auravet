@@ -135,10 +135,18 @@ const buildInvoiceWhere = (filters: z.infer<typeof invoiceFilterSchema>): Prisma
 const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof invoiceInclude }>>) => {
   let openTotal = new Prisma.Decimal(0);
   let paidTotal = new Prisma.Decimal(0);
+  let receivedTotal = new Prisma.Decimal(0);
   let openCount = 0;
   let paidCount = 0;
 
   for (const invoice of invoices) {
+    const receivedForInvoice = invoice.installments.reduce((acc, installment) => {
+      if (!installment.paidAt) return acc;
+      return acc.add(installment.amount);
+    }, new Prisma.Decimal(0));
+
+    receivedTotal = receivedTotal.add(receivedForInvoice);
+
     if (invoice.status.slug === 'QUITADA') {
       paidTotal = paidTotal.add(invoice.total);
       paidCount += 1;
@@ -151,6 +159,7 @@ const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof
   return {
     openTotal: Number(openTotal.toFixed(2)),
     paidTotal: Number(paidTotal.toFixed(2)),
+    receivedTotal: Number(receivedTotal.toFixed(2)),
     openCount,
     paidCount,
   };

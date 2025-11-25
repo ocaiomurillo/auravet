@@ -385,15 +385,18 @@ const AccountingPage = () => {
 
       <Card
         title="Resumo de receitas"
-        description="Acompanhe totais quitados e em aberto para manter o fluxo de caixa saudável."
+        description="Acompanhe totais recebidos, quitados e em aberto para manter o fluxo de caixa saudável."
       >
         <div className="grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl bg-emerald-100/60 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Recebido</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Total recebido</p>
             <p className="text-xl font-semibold text-emerald-700">
-              {currencyFormatter.format(summary?.paidTotal ?? 0)}
+              {currencyFormatter.format(summary?.receivedTotal ?? 0)}
             </p>
-            <p className="text-xs text-brand-grafite/70">{summary?.paidCount ?? 0} faturas quitadas</p>
+            <p className="text-xs text-brand-grafite/70">Somatório das parcelas pagas, independente do status.</p>
+            <p className="text-[11px] text-brand-grafite/60">
+              Quitado em faturas: {currencyFormatter.format(summary?.paidTotal ?? 0)} ({summary?.paidCount ?? 0})
+            </p>
           </div>
           <div className="rounded-2xl bg-brand-azul/10 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">A receber</p>
