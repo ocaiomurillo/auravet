@@ -336,18 +336,44 @@ export interface AppointmentCalendarResponse {
   summary: AppointmentCalendarSummary;
 }
 
+export interface DashboardAppointmentsStatusSummary {
+  scheduled?: number;
+  confirmed?: number;
+  cancelled?: number;
+  completed?: number;
+}
+
+export interface DashboardAppointmentsTimeframeSummary {
+  today?: number;
+  upcomingWeek?: number;
+  upcomingMonth?: number;
+}
+
 export interface DashboardAppointmentsSummary {
-  scheduled: number;
-  confirmed: number;
-  completed: number;
-  today: number;
-  upcomingWeek: number;
+  status?: DashboardAppointmentsStatusSummary;
+  timeframe?: DashboardAppointmentsTimeframeSummary;
+  scheduled?: number;
+  confirmed?: number;
+  completed?: number;
+  cancelled?: number;
+  today?: number;
+  upcomingWeek?: number;
 }
 
 export interface DashboardServicesSummary {
-  total: number;
-  ongoing: number;
-  completed: number;
+  total?: number;
+  ongoing?: number;
+  completed?: number;
+  cancelled?: number;
+  status?: {
+    ongoing?: number;
+    completed?: number;
+    cancelled?: number;
+  };
+  performance?: {
+    today?: number;
+    monthToDate?: number;
+  };
 }
 
 export interface DashboardProductsSummary {
@@ -357,10 +383,24 @@ export interface DashboardProductsSummary {
 }
 
 export interface DashboardInvoicesSummary {
-  blocked: number;
-  open: number;
-  partiallyPaid: number;
-  paid: number;
+  status?: {
+    blocked?: number;
+    open?: number;
+    partiallyPaid?: number;
+    paid?: number;
+    overdue?: number;
+  };
+  receivables?: {
+    dueToday?: number;
+    dueSoon?: number;
+    receivedTotal?: number;
+  };
+  blocked?: number;
+  open?: number;
+  partiallyPaid?: number;
+  paid?: number;
+  receivedTotal?: number;
+  overdue?: number;
 }
 
 export interface DashboardEntitySummary {
