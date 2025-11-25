@@ -429,10 +429,9 @@ const AnimalsPage = () => {
                         onChange={(event) => setAttendanceStatusFilter(event.target.value as AttendanceStatus | '')}
                       >
                         <option value="">Todos</option>
-                        <option value="AGENDADO">Agendado</option>
-                        <option value="CONFIRMADO">Confirmado</option>
-                        <option value="CONCLUIDO">Concluído</option>
+                        <option value="EM_ANDAMENTO">Em andamento</option>
                         <option value="CANCELADO">Cancelado</option>
+                        <option value="CONCLUIDO">Concluído</option>
                       </SelectField>
                     </div>
                     <ul className="space-y-3">

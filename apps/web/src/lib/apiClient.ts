@@ -246,8 +246,10 @@ const buildAttendanceQuery = (filters: AttendanceFilters = {}) => {
 };
 
 export const servicesApi = {
+  create: (payload: unknown) => apiClient.post<Attendance>('/services', payload),
   list: (filters: AttendanceFilters = {}) => apiClient.get<Attendance[]>(`/services${buildAttendanceQuery(filters)}`),
   getById: (id: string) => apiClient.get<Attendance>(`/services/${id}`),
+  conclude: (id: string, payload: unknown) => apiClient.post<Attendance>(`/services/${id}/conclude`, payload),
   update: (id: string, payload: unknown) => apiClient.put<Attendance>(`/services/${id}`, payload),
 };
 

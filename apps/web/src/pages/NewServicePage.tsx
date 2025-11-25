@@ -552,7 +552,7 @@ const NewServicePage = () => {
   }, [selectedAppointment, setValue]);
 
   const createAttendance = useMutation({
-    mutationFn: (payload: CreateAttendancePayload) => apiClient.post<Attendance>('/services', payload),
+    mutationFn: (payload: CreateAttendancePayload) => servicesApi.create(payload),
     onSuccess: async (service, payload) => {
       toast.success('Atendimento registrado com sucesso.');
 
@@ -644,26 +644,25 @@ const NewServicePage = () => {
   });
 
   const concludeAttendance = useMutation({
-    mutationFn: (appointmentId: string) => {
+    mutationFn: async () => {
+      if (!serviceId) {
+        throw new Error('Atendimento precisa ser salvo antes de concluir.');
+      }
+
       const normalizedNotes = selectedAppointment?.notes?.trim() ?? attendance?.observacoes?.trim();
 
-      return appointmentsApi.complete(appointmentId, {
+      return servicesApi.conclude(serviceId, {
         notes: normalizedNotes && normalizedNotes.length > 0 ? normalizedNotes : undefined,
-        service: attendance
-          ? {
-              tipo: attendance.tipo,
-              preco: attendance.preco,
-              observacoes: attendance.observacoes?.trim() || normalizedNotes || undefined,
-            }
-          : undefined,
       });
     },
-    onSuccess: (_, appointmentId) => {
-      toast.success('Agendamento concluído e sincronizado com sucesso.');
+    onSuccess: () => {
+      toast.success('Atendimento concluído e fatura preparada.');
       queryClient.invalidateQueries({ queryKey: ['attendance', serviceId] });
-      queryClient.invalidateQueries({ queryKey: ['appointment', appointmentId] });
+      queryClient.invalidateQueries({ queryKey: ['attendances'] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['appointments', 'billable'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting', 'invoices'] });
     },
     onError: (err: unknown) => {
       const message = formatErrorMessage(err, 'Não foi possível encerrar o atendimento agora.');
@@ -887,14 +886,21 @@ const NewServicePage = () => {
   });
 
   const handleConcludeAttendance = () => {
-    const appointmentId = attendance?.appointmentId ?? null;
-
-    if (!appointmentId) {
-      toast.error('Vincule um agendamento para encerrar o atendimento.');
+    if (!attendance || !serviceId) {
+      toast.error('Salve o atendimento antes de concluir.');
       return;
     }
 
-    concludeAttendance.mutate(appointmentId);
+    if (attendance.status === 'CONCLUIDO') {
+      toast.error('Atendimento já está concluído.');
+      return;
+    }
+
+    if (!window.confirm('Concluir atendimento? Essa ação é irreversível e gerará a fatura bloqueada.')) {
+      return;
+    }
+
+    concludeAttendance.mutate();
   };
 
   const pageTitle = isViewing
@@ -1424,22 +1430,23 @@ const NewServicePage = () => {
           ) : null}
 
           <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
-            {isExistingAttendance && attendance?.appointmentId ? (
+            {isExistingAttendance ? (
               <Button
                 type="button"
                 variant="secondary"
                 disabled={
                   isFormReadOnly ||
                   concludeAttendance.isPending ||
-                  attendance?.appointment?.status === 'CONCLUIDO'
+                  attendance?.status === 'CONCLUIDO' ||
+                  attendance?.status === 'CANCELADO'
                 }
                 onClick={handleConcludeAttendance}
               >
-                {attendance?.appointment?.status === 'CONCLUIDO'
-                  ? 'Agendamento concluído'
+                {attendance?.status === 'CONCLUIDO'
+                  ? 'Atendimento concluído'
                   : concludeAttendance.isPending
-                    ? 'Concluindo agendamento...'
-                    : 'Concluir agendamento'}
+                    ? 'Concluindo atendimento...'
+                    : 'Concluir atendimento'}
               </Button>
             ) : null}
             <Button

@@ -21,10 +21,9 @@ const attendanceTypeLabels: Record<AttendanceType, string> = {
 };
 
 const statusLabels: Record<AttendanceStatus, string> = {
-  AGENDADO: 'Agendado',
-  CONFIRMADO: 'Confirmado',
-  CONCLUIDO: 'Concluído',
+  EM_ANDAMENTO: 'Em andamento',
   CANCELADO: 'Cancelado',
+  CONCLUIDO: 'Concluído',
 };
 
 const formatCurrency = (value: number) =>

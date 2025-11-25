@@ -134,13 +134,13 @@ const indicatorClasses: Record<'success' | 'warning' | 'danger' | 'info', string
 
 const AccountingPage = () => {
   const [filters, setFilters] = useState<FilterState>({
-    status: 'ABERTA',
+    status: '',
     from: '',
     to: '',
     dueStatus: 'all',
   });
   const [draftFilters, setDraftFilters] = useState<FilterState>({
-    status: 'ABERTA',
+    status: '',
     from: '',
     to: '',
     dueStatus: 'all',
@@ -250,8 +250,8 @@ const AccountingPage = () => {
   };
 
   const handleReset = () => {
-    setDraftFilters({ status: 'ABERTA', from: '', to: '', dueStatus: 'all' });
-    setFilters({ status: 'ABERTA', from: '', to: '', dueStatus: 'all' });
+    setDraftFilters({ status: '', from: '', to: '', dueStatus: 'all' });
+    setFilters({ status: '', from: '', to: '', dueStatus: 'all' });
   };
 
   const handleGeneratePdf = async (invoice: Invoice) => {
@@ -425,6 +425,7 @@ const AccountingPage = () => {
       <Card title="Filtrar faturas" description="Combine período e status para refinar a visão.">
         <div className="mb-2 flex flex-wrap gap-2">
           {[
+            { label: 'Bloqueadas', value: 'BLOQUEADA' },
             { label: 'Abertas', value: 'ABERTA' },
             { label: 'Quitadas', value: 'QUITADA' },
           ].map((option) => (

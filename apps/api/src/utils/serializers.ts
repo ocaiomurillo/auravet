@@ -180,7 +180,7 @@ export type SerializedService = {
   animalId: string;
   tipo: Servico['tipo'];
   data: string;
-  status: Appointment['status'];
+  status: Servico['status'];
   preco: number;
   observacoes: string | null;
   createdAt: string;
@@ -430,7 +430,7 @@ export const serializeService = (
     animalId: service.animalId,
     tipo: service.tipo,
     data: service.data.toISOString(),
-    status: service.appointment?.status ?? 'CONCLUIDO',
+    status: service.status,
     preco: Number(service.preco),
     observacoes: service.observacoes ?? null,
     createdAt: service.createdAt.toISOString(),

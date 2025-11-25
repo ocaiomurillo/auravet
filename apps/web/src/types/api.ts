@@ -62,7 +62,9 @@ export interface Animal {
 
 export type AttendanceType = 'CONSULTA' | 'EXAME' | 'VACINACAO' | 'CIRURGIA' | 'OUTROS';
 
-export type AttendanceStatus = 'AGENDADO' | 'CONFIRMADO' | 'CONCLUIDO' | 'CANCELADO';
+export type AppointmentStatus = 'AGENDADO' | 'CONFIRMADO' | 'CONCLUIDO' | 'CANCELADO';
+
+export type AttendanceStatus = 'EM_ANDAMENTO' | 'CANCELADO' | 'CONCLUIDO';
 
 export type ServiceProfessional = 'MEDICO' | 'ENFERMEIRO' | 'AMBOS';
 
@@ -76,7 +78,7 @@ export interface Attendance {
   observacoes?: string | null;
   createdAt: string;
   appointmentId: string | null;
-  appointment?: { scheduledStart: string; scheduledEnd: string; status: AttendanceStatus } | null;
+  appointment?: { scheduledStart: string; scheduledEnd: string; status: AppointmentStatus } | null;
   assistantId: string | null;
   animal?: Animal;
   catalogItems: ServiceCatalogItem[];
@@ -299,7 +301,7 @@ export interface Appointment {
   veterinarianId: string;
   assistantId: string | null;
   serviceId: string | null;
-  status: AttendanceStatus;
+  status: AppointmentStatus;
   scheduledStart: string;
   scheduledEnd: string;
   confirmedAt: string | null;

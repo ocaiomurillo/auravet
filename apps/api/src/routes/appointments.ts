@@ -23,7 +23,6 @@ import {
   serializeAppointment,
   serializeAppointmentUser,
 } from '../utils/serializers';
-import { syncInvoiceForService } from '../utils/invoice';
 
 export const appointmentsRouter = Router();
 
@@ -839,12 +838,6 @@ appointmentsRouter.patch(
         data,
         include: appointmentInclude,
       });
-
-      if (serviceId) {
-        await syncInvoiceForService(tx, serviceId, {
-          responsibleId: req.user?.id ?? null,
-        });
-      }
 
       return updated;
     });

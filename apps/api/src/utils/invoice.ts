@@ -1,8 +1,9 @@
-import { AppointmentStatus, PaymentCondition, Prisma, PrismaClient } from '@prisma/client';
+import { PaymentCondition, Prisma, PrismaClient, ServiceStatus } from '@prisma/client';
 
 import { HttpError } from './http-error';
 import { serializeService } from './serializers';
 
+const BLOCKED_STATUS_SLUG = 'BLOQUEADA';
 const OPEN_STATUS_SLUG = 'ABERTA';
 const PAID_STATUS_SLUG = 'QUITADA';
 
@@ -205,6 +206,10 @@ export const syncInvoiceForService = async (
   const existingInvoiceItem = service.invoiceItems[0];
   const existingInvoice = existingInvoiceItem?.invoice ?? null;
 
+  if (service.status !== ServiceStatus.CONCLUIDO) {
+    throw new HttpError(400, 'Apenas atendimentos concluídos podem ser faturados.');
+  }
+
   const conditionId = paymentConditionId ?? existingInvoice?.paymentConditionId ?? null;
   const condition = conditionId
     ? await tx.paymentCondition.findUnique({ where: { id: conditionId } })
@@ -281,12 +286,12 @@ export const syncInvoiceForService = async (
     return refreshed;
   }
 
-  const openStatus = await ensureInvoiceStatus(tx, OPEN_STATUS_SLUG);
+  const blockedStatus = await ensureInvoiceStatus(tx, BLOCKED_STATUS_SLUG);
 
   const created = await tx.invoice.create({
     data: {
       ownerId: service.animal.ownerId,
-      statusId: openStatus.id,
+      statusId: blockedStatus.id,
       responsibleId: resolvedResponsible,
       paymentConditionId: resolvedConditionId,
       dueDate: resolvedDueDate,
@@ -312,27 +317,20 @@ export const fetchInvoiceCandidates = async (
   tx: Prisma.TransactionClient | PrismaClient,
   ownerId?: string,
 ) => {
-  const appointments = await tx.appointment.findMany({
+  const services = await tx.servico.findMany({
     where: {
-      status: AppointmentStatus.CONCLUIDO,
-      serviceId: { not: null },
-      service: { invoiceItems: { none: {} } },
-      ownerId: ownerId ?? undefined,
+      status: ServiceStatus.CONCLUIDO,
+      invoiceItems: { none: {} },
+      animal: ownerId ? { ownerId } : undefined,
     },
     include: {
-      service: {
-        include: {
-          animal: { include: { owner: true } },
-          items: { include: { product: true } },
-          catalogItems: { include: { definition: true } },
-          appointment: true,
-        },
-      },
+      animal: { include: { owner: true } },
+      items: { include: { product: true } },
+      catalogItems: { include: { definition: true } },
+      appointment: true,
     },
-    orderBy: { scheduledStart: 'desc' },
+    orderBy: { data: 'desc' },
   });
-
-  const services = appointments.flatMap((appointment) => (appointment.service ? [appointment.service] : []));
 
   return services.map((service) => serializeService(service, { includeAnimal: true }));
 };
