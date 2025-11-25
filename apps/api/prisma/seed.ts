@@ -382,6 +382,7 @@ const DEFAULT_ROLES: Array<{
 
 const DEFAULT_INVOICE_STATUSES = [
   { slug: 'ABERTA', name: 'Aberta' },
+  { slug: 'BLOQUEADA', name: 'Bloqueada' },
   { slug: 'QUITADA', name: 'Quitada' },
 ] as const;
 

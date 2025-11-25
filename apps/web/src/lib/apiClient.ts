@@ -226,7 +226,9 @@ export const dashboardApi = {
 };
 
 export const servicesApi = {
+  create: (payload: unknown) => apiClient.post<Attendance>('/services', payload),
   getById: (id: string) => apiClient.get<Attendance>(`/services/${id}`),
+  conclude: (id: string, payload: unknown) => apiClient.post<Attendance>(`/services/${id}/conclude`, payload),
   update: (id: string, payload: unknown) => apiClient.put<Attendance>(`/services/${id}`, payload),
 };
 

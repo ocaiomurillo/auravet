@@ -1,4 +1,5 @@
-import { AppointmentStatus, Prisma, Product, ServiceDefinition } from '@prisma/client';
+import { AppointmentStatus, Prisma, Product, ServiceDefinition, ServiceStatus } from '@prisma/client';
+import { z } from 'zod';
 import { Router } from 'express';
 
 import { env } from '../config/env';
@@ -114,6 +115,10 @@ const ensureDistinctCatalogItems = (items: ServiceCatalogItemInput[]) => {
   }
 };
 
+const concludeServiceSchema = z.object({
+  notes: z.string().trim().optional(),
+});
+
 const loadProductsMap = async (tx: Prisma.TransactionClient, ids: string[]): Promise<Map<string, Product>> => {
   if (!ids.length) {
     return new Map();
@@ -195,7 +200,7 @@ const findOngoingServiceForAnimal = async (animalId: string) =>
   prisma.servico.findFirst({
     where: {
       animalId,
-      appointment: { status: { not: AppointmentStatus.CONCLUIDO } },
+      status: ServiceStatus.EM_ANDAMENTO,
     },
     orderBy: { data: 'desc' },
     select: { id: true },
@@ -384,6 +389,7 @@ servicesRouter.post(
         data: {
           animal: { connect: { id: payload.animalId } },
           tipo: payload.tipo,
+          status: ServiceStatus.EM_ANDAMENTO,
           data: serviceDate,
           preco: toDecimal(normalizedPriceValue),
           observacoes: payload.observacoes ?? null,
@@ -414,15 +420,6 @@ servicesRouter.post(
         await tx.product.update({
           where: { id: item.productId },
           data: { estoqueAtual: { decrement: item.quantidade } },
-        });
-      }
-
-      await syncInvoiceForService(tx, created.id, { responsibleId: created.responsavelId ?? responsibleId });
-
-      if (appointment) {
-        await concludeAppointmentForService(tx, appointment, created.id, {
-          notes: payload.observacoes ?? null,
-          completedAt: serviceDate,
         });
       }
 
@@ -539,21 +536,14 @@ servicesRouter.put(
         }
 
         const targetAnimalId = payload.animalId ?? existing.animalId;
-        let appointmentForLink: Awaited<ReturnType<typeof tx.appointment.findUnique>> | null = null;
-
         if (payload.appointmentId) {
           if (currentAppointmentId && payload.appointmentId !== currentAppointmentId) {
             throw new HttpError(400, 'Atendimento já está vinculado a outro agendamento.');
           }
 
-          appointmentForLink = await ensureAppointmentForService(
-            tx,
-            payload.appointmentId,
-            targetAnimalId,
-            id,
-          );
+          await ensureAppointmentForService(tx, payload.appointmentId, targetAnimalId, id);
         } else if (currentAppointmentId) {
-          appointmentForLink = existing.appointment ?? null;
+          await ensureAppointmentForService(tx, currentAppointmentId, targetAnimalId, id);
         }
 
         const updateData: Prisma.ServicoUpdateInput = {};
@@ -690,17 +680,6 @@ servicesRouter.put(
           include: serviceInclude,
         });
 
-        await syncInvoiceForService(tx, id, {
-          responsibleId: updated.responsavelId ?? req.user?.id ?? null,
-        });
-
-        if (appointmentForLink) {
-          await concludeAppointmentForService(tx, appointmentForLink, updated.id, {
-            notes: payload.observacoes ?? existing.observacoes ?? null,
-            completedAt: updated.data,
-          });
-        }
-
         return updated;
       });
 
@@ -711,6 +690,52 @@ servicesRouter.put(
       }
       throw error;
     }
+  }),
+);
+
+servicesRouter.post(
+  '/:id/conclude',
+  requirePermission('services:write'),
+  asyncHandler(async (req, res) => {
+    const { id } = serviceIdSchema.parse(req.params);
+    const payload = concludeServiceSchema.parse(req.body);
+
+    const service = await prisma.$transaction(async (tx) => {
+      const existing = await tx.servico.findUnique({ where: { id }, include: serviceInclude });
+
+      if (!existing) {
+        throw new HttpError(404, 'Serviço não encontrado.');
+      }
+
+      if (existing.status === ServiceStatus.CONCLUIDO) {
+        throw new HttpError(400, 'Atendimento já concluído.');
+      }
+
+      if (existing.status === ServiceStatus.CANCELADO) {
+        throw new HttpError(400, 'Não é possível concluir um atendimento cancelado.');
+      }
+
+      const updated = await tx.servico.update({
+        where: { id },
+        data: { status: ServiceStatus.CONCLUIDO },
+        include: serviceInclude,
+      });
+
+      if (updated.appointment) {
+        await concludeAppointmentForService(tx, updated.appointment, updated.id, {
+          notes: payload.notes ?? updated.observacoes ?? null,
+          completedAt: updated.data,
+        });
+      }
+
+      await syncInvoiceForService(tx, updated.id, {
+        responsibleId: updated.responsavelId ?? req.user?.id ?? null,
+      });
+
+      return tx.servico.findUniqueOrThrow({ where: { id }, include: serviceInclude });
+    });
+
+    res.json(serializeService(service, { includeAnimal: true }));
   }),
 );
 

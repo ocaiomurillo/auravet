@@ -1,4 +1,4 @@
-import { AppointmentStatus, Prisma, PaymentCondition, PaymentConditionType } from '@prisma/client';
+import { Prisma, PaymentCondition, PaymentConditionType, ServiceStatus } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -64,18 +64,21 @@ const resolveServiceIdForInvoice = async (
     throw new HttpError(400, 'Selecione um atendimento ou agendamento para faturar.');
   }
 
-  const appointment = await tx.appointment.findUnique({ where: { id: payload.appointmentId } });
+  const appointment = await tx.appointment.findUnique({
+    where: { id: payload.appointmentId },
+    include: { service: true },
+  });
 
   if (!appointment) {
     throw new HttpError(404, 'Agendamento não encontrado para faturamento.');
   }
 
-  if (appointment.status !== AppointmentStatus.CONCLUIDO) {
-    throw new HttpError(400, 'Apenas agendamentos concluídos podem ser faturados.');
+  if (!appointment.serviceId || !appointment.service) {
+    throw new HttpError(400, 'Agendamento selecionado ainda não possui atendimento vinculado.');
   }
 
-  if (!appointment.serviceId) {
-    throw new HttpError(400, 'Agendamento selecionado ainda não possui atendimento vinculado.');
+  if (appointment.service.status !== ServiceStatus.CONCLUIDO) {
+    throw new HttpError(400, 'Apenas atendimentos concluídos podem ser faturados.');
   }
 
   return appointment.serviceId;

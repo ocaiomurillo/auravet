@@ -21,6 +21,12 @@ enum TipoServico {
   OUTROS
 }
 
+enum ServiceStatus {
+  EM_ANDAMENTO
+  CANCELADO
+  CONCLUIDO
+}
+
 model ServiceDefinition {
   id            String  @id @default(cuid())
   nome          String  @unique
@@ -95,6 +101,7 @@ model Servico {
   animalId     String
   animal       Animal      @relation(fields: [animalId], references: [id], onDelete: Cascade)
   tipo         TipoServico
+  status       ServiceStatus @default(EM_ANDAMENTO)
   data         DateTime
   preco        Decimal     @db.Decimal(10, 2)
   observacoes  String?

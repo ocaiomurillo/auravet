@@ -10,8 +10,16 @@ const appointmentStatus = {
   CONCLUIDO: 'CONCLUIDO',
 };
 
+const serviceStatus = {
+  EM_ANDAMENTO: 'EM_ANDAMENTO',
+  CANCELADO: 'CANCELADO',
+  CONCLUIDO: 'CONCLUIDO',
+};
+
 (Prisma as unknown as { AppointmentStatus?: Record<string, string> }).AppointmentStatus ??= appointmentStatus;
 (PrismaModule as unknown as { AppointmentStatus?: Record<string, string> }).AppointmentStatus ??= appointmentStatus;
+(Prisma as unknown as { ServiceStatus?: Record<string, string> }).ServiceStatus ??= serviceStatus;
+(PrismaModule as unknown as { ServiceStatus?: Record<string, string> }).ServiceStatus ??= serviceStatus;
 
 export type InMemoryPrisma = PrismaClient & { reset(): void };
 
