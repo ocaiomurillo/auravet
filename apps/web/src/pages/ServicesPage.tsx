@@ -65,7 +65,7 @@ type FiltersState = {
 const ServicesPage = () => {
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
-  const canCreateDefinitions = hasModule('services:write');
+  const canCreateDefinitions = hasModule('services:manage');
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingDefinition, setEditingDefinition] = useState<ServiceDefinition | null>(null);

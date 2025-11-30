@@ -35,7 +35,7 @@ const OwnersPage = () => {
   const [filterCpf, setFilterCpf] = useState('');
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
-  const canEdit = hasModule('owners:write');
+  const canEdit = hasModule('owners:manage');
 
   const buildXlsxFilename = (base: string) =>
     `auravet-${base.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}-${Date.now()}.xlsx`;
