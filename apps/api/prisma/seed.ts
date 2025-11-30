@@ -270,7 +270,7 @@ const DEFAULT_MODULES = [
     description: 'Permite visualizar a lista de tutores cadastrados.',
   },
   {
-    slug: 'owners:write',
+    slug: 'owners:manage',
     name: 'Gerenciar tutores',
     description: 'Permite criar e editar tutores.',
   },
@@ -280,7 +280,7 @@ const DEFAULT_MODULES = [
     description: 'Permite visualizar animais cadastrados.',
   },
   {
-    slug: 'animals:write',
+    slug: 'animals:manage',
     name: 'Gerenciar animais',
     description: 'Permite cadastrar e editar animais.',
   },
@@ -290,7 +290,7 @@ const DEFAULT_MODULES = [
     description: 'Permite visualizar os serviços prestados.',
   },
   {
-    slug: 'services:write',
+    slug: 'services:manage',
     name: 'Gerenciar serviços',
     description: 'Permite registrar e atualizar serviços.',
   },
@@ -300,21 +300,56 @@ const DEFAULT_MODULES = [
     description: 'Permite acompanhar o catálogo e estoque de produtos.',
   },
   {
-    slug: 'products:write',
+    slug: 'products:manage',
     name: 'Gerenciar produtos',
     description: 'Permite cadastrar produtos e ajustar estoque.',
+  },
+  {
+    slug: 'appointments:manage',
+    name: 'Gerenciar agendamentos',
+    description: 'Permite criar, reagendar e cancelar consultas e procedimentos.',
+  },
+  {
+    slug: 'calendar:manage',
+    name: 'Gerenciar agenda',
+    description: 'Permite organizar disponibilidade e horários da equipe.',
+  },
+  {
+    slug: 'attendances:manage',
+    name: 'Gerenciar atendimentos',
+    description: 'Permite registrar e atualizar atendimentos realizados.',
+  },
+  {
+    slug: 'payment-conditions:manage',
+    name: 'Gerenciar condições de pagamento',
+    description: 'Permite cadastrar e atualizar condições e prazos de pagamento.',
+  },
+  {
+    slug: 'accounting:manage',
+    name: 'Gerenciar financeiro',
+    description: 'Permite acompanhar lançamentos financeiros e relatórios.',
+  },
+  {
+    slug: 'cashier:manage',
+    name: 'Gerenciar caixa',
+    description: 'Permite gerenciar contas a receber e registrar pagamentos.',
   },
   {
     slug: 'users:manage',
     name: 'Administrar usuários',
     description: 'Permite criar e gerenciar usuários e funções.',
   },
-  {
-    slug: 'cashier:access',
-    name: 'Caixa',
-    description: 'Permite gerenciar contas a receber e registrar pagamentos.',
-  },
 ] as const;
+
+const LEGACY_MODULE_SLUG_MAP: Record<string, string> = {
+  'owners:write': 'owners:manage',
+  'animals:write': 'animals:manage',
+  'services:write': 'services:manage',
+  'products:write': 'products:manage',
+  'cashier:access': 'cashier:manage',
+};
+
+const BASE_READ_MODULES = ['owners:read', 'animals:read', 'products:read', 'services:read'] as const;
 
 const DEFAULT_ROLES: Array<{
   slug: string;
@@ -331,52 +366,34 @@ const DEFAULT_ROLES: Array<{
   {
     slug: 'AUXILIAR_ADMINISTRATIVO',
     name: 'Auxiliar Administrativo',
-    modules: [
-      'owners:read',
-      'owners:write',
-      'animals:read',
-      'animals:write',
-      'services:read',
-      'services:write',
-      'products:read',
-      'products:write',
-      'cashier:access',
-    ],
+    modules: [...BASE_READ_MODULES, 'appointments:manage', 'calendar:manage', 'products:manage'],
   },
   {
     slug: 'ASSISTENTE_ADMINISTRATIVO',
     name: 'Assistente Administrativo',
-    modules: [
-      'owners:read',
-      'animals:read',
-      'services:read',
-      'services:write',
-      'products:read',
-      'cashier:access',
-    ],
+    modules: [...BASE_READ_MODULES, 'accounting:manage', 'cashier:manage'],
   },
   {
     slug: 'ENFERMEIRO',
     name: 'Enfermeiro',
-    modules: [
-      'owners:read',
-      'animals:read',
-      'animals:write',
-      'services:read',
-      'services:write',
-      'products:read',
-      'products:write',
-    ],
+    modules: [...BASE_READ_MODULES, 'appointments:manage', 'calendar:manage', 'attendances:manage'],
   },
   {
     slug: 'MEDICO',
     name: 'Médico',
-    modules: ['owners:read', 'animals:read', 'services:read', 'services:write', 'products:read'],
+    modules: [...BASE_READ_MODULES, 'appointments:manage', 'calendar:manage', 'attendances:manage'],
   },
   {
     slug: 'CONTADOR',
     name: 'Contador',
-    modules: ['services:read', 'products:read', 'cashier:access'],
+    modules: [
+      ...BASE_READ_MODULES,
+      'products:manage',
+      'services:manage',
+      'payment-conditions:manage',
+      'accounting:manage',
+      'cashier:manage',
+    ],
   },
 ];
 
@@ -993,6 +1010,27 @@ const DEFAULT_SERVICE_DEFINITIONS: Array<{
 console.log('>> Iniciando seed Auravet...');
 
 async function main() {
+  const desiredModuleSlugs = new Set(DEFAULT_MODULES.map((module) => module.slug));
+
+  for (const [legacySlug, targetSlug] of Object.entries(LEGACY_MODULE_SLUG_MAP)) {
+    const legacyModule = await prisma.module.findUnique({ where: { slug: legacySlug } });
+
+    if (!legacyModule) {
+      continue;
+    }
+
+    const targetModule = await prisma.module.findUnique({ where: { slug: targetSlug } });
+
+    if (targetModule) {
+      await prisma.module.delete({ where: { slug: legacySlug } });
+      continue;
+    }
+
+    await prisma.module.update({ where: { slug: legacySlug }, data: { slug: targetSlug } });
+  }
+
+  await prisma.module.deleteMany({ where: { slug: { notIn: Array.from(desiredModuleSlugs) } } });
+
   const modules = await Promise.all(
     DEFAULT_MODULES.map((module) =>
       prisma.module.upsert({
@@ -1006,6 +1044,7 @@ async function main() {
           slug: module.slug,
           name: module.name,
           description: module.description,
+          isActive: true,
         },
       }),
     ),
