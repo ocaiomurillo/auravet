@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Field from '../components/Field';
+import Modal from '../components/Modal';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient, appointmentsApi, productsApi, serviceDefinitionsApi, servicesApi } from '../lib/apiClient';
@@ -104,6 +105,7 @@ const NewServicePage = () => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState(
     searchParams.get('appointmentId') ?? '',
   );
+  const [confirmationModal, setConfirmationModal] = useState<'conclude' | 'cancel' | null>(null);
   const formatErrorMessage = useCallback(
     (error: unknown, fallback: string) => formatApiErrorMessage(error, fallback),
     [],
@@ -121,11 +123,11 @@ const NewServicePage = () => {
         data: '',
         fim: '',
         responsavelId: '',
-      assistantId: '',
-      catalogItems: [],
-      items: [],
-    },
-  });
+        assistantId: '',
+        catalogItems: [],
+        items: [],
+      },
+    });
 
   const items = watch('items');
   const catalogItems = watch('catalogItems');
@@ -922,11 +924,7 @@ const NewServicePage = () => {
       return;
     }
 
-    if (!window.confirm('Concluir atendimento? Essa ação é irreversível e gerará a fatura bloqueada.')) {
-      return;
-    }
-
-    concludeAttendance.mutate();
+    setConfirmationModal('conclude');
   };
 
   const handleCancelAttendance = () => {
@@ -945,12 +943,42 @@ const NewServicePage = () => {
       return;
     }
 
-    if (!window.confirm('Cancelar atendimento? Essa ação não gerará faturamento e desabilita novas edições.')) {
+    setConfirmationModal('cancel');
+  };
+
+  useEffect(() => {
+    if (concludeAttendance.isSuccess) {
+      setConfirmationModal((current) => (current === 'conclude' ? null : current));
+    }
+  }, [concludeAttendance.isSuccess]);
+
+  useEffect(() => {
+    if (cancelAttendance.isSuccess) {
+      setConfirmationModal((current) => (current === 'cancel' ? null : current));
+    }
+  }, [cancelAttendance.isSuccess]);
+
+  const handleCloseConfirmationModal = () => {
+    if (concludeAttendance.isPending || cancelAttendance.isPending) {
       return;
     }
 
-    cancelAttendance.mutate();
+    setConfirmationModal(null);
   };
+
+  const confirmationMutation =
+    confirmationModal === 'conclude'
+      ? concludeAttendance
+      : confirmationModal === 'cancel'
+        ? cancelAttendance
+        : null;
+
+  const confirmationError =
+    confirmationModal === 'conclude' && concludeAttendance.isError
+      ? formatErrorMessage(concludeAttendance.error, 'Não foi possível encerrar o atendimento agora.')
+      : confirmationModal === 'cancel' && cancelAttendance.isError
+        ? formatErrorMessage(cancelAttendance.error, 'Não foi possível cancelar o atendimento agora.')
+        : null;
 
   const pageTitle = isViewing
     ? 'Visualizar atendimento'
@@ -963,11 +991,91 @@ const NewServicePage = () => {
       ? 'Atualize serviços, insumos e entradas do prontuário mantendo o histórico organizado.'
       : 'Combine múltiplos serviços do catálogo e produtos utilizados para gerar um atendimento completo.';
 
+  const isConfirmationPending = confirmationMutation?.isPending ?? false;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">{pageTitle}</h1>
+    <>
+      <Modal
+        open={Boolean(confirmationModal)}
+        title={
+          confirmationModal === 'conclude'
+            ? 'Confirmar conclusão do atendimento'
+            : 'Confirmar cancelamento do atendimento'
+        }
+        description={
+          confirmationModal === 'conclude'
+            ? 'Ao concluir, o atendimento será bloqueado para edição e a fatura ficará pronta para cobrança.'
+            : 'Ao cancelar, o atendimento não poderá ser reativado e nenhuma cobrança será gerada.'
+        }
+        onClose={handleCloseConfirmationModal}
+        actions={
+          confirmationModal ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className="border border-brand-azul/30"
+                onClick={handleCloseConfirmationModal}
+                disabled={isConfirmationPending}
+              >
+                Manter em aberto
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className={
+                  confirmationModal === 'cancel'
+                    ? 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                    : undefined
+                }
+                disabled={isConfirmationPending}
+                onClick={() => {
+                  if (confirmationModal === 'conclude') {
+                    concludeAttendance.mutate();
+                  }
+
+                  if (confirmationModal === 'cancel') {
+                    cancelAttendance.mutate();
+                  }
+                }}
+              >
+                {confirmationModal === 'conclude'
+                  ? concludeAttendance.isPending
+                    ? 'Concluindo atendimento...'
+                    : 'Sim, concluir atendimento'
+                  : cancelAttendance.isPending
+                    ? 'Cancelando atendimento...'
+                    : 'Sim, cancelar atendimento'}
+              </Button>
+            </>
+          ) : null
+        }
+      >
+        {confirmationModal === 'conclude' ? (
+          <p className="text-sm leading-relaxed text-brand-grafite">
+            Essa ação é irreversível e bloqueia novas edições. Confirme somente se todas as informações e
+            valores estiverem corretos.
+          </p>
+        ) : null}
+
+        {confirmationModal === 'cancel' ? (
+          <p className="text-sm leading-relaxed text-brand-grafite">
+            O atendimento será encerrado sem faturamento e não poderá ser recuperado depois. Prossiga apenas se
+            tiver certeza do cancelamento.
+          </p>
+        ) : null}
+
+        {confirmationError ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {confirmationError}
+          </div>
+        ) : null}
+      </Modal>
+
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">{pageTitle}</h1>
           <p className="text-sm text-brand-grafite/70">{pageDescription}</p>
         </div>
         <Button variant="secondary" asChild>
