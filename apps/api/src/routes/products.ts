@@ -32,7 +32,7 @@ productsRouter.get(
 
 productsRouter.post(
   '/',
-  requirePermission('products:write'),
+  requirePermission('products:manage'),
   asyncHandler(async (req, res) => {
     const payload = productCreateSchema.parse(req.body);
 
@@ -71,7 +71,7 @@ productsRouter.get(
 
 productsRouter.put(
   '/:id',
-  requirePermission('products:write'),
+  requirePermission('products:manage'),
   asyncHandler(async (req, res) => {
     const { id } = productIdSchema.parse(req.params);
     const payload = productUpdateSchema.parse(req.body);
@@ -126,7 +126,7 @@ productsRouter.put(
 
 productsRouter.patch(
   '/:id/stock',
-  requirePermission('products:write'),
+  requirePermission('products:manage'),
   asyncHandler(async (req, res) => {
     const { id } = productIdSchema.parse(req.params);
     const { amount } = productAdjustStockSchema.parse(req.body);
@@ -154,7 +154,7 @@ productsRouter.patch(
 
 productsRouter.delete(
   '/:id',
-  requirePermission('products:write'),
+  requirePermission('products:manage'),
   asyncHandler(async (req, res) => {
     const { id } = productIdSchema.parse(req.params);
 

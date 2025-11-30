@@ -77,7 +77,7 @@ ownersRouter.get(
 
 ownersRouter.post(
   '/',
-  requirePermission('owners:write'),
+  requirePermission('owners:manage'),
   asyncHandler(async (req, res) => {
     const payload = ownerCreateSchema.parse(req.body);
 
@@ -135,7 +135,7 @@ ownersRouter.get(
 
 ownersRouter.put(
   '/:id',
-  requirePermission('owners:write'),
+  requirePermission('owners:manage'),
   asyncHandler(async (req, res) => {
     const { id } = ownerIdSchema.parse(req.params);
     const payload = ownerUpdateSchema.parse(req.body);
@@ -166,7 +166,7 @@ ownersRouter.put(
 
 ownersRouter.delete(
   '/:id',
-  requirePermission('owners:write'),
+  requirePermission('owners:manage'),
   asyncHandler(async (req, res) => {
     const { id } = ownerIdSchema.parse(req.params);
 

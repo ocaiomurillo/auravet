@@ -329,7 +329,7 @@ const calculateRange = (view: 'day' | 'week' | 'month', reference: Date) => {
 
 appointmentsRouter.get(
   '/',
-  requirePermission('services:read'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const filters = appointmentFilterSchema.parse(req.query);
 
@@ -412,7 +412,7 @@ appointmentsRouter.get(
 
 appointmentsRouter.post(
   '/',
-  requirePermission('services:write'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const payload = appointmentCreateSchema.parse(req.body);
 
@@ -466,7 +466,7 @@ appointmentsRouter.post(
 
 appointmentsRouter.get(
   '/collaborators',
-  requirePermission('services:read'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (_req, res) => {
     const collaborators = (await prisma.user.findMany({
       where: {
@@ -488,7 +488,7 @@ appointmentsRouter.get(
 
 appointmentsRouter.get(
   '/calendar',
-  requirePermission('services:read'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const query = appointmentCalendarQuerySchema.parse(req.query);
 
@@ -563,7 +563,7 @@ appointmentsRouter.get(
 
 appointmentsRouter.get(
   '/:id',
-  requirePermission('services:read'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const { id } = appointmentIdSchema.parse(req.params);
 
@@ -602,7 +602,7 @@ appointmentsRouter.get(
 
 appointmentsRouter.put(
   '/:id',
-  requirePermission('services:write'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const { id } = appointmentIdSchema.parse(req.params);
     const payload = appointmentUpdateSchema.parse(req.body);
@@ -702,7 +702,7 @@ appointmentsRouter.put(
 
 appointmentsRouter.patch(
   '/:id/confirm',
-  requirePermission('services:write'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const { id } = appointmentIdSchema.parse(req.params);
     const payload = appointmentConfirmSchema.parse(req.body);
@@ -737,7 +737,7 @@ appointmentsRouter.patch(
 
 appointmentsRouter.patch(
   '/:id/cancel',
-  requirePermission('services:write'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const { id } = appointmentIdSchema.parse(req.params);
     const payload = appointmentConfirmSchema.parse(req.body);
@@ -793,7 +793,7 @@ appointmentsRouter.patch(
 
 appointmentsRouter.patch(
   '/:id/reschedule',
-  requirePermission('services:write'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const { id } = appointmentIdSchema.parse(req.params);
     const payload = appointmentRescheduleSchema.parse(req.body);
@@ -836,7 +836,7 @@ const toDecimal = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
 appointmentsRouter.patch(
   '/:id/complete',
-  requirePermission('services:write'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const { id } = appointmentIdSchema.parse(req.params);
     const payload = appointmentCompleteSchema.parse(req.body);
@@ -931,7 +931,7 @@ appointmentsRouter.patch(
 
 appointmentsRouter.delete(
   '/:id',
-  requirePermission('services:write'),
+  requirePermission('appointments:manage'),
   asyncHandler(async (req, res) => {
     const { id } = appointmentIdSchema.parse(req.params);
 

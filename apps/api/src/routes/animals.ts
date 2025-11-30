@@ -75,7 +75,7 @@ animalsRouter.get(
 
 animalsRouter.post(
   '/',
-  requirePermission('animals:write'),
+  requirePermission('animals:manage'),
   asyncHandler(async (req, res) => {
     const payload = animalCreateSchema.parse(req.body);
 
@@ -190,7 +190,7 @@ animalsRouter.get(
 
 animalsRouter.put(
   '/:id',
-  requirePermission('animals:write'),
+  requirePermission('animals:manage'),
   asyncHandler(async (req, res) => {
     const { id } = animalIdSchema.parse(req.params);
     const payload = animalUpdateSchema.parse(req.body);
@@ -251,7 +251,7 @@ animalsRouter.put(
 
 animalsRouter.delete(
   '/:id',
-  requirePermission('animals:write'),
+  requirePermission('animals:manage'),
   asyncHandler(async (req, res) => {
     const { id } = animalIdSchema.parse(req.params);
 

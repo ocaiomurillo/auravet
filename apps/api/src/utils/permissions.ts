@@ -7,10 +7,18 @@ export const cashierPermissionAliases = ['cashier:manage', 'cashier:access'] as 
 export const financePermissions = ['accounting:manage', ...cashierPermissionAliases] as const;
 
 export const moduleAliases: Record<string, string[]> = {
+  'animals:manage': ['animals:write'],
+  'animals:write': ['animals:manage'],
   'attendances:manage': ['services:manage', 'services:write'],
   'attendances:read': ['services:read'],
   'cashier:access': ['cashier:manage'],
   'cashier:manage': ['cashier:access'],
+  'owners:manage': ['owners:write'],
+  'owners:write': ['owners:manage'],
+  'products:manage': ['products:write'],
+  'products:write': ['products:manage'],
+  'appointments:manage': ['appointments:write'],
+  'appointments:write': ['appointments:manage'],
   'services:manage': ['attendances:manage', 'services:write'],
   'services:read': ['attendances:read', 'attendances:manage'],
   'services:write': ['attendances:manage', 'services:manage'],
