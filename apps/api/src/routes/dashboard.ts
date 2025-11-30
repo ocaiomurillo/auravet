@@ -49,6 +49,7 @@ dashboardRouter.get(
   '/summary',
   asyncHandler(async (req, res) => {
     const modules = req.user?.modules ?? [];
+    const canViewFinance = hasModule(modules, 'cashier:manage') || hasModule(modules, 'accounting:manage');
     const summary: DashboardSummary = {};
     const jobs: Array<Promise<void>> = [];
 
@@ -159,7 +160,7 @@ dashboardRouter.get(
       );
     }
 
-    if (hasModule(modules, 'cashier:manage')) {
+    if (canViewFinance) {
       jobs.push(
         (async () => {
           const now = new Date();

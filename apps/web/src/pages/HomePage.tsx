@@ -17,7 +17,7 @@ const HomePage = () => {
   const canViewOwners = hasModule('owners:read');
   const canViewAnimals = hasModule('animals:read');
   const canViewProducts = hasModule('products:read');
-  const canViewAccounting = hasModule('accounting:manage');
+  const canViewFinance = hasModule('accounting:manage') || hasModule('cashier:manage');
   const canCreateAttendances = hasModule('services:write');
 
   const shouldFetchSummary =
@@ -26,7 +26,7 @@ const HomePage = () => {
     canViewOwners ||
     canViewAnimals ||
     canViewProducts ||
-    canViewAccounting;
+    canViewFinance;
 
   const summaryQuery = useQuery<DashboardSummaryResponse, Error>({
     queryKey: ['dashboard', 'summary'],
@@ -308,7 +308,7 @@ const HomePage = () => {
         </Card>
       ) : null}
 
-      {canViewAccounting ? (
+      {canViewFinance ? (
         <Card
           title="Faturas"
           description="Visualize recebíveis, acompanhe status de cobrança e antecipe vencimentos."

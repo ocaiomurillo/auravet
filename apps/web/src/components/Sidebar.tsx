@@ -14,7 +14,14 @@ const Sidebar = () => {
   const { hasModule } = useAuth();
 
   const availableNavItems = useMemo(
-    () => navItems.filter((item) => !item.module || hasModule(item.module)),
+    () =>
+      navItems.filter((item) => {
+        if (!item.module) return true;
+
+        return Array.isArray(item.module)
+          ? item.module.some((module) => hasModule(module))
+          : hasModule(item.module);
+      }),
     [hasModule]
   );
 

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface RequireModulesProps {
   modules: string[];
+  mode?: 'all' | 'any';
 }
 
 export const hasAllRequiredModules = (
@@ -11,11 +12,14 @@ export const hasAllRequiredModules = (
   hasModule: (module: string) => boolean,
 ) => modules.every((module) => hasModule(module));
 
-const RequireModules = ({ modules }: RequireModulesProps) => {
+const RequireModules = ({ modules, mode = 'all' }: RequireModulesProps) => {
   const { hasModule } = useAuth();
   const location = useLocation();
 
-  const allowed = hasAllRequiredModules(modules, hasModule);
+  const allowed =
+    mode === 'any'
+      ? modules.some((module) => hasModule(module))
+      : hasAllRequiredModules(modules, hasModule);
 
   if (!allowed) {
     return <Navigate to="/unauthorized" replace state={{ from: location }} />;

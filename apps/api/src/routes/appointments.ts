@@ -3,7 +3,7 @@ import { Router } from 'express';
 
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
-import { requirePermission } from '../middlewares/require-permission';
+import { requireAnyPermission, requirePermission } from '../middlewares/require-permission';
 import {
   appointmentCalendarQuerySchema,
   appointmentCompleteSchema,
@@ -372,7 +372,7 @@ appointmentsRouter.get(
 
 appointmentsRouter.get(
   '/billable',
-  requirePermission('cashier:manage'),
+  requireAnyPermission('accounting:manage', 'cashier:manage'),
   asyncHandler(async (req, res) => {
     const filters = appointmentBillableQuerySchema.parse(req.query);
 

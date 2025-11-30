@@ -18,7 +18,7 @@ import {
 export type NavItem = {
   to: string;
   label: string;
-  module?: string;
+  module?: string | string[];
   icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
@@ -34,11 +34,16 @@ export const navItems: NavItem[] = [
   {
     to: '/payment-conditions',
     label: 'Condições',
-    module: 'payment-conditions:manage',
+    module: ['accounting:manage', 'cashier:manage'],
     icon: ReceiptPercentIcon,
   },
-  { to: '/accounting', label: 'Financeiro', module: 'accounting:manage', icon: CurrencyDollarIcon },
-  { to: '/cashier', label: 'Caixa', module: 'cashier:manage', icon: BanknotesIcon },
+  {
+    to: '/accounting',
+    label: 'Financeiro',
+    module: ['accounting:manage', 'cashier:manage'],
+    icon: CurrencyDollarIcon,
+  },
+  { to: '/cashier', label: 'Caixa', module: ['accounting:manage', 'cashier:manage'], icon: BanknotesIcon },
   { to: '/users', label: 'Usuários', module: 'users:manage', icon: UserCircleIcon },
   { to: '/roles', label: 'Funções', module: 'users:manage', icon: KeyIcon },
 ];
