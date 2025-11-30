@@ -97,7 +97,15 @@ const AppointmentStatusMap = {
   AGENDADO: PrismaAppointmentStatus?.AGENDADO ?? 'AGENDADO',
   CONFIRMADO: PrismaAppointmentStatus?.CONFIRMADO ?? 'CONFIRMADO',
   CONCLUIDO: PrismaAppointmentStatus?.CONCLUIDO ?? 'CONCLUIDO',
+  CANCELADO: PrismaAppointmentStatus?.CANCELADO ?? 'CANCELADO',
 } as const;
+
+const inactiveAppointmentStatuses = new Set<string>([
+  AppointmentStatusMap.CONCLUIDO,
+  AppointmentStatusMap.CANCELADO,
+]);
+
+const isInactiveAppointment = (status: string) => inactiveAppointmentStatuses.has(status);
 
 const handleAppointmentUpdateError = (error: unknown): never => {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -175,9 +183,7 @@ const computeAvailabilityMap = (appointments: AppointmentWithAllRelations[]) => 
     map.set(appointment.id, { ...defaultAvailability });
   }
 
-  const relevant = appointments.filter(
-    (appointment) => appointment.status !== AppointmentStatusMap.CONCLUIDO,
-  );
+  const relevant = appointments.filter((appointment) => !isInactiveAppointment(appointment.status));
 
   const detectConflicts = (key: 'veterinarianId' | 'assistantId') => {
     const grouped = new Map<string, AppointmentWithAllRelations[]>();
@@ -517,9 +523,8 @@ appointmentsRouter.get(
 
       const daysInRange = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       const totalSlots = slotsPerDay * Math.max(daysInRange, 1);
-      const bookedSlots = appointments.filter(
-        (appointment) => appointment.status !== AppointmentStatusMap.CONCLUIDO,
-      ).length;
+      const bookedSlots = appointments.filter((appointment) => !isInactiveAppointment(appointment.status))
+        .length;
 
       capacity = {
         totalSlots,
@@ -529,9 +534,7 @@ appointmentsRouter.get(
     } else {
       capacity = {
         totalSlots: null,
-        bookedSlots: appointments.filter(
-          (appointment) => appointment.status !== AppointmentStatusMap.CONCLUIDO,
-        ).length,
+        bookedSlots: appointments.filter((appointment) => !isInactiveAppointment(appointment.status)).length,
         availableSlots: null,
       };
     }
@@ -605,6 +608,7 @@ appointmentsRouter.put(
 
     const appointment = await prisma.appointment.findUnique({
       where: { id },
+      include: { serviceRecord: true },
     });
 
     if (!appointment) {
@@ -664,6 +668,16 @@ appointmentsRouter.put(
       } else if (payload.status === AppointmentStatusMap.CONCLUIDO) {
         data.confirmedAt = appointment.confirmedAt ?? new Date();
         data.completedAt = new Date();
+      } else if (payload.status === AppointmentStatusMap.CANCELADO) {
+        if (appointment.serviceId || appointment.serviceRecord) {
+          throw new HttpError(
+            400,
+            'Não é possível cancelar um agendamento que já está vinculado a um atendimento concluído.',
+          );
+        }
+
+        data.confirmedAt = null;
+        data.completedAt = null;
       }
     }
 
@@ -707,6 +721,62 @@ appointmentsRouter.patch(
       handleAppointmentUpdateError(error);
       throw error;
     }
+
+    const availability = await detectScheduleConflicts({
+      appointmentId: updated.id,
+      veterinarianId: updated.veterinarianId,
+      assistantId: updated.assistantId,
+      scheduledStart: updated.scheduledStart,
+      scheduledEnd: updated.scheduledEnd,
+    });
+
+    res.json({ appointment: serializeAppointment(updated, availability) });
+  }),
+);
+
+appointmentsRouter.patch(
+  '/:id/cancel',
+  requirePermission('services:write'),
+  asyncHandler(async (req, res) => {
+    const { id } = appointmentIdSchema.parse(req.params);
+    const payload = appointmentConfirmSchema.parse(req.body);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const existing = await tx.appointment.findUnique({
+        where: { id },
+        include: appointmentInclude,
+      });
+
+      if (!existing) {
+        throw new HttpError(404, 'Agendamento não encontrado.');
+      }
+
+      if (existing.status === AppointmentStatusMap.CONCLUIDO) {
+        throw new HttpError(400, 'Não é possível cancelar um agendamento já concluído.');
+      }
+
+      if (existing.status === AppointmentStatusMap.CANCELADO) {
+        throw new HttpError(400, 'Agendamento já está cancelado.');
+      }
+
+      if (existing.serviceId || existing.serviceRecord) {
+        throw new HttpError(
+          400,
+          'Não é possível cancelar um agendamento que já está vinculado a um atendimento concluído.',
+        );
+      }
+
+      return tx.appointment.update({
+        where: { id },
+        data: {
+          status: AppointmentStatusMap.CANCELADO,
+          confirmedAt: null,
+          completedAt: null,
+          notes: payload.notes !== undefined ? normalizeNotes(payload.notes) : existing.notes ?? null,
+        },
+        include: appointmentInclude,
+      });
+    });
 
     const availability = await detectScheduleConflicts({
       appointmentId: updated.id,
@@ -778,6 +848,10 @@ appointmentsRouter.patch(
 
       if (!existing) {
         throw new HttpError(404, 'Agendamento não encontrado.');
+      }
+
+      if (existing.status === AppointmentStatusMap.CANCELADO) {
+        throw new HttpError(400, 'Agendamentos cancelados não podem ser concluídos.');
       }
 
       const now = new Date();
