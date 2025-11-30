@@ -1,3 +1,4 @@
+import { PaymentConditionType } from '@prisma/client';
 import { z } from 'zod';
 
 export const paymentConditionPayloadSchema = z.object({
@@ -7,6 +8,11 @@ export const paymentConditionPayloadSchema = z.object({
   observacoes: z.string().trim().max(500).optional(),
 });
 
+export const paymentConditionIdValueSchema = z.union([
+  z.string().cuid(),
+  z.nativeEnum(PaymentConditionType),
+]);
+
 export const paymentConditionIdSchema = z.object({
-  id: z.string().cuid(),
+  id: paymentConditionIdValueSchema,
 });

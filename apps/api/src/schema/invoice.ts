@@ -1,4 +1,7 @@
+import { PaymentConditionType } from '@prisma/client';
 import { z } from 'zod';
+
+import { paymentConditionIdValueSchema } from './payment-condition';
 
 export const invoiceFilterSchema = z.object({
   ownerId: z.string().cuid().optional(),
@@ -16,20 +19,14 @@ export const paymentMethodSchema = z.enum([
   'OUTROS',
 ]);
 
-export const paymentConditionSchema = z.enum([
-  'A_VISTA',
-  'DIAS_30',
-  'DIAS_60',
-  'CARTAO_2X',
-  'CARTAO_3X',
-]);
+export const paymentConditionSchema = z.nativeEnum(PaymentConditionType);
 
 export const invoiceGenerateSchema = z
   .object({
     serviceId: z.string().cuid().optional(),
     appointmentId: z.string().cuid().optional(),
     dueDate: z.string().optional(),
-    paymentConditionId: z.string().cuid().optional(),
+    paymentConditionId: paymentConditionIdValueSchema.optional(),
   })
   .refine((value) => Boolean(value.serviceId || value.appointmentId), {
     message: 'Informe um atendimento ou agendamento para gerar a conta.',
@@ -49,7 +46,7 @@ export const invoiceInstallmentSchema = z.object({
 export const invoicePaymentSchema = z.object({
   paymentMethod: paymentMethodSchema,
   paymentCondition: paymentConditionSchema.optional(),
-  paymentConditionId: z.string().cuid().optional(),
+  paymentConditionId: paymentConditionIdValueSchema.optional(),
   installments: z.array(invoiceInstallmentSchema).min(1, 'Informe ao menos uma parcela.'),
   paymentNotes: z.string().max(500).optional(),
 }).refine((value) => Boolean(value.paymentCondition || value.paymentConditionId), {
@@ -60,7 +57,7 @@ export const invoicePaymentSchema = z.object({
 export const invoiceAdjustmentSchema = z.object({
   dueDate: z.string(),
   paymentMethod: paymentMethodSchema.optional(),
-  paymentConditionId: z.string().cuid().nullish(),
+  paymentConditionId: paymentConditionIdValueSchema.nullish(),
   interestPercent: z.number().min(0).max(100).default(0),
   installments: z.array(invoiceInstallmentSchema.omit({ paidAt: true })).optional(),
 });
