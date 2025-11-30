@@ -54,7 +54,7 @@ type ExportHeader = (typeof exportHeaders)[number];
 
 const ProductsPage = () => {
   const { hasModule } = useAuth();
-  const canManageProducts = hasModule('products:write');
+  const canManageProducts = hasModule('products:manage');
   const queryClient = useQueryClient();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);

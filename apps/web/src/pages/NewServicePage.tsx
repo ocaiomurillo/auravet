@@ -95,7 +95,7 @@ const NewServicePage = () => {
   const { id: serviceId } = useParams();
   const [searchParams] = useSearchParams();
   const { user, hasModule } = useAuth();
-  const canOverrideProductPrice = hasModule('products:write');
+  const canOverrideProductPrice = hasModule('products:manage');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastPayload, setLastPayload] = useState<
     CreateAttendancePayload | UpdateAttendancePayload | null

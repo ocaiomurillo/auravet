@@ -48,7 +48,7 @@ const AnimalsPage = () => {
 
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
-  const canManageAnimals = hasModule('animals:write');
+  const canManageAnimals = hasModule('animals:manage');
   const canRegisterAttendances = hasModule('attendances:manage');
   const canViewAttendances = hasModule('attendances:manage');
 

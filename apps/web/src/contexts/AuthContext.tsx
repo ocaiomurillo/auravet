@@ -38,6 +38,18 @@ const MODULE_ALIASES: Record<string, string[]> = {
   'cashier:access': ['cashier:manage'],
 };
 
+const buildLegacyAliases = (module: string) => {
+  if (module.endsWith(':write')) {
+    return [module.replace(':write', ':manage')];
+  }
+
+  if (module.endsWith(':manage')) {
+    return [module.replace(':manage', ':write')];
+  }
+
+  return [];
+};
+
 const fetchCurrentUser = async (): Promise<User> => {
   const response = await apiClient.get<{ user: User }>('/auth/me');
   return response.user;
@@ -112,8 +124,8 @@ export const AuthProvider = ({ children }: PropsWithChildren): JSX.Element => {
         return true;
       }
 
-      const aliases = MODULE_ALIASES[module];
-      if (!aliases) {
+      const aliases = [...(MODULE_ALIASES[module] ?? []), ...buildLegacyAliases(module)];
+      if (!aliases.length) {
         return false;
       }
 
