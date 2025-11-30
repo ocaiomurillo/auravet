@@ -38,25 +38,25 @@ const App = () => {
           <Route element={<RequireModules modules={['services:read']} />}>
             <Route path="services" element={<ServicesPage />} />
           </Route>
-          <Route element={<RequireModules modules={['services:read', 'animals:read', 'owners:read']} />}>
+          <Route element={<RequireModules modules={['attendances:manage', 'animals:read', 'owners:read']} />}>
             <Route path="attendances" element={<AttendancesPage />} />
           </Route>
-          <Route element={<RequireModules modules={['services:read', 'owners:read', 'animals:read']} />}>
+          <Route element={<RequireModules modules={['appointments:manage', 'owners:read', 'animals:read']} />}>
             <Route path="appointments" element={<AppointmentsPage />} />
           </Route>
-          <Route element={<RequireModules modules={['services:read']} />}>
+          <Route element={<RequireModules modules={['calendar:manage']} />}>
             <Route path="calendar" element={<CalendarPage />} />
           </Route>
           <Route element={<RequireModules modules={['products:read']} />}>
             <Route path="products" element={<ProductsPage />} />
           </Route>
-          <Route element={<RequireModules modules={['cashier:access']} />}>
+          <Route element={<RequireModules modules={['accounting:manage']} />}>
             <Route path="accounting" element={<AccountingPage />} />
           </Route>
-          <Route element={<RequireModules modules={['cashier:access']} />}>
+          <Route element={<RequireModules modules={['payment-conditions:manage']} />}>
             <Route path="payment-conditions" element={<PaymentConditionsPage />} />
           </Route>
-          <Route element={<RequireModules modules={['cashier:access']} />}>
+          <Route element={<RequireModules modules={['cashier:manage']} />}>
             <Route path="cashier" element={<CashierPage />} />
           </Route>
           <Route

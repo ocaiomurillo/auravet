@@ -6,9 +6,9 @@ const assert = (condition: boolean, message: string) => {
   }
 };
 
-const modules = ['services:read', 'owners:read', 'animals:read'];
+const modules = ['attendances:manage', 'owners:read', 'animals:read'];
 const allGranted = new Set(modules);
-const missingAnimals = new Set(['services:read', 'owners:read']);
+const missingAnimals = new Set(['attendances:manage', 'owners:read']);
 
 const allGrantedResult = hasAllRequiredModules(modules, (module) => allGranted.has(module));
 assert(allGrantedResult, 'Expected access when all modules are granted');
