@@ -1,171 +1,319 @@
-# Auravet — Cuidar é natural
+# Auravet 🐾  
+_Plataforma web full stack para gestão de clínica veterinária_
 
-Auravet é a clínica veterinária digital-first da equipe, com backend Node + Express + Prisma, frontend React + Vite + Tailwind e infraestrutura preparada para rodar tanto localmente quanto via Docker. Este guia foi reescrito para orientar a instalação passo a passo nos dois cenários.
+A **Auravet** é uma clínica veterinária _digital-first_ que une tecnologia, ciência e acolhimento.  
+Este repositório contém o sistema web da Auravet: uma plataforma completa para gerir **tutores, pets, agenda, atendimentos, estoque, caixa, financeiro, usuários e funções**, construída em monorepo com **React + Node.js + Prisma + PostgreSQL + Docker**.
 
-## 📁 Estrutura do monorepo
+> “Cuidar é natural” – e o objetivo do sistema é fazer com que a parte burocrática seja a mais leve possível.
+
+---
+
+## ✨ Principais funcionalidades
+
+- **Cadastro de Tutores e Pets**
+  - Registro completo de tutores (dados pessoais, contato, endereço)
+  - Vínculo tutor ➝ múltiplos pets
+  - Histórico de atendimentos por pet
+
+- **Agenda e Agendamentos**
+  - Agenda interna por profissional
+  - Criação de agendamentos (data, horário, médico, assistente, pet)
+  - Confirmação de presença
+  - Reagendamento com verificação de conflitos
+
+- **Atendimentos**
+  - Abertura do atendimento a partir da agenda
+  - Registro de anamnese, serviços realizados e produtos utilizados
+  - Notas de prontuário por atendimento
+  - Conclusão do atendimento gerando fatura automaticamente
+
+- **Serviços e Produtos**
+  - Catálogo de serviços (consultas, exames, vacinas, cirurgias…)
+  - Cadastro e edição de produtos (medicamentos, insumos, itens de venda)
+  - Controle de estoque e itens críticos
+  - Inserção de serviços/produtos diretamente no atendimento e na fatura
+
+- **Caixa e Faturas**
+  - Faturas geradas automaticamente a partir dos atendimentos
+  - Ajuste de itens na fatura (inclusive vendas de última hora)
+  - Registro de pagamento com forma e condição de pagamento
+  - Geração de **PDF** da fatura/recibo
+
+- **Módulo Financeiro**
+  - Monitoramento de faturas abertas, pagas e vencidas
+  - Acompanhamento de inadimplência e renegociação
+  - Cadastro de condições de pagamento (à vista, 30 dias, parcelado etc.)
+
+- **Usuários, Funções e Permissões**
+  - Cadastro de colaboradores (médicos, enfermeiros, auxiliares, assistentes, contador, admin)
+  - Módulo de **funções** (roles) com controle de quais módulos cada função acessa
+  - Modelo de autorização baseado em módulos/permissões
+
+- **Dashboard**
+  - Visão geral com indicadores operacionais da clínica (tutores, pets, atendimentos, faturas etc.)
+
+---
+
+## 🏗 Arquitetura
+
+A Auravet foi construída em **arquitetura em camadas** e organizada em **monorepo**:
+
+- **Frontend (Camada de Apresentação)**
+  - React 18
+  - Vite 5
+  - Tailwind CSS
+  - React Router, React Query, React Hook Form
+
+- **Backend (Camada de Aplicação)**
+  - Node.js 20
+  - Express
+  - Zod para validação de payloads
+  - Swagger para documentação da API
+
+- **Banco de Dados (Camada de Dados)**
+  - PostgreSQL 16
+  - Prisma ORM (mapeamento, migrações e tipagem)
+
+- **Infraestrutura**
+  - Docker + Docker Compose
+  - npm workspaces (monorepo)
+  - Husky + lint-staged (hooks de commit)
+  - Configuração de ambientes via variáveis de ambiente
+
+---
+
+## 📁 Estrutura de pastas (visão geral)
+
+```bash
+.
+├── apps
+│   ├── api        # Backend (Node.js + Express + Prisma)
+│   └── web        # Frontend (React + Vite + Tailwind)
+├── docs           # Documentação técnica, diagramas e artefatos
+├── infra
+│   └── docker     # Arquivos de Docker e Docker Compose
+├── prisma         # schema.prisma, migrations e seed
+├── scripts        # scripts de setup (local e docker)
+├── doc.pdf        # Documento completo do projeto (relatório + diagramas)
+└── README.md
+````
+
+> 🔎 O arquivo **`doc.pdf`** na raiz traz a documentação completa do projeto (texto do relatório, explicação dos módulos, diagramas de caso de uso, classes, sequência, atividades etc.).
+> As figuras usadas nesse PDF são as mesmas organizadas na pasta `docs/` (diagramas em UML, telas e fluxos).
+
+---
+
+## 🚀 Como rodar o projeto
+
+### 1. Pré-requisitos
+
+* Node.js 20+
+* npm (ou pnpm/yarn, se quiser adaptar)
+* Docker e Docker Compose (para a opção com containers)
+* PostgreSQL (apenas se for rodar tudo localmente, sem Docker)
+
+Certifique-se também de ter um `.env` na raiz do repositório (para Docker, ele é usado pelo `setup-docker.sh`).
+Caso não exista, o script local já cuida de criar um `.env` a partir de `.env.example`.
+
+---
+
+### 2. Setup rápido com scripts (recomendado)
+
+Na raiz do projeto existe a pasta `scripts/` com dois scripts de automação:
+
+* `scripts/setup-local.sh` → prepara **ambiente local** (Node + Prisma + banco local)
+* `scripts/setup-docker.sh` → prepara e sobe o ambiente completo com **Docker**
+
+> No Linux/macOS, antes de rodar pela primeira vez:
+
+```bash
+chmod +x scripts/setup-local.sh
+chmod +x scripts/setup-docker.sh
 ```
-auravet/
-├─ apps/
-│  ├─ api/        # Node 20, Express, Prisma, Swagger
-│  └─ web/        # React 18, Vite, Tailwind (tema Auravet)
-├─ docs/          # Prévias visuais
-├─ infra/docker/  # Stack Docker Compose
-├─ .env.example
-├─ package.json   # Scripts e workspaces
-└─ README.md
+
+#### 2.1 Ambiente local (sem Docker)
+
+Esse script cuida de:
+
+* Garantir que exista um `.env` (copiando de `.env.example` se necessário)
+* Instalar as dependências do monorepo (`npm install`)
+* Gerar o Prisma Client
+* Aplicar as migrações (`prisma migrate`)
+* Executar o seed (cria usuários, tutores, pets, produtos, serviços, agendamentos, atendimentos e faturas de exemplo)
+
+Passo a passo:
+
+```bash
+# Na raiz do repositório
+./scripts/setup-local.sh
+
+# Depois que o setup terminar:
+npm run dev
 ```
 
-## 🧰 Tecnologias principais
-| Categoria | Tecnologias | Papel | Por que escolhemos |
-| --- | --- | --- | --- |
-| Backend | Node.js 20, Express 4, Prisma, Zod, Swagger UI | Servir a API REST, validar entrada e manter schema/migrações do banco. | Ecossistema consolidado, baixo tempo de boot (Express) e produtividade com schema typesafe do Prisma + Zod. Swagger UI facilita descoberta de rotas. |
-| Frontend | React 18, Vite 5, TailwindCSS 3, React Router 6, React Query 5, React Hook Form 7, Headless UI, Radix Slot, Sonner, Heroicons | Construir SPA performática, roteada e com formulários e estados assíncronos previsíveis. | Vite entrega DX rápida, Tailwind acelera UI consistente e React Query/Hook Form simplificam cache e validação de formulários. Biblioteca de ícones e componentes headless evitam reinventar acessibilidade. |
-| Banco de dados | PostgreSQL 16 | Armazenamento relacional de produção. | Estável, com tipos fortes e suporte nativo a migrações/versionamento via Prisma. |
-| APIs e comunicação | REST + Swagger (`/docs`), CORS configurado, consumo via `VITE_API_URL` | Documentar e expor contratos HTTP e permitir chamadas seguras do front. | Swagger mantém documentação viva; CORS controlado evita vazamentos; `VITE_API_URL` injeta o endpoint correto no build. |
-| Build, testes e qualidade | TypeScript estrito, TSX, ESLint, Prettier, Husky + lint-staged, npm workspaces, Docker Compose, Node Test Runner (API) | Garantir compilação, lint, formatação e ganchos de commit; gerenciar monorepo e infraestrutura local/Docker. | Ferramentas padrão do ecossistema Node, automatizam checagens antes dos commits e fornecem ambientes reprodutíveis (Compose). |
+Por padrão (ajuste se seu `package.json` estiver diferente):
 
-## ✅ Pré-requisitos
-| Cenário | Dependências |
-| ------- | ------------- |
-| **Sem Docker (instalação local)** | Node.js 20+, npm 9+, PostgreSQL 16 (servidor acessível), `psql`/`createdb` opcionais |
-| **Com Docker** | Docker 24+, Docker Compose Plugin | 
+* API: `http://localhost:4000`
+* Web: `http://localhost:5173`
 
-## 🔐 Variáveis de ambiente
-1. Copie o arquivo base:
-   ```bash
-   cp .env.example .env
-   ```
-2. Ajuste os valores conforme o ambiente:
-   - `DATABASE_URL` (conexão PostgreSQL)
-   - `API_PORT`, `API_HOST`, `CORS_ORIGIN`
-   - `JWT_SECRET`, `JWT_EXPIRES_IN`, `PASSWORD_SALT_ROUNDS`
-   - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME` (opcionais)
-   - `VITE_API_URL` (URL consumida pelo frontend; defina antes de gerar o build de produção)
+#### 2.2 Ambiente completo com Docker
 
-> Produção: a imagem da API não traz valores padrão para `DATABASE_URL` ou `JWT_SECRET`. Defina-os explicitamente (via `.env`,
-> secrets ou variáveis do orquestrador) antes de subir containers; o processo de inicialização falha cedo se eles estiverem em
-> branco. O `docker-compose.yml` já exige `JWT_SECRET` e permite sobrepor `DATABASE_URL` para apontar para um banco gerenciado.
+O script `setup-docker.sh` faz o seguinte:
 
-> Dica: o workspace do frontend carrega automaticamente `.env.development`, `.env.staging` e `.env.production` em `apps/web/`.
-> Esses arquivos já trazem valores padrão para `VITE_API_URL` por ambiente (dev: `http://localhost:4000`, stage: `https://api.stage.auravet.com`,
-> prod: `https://api.auravet.com`). Use `--mode <ambiente>` ao rodar `npm run build --workspace apps/web` se quiser selecionar
-> explicitamente um modo.
+1. Vai para `infra/docker`
+2. Derruba containers antigos e **remove volumes** (`down -v`) → banco zerado
+3. Faz o **build** das imagens `api` e `web`
+4. Sobe apenas o container `db`
+5. Dentro do container da API:
 
-> `PASSWORD_SALT_ROUNDS` controla o custo exponencial (`2^N`) usado pelo Scrypt ao hashear senhas.
+   * Aplica migrações (`prisma migrate deploy`)
+   * Gera o Prisma Client
+   * Compila e executa o script de seed (`prisma/seed.ts`)
+6. Sobe os containers `api` e `web` em modo *detach*
+
+Uso:
+
+```bash
+# Na raiz do repositório, com o .env já configurado
+./scripts/setup-docker.sh
+```
+
+Ao final, o próprio script mostra os endpoints padrão:
+
+* Web: `http://localhost:5173`
+* API: `http://localhost:4000`
 
 ---
 
-## ⚡ Instalação expressa (scripts prontos)
-Quer começar com um único comando? Use os scripts na pasta `scripts/`:
+## 👥 Usuários criados pelo seed (logins de demonstração)
 
-- **Local (Node + PostgreSQL já disponíveis):**
-  ```bash
-  bash scripts/setup-local.sh
-  npm run dev
-  ```
-  O script copia `.env.example` para `.env` se o arquivo não existir, instala dependências e roda `prisma generate/migrate/seed`.
+Após rodar o seed (via scripts ou manualmente), o sistema já vem com:
 
-- **Docker (subir tudo com Compose):**
-  ```bash
-  bash scripts/setup-docker.sh
-  ```
-  Ele executa o build + `docker compose up -d` e aplica migrações/seed dentro do container da API.
+### Admin principal
 
-Se preferir um passo a passo manual, use as seções abaixo.
+* **Função:** Administrador
+* **E-mail:** `admin@auravet.com`
+* **Senha padrão:** `Admin123!`
+  (pode ser alterada via variáveis de ambiente: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_NAME`, `SEED_ADMIN_PASSWORD`)
 
-## 🖥️ Instalação local (sem Docker)
-1. **Clonar o repositório**
-   ```bash
-   git clone https://github.com/<sua-organizacao>/auravet.git
-   cd auravet
-   ```
+Esse usuário tem acesso completo a todos os módulos.
 
-2. **Garantir PostgreSQL**
-   - Crie um banco vazio conforme o `DATABASE_URL`. Exemplo:
-     ```bash
-     createdb auravet
-     ```
-   - Certifique-se de que o usuário definido na conexão possui permissões de leitura/escrita.
+### Colaboradores de exemplo
 
-3. **Instalar dependências**
-   ```bash
-   npm install
-   ```
+Todos os usuários abaixo são criados com **senha padrão**:
 
-4. **Gerar Prisma Client, migrar e semear dados**
-   ```bash
-   npm run prisma:generate --workspace apps/api
-   npm run prisma:migrate --workspace apps/api
-   npm run prisma:seed --workspace apps/api
-   ```
-   - O comando `prisma:migrate` aplicará todas as migrações no banco configurado.
-   - O seed cria o usuário administrador (email e senha definidos em `.env`).
+```text
+Auravet123!
+```
 
-5. **Executar em modo desenvolvimento**
- ```bash
-  npm run dev
-  ```
-  - O script usa `concurrently` para rodar **Express (API)** via `tsx watch` e o **Vite** do frontend lado a lado.
-  - API: `http://localhost:4000`
-  - Swagger: `http://localhost:4000/docs`
-  - Frontend: `http://localhost:5173`
+> A senha pode ser sobrescrita via variável de ambiente `SEED_COLLABORATOR_PASSWORD`.
 
-6. **Executar serviços individualmente (opcional)**
-   ```bash
-   npm run dev --workspace apps/api   # somente API
-   npm run dev --workspace apps/web   # somente frontend
-   ```
+| Função                    | Nome                        | E-mail (login)                                                                |
+| ------------------------- | --------------------------- | ----------------------------------------------------------------------------- |
+| Administrador             | Marina Duarte Azevedo       | [marina.azevedo@auravet.com.br](mailto:marina.azevedo@auravet.com.br)         |
+| Médico                    | Dr. Rafael Nogueira Prado   | [rafael.prado@auravet.com.br](mailto:rafael.prado@auravet.com.br)             |
+| Médico                    | Dra. Camila Teixeira Lins   | [camila.lins@auravet.com.br](mailto:camila.lins@auravet.com.br)               |
+| Médico                    | Dr. Lucas Almeida Furtado   | [lucas.furtado@auravet.com.br](mailto:lucas.furtado@auravet.com.br)           |
+| Médico                    | Dra. Bianca Correia Menezes | [bianca.menezes@auravet.com.br](mailto:bianca.menezes@auravet.com.br)         |
+| Médico                    | Dr. Henrique Sales Pacheco  | [henrique.pacheco@auravet.com.br](mailto:henrique.pacheco@auravet.com.br)     |
+| Auxiliar Administrativo   | Juliana Costa Ribeiro       | [juliana.ribeiro@auravet.com.br](mailto:juliana.ribeiro@auravet.com.br)       |
+| Auxiliar Administrativo   | Bruno Henrique Matos        | [bruno.matos@auravet.com.br](mailto:bruno.matos@auravet.com.br)               |
+| Assistente Administrativo | Carolina Pires Andrade      | [carolina.andrade@auravet.com.br](mailto:carolina.andrade@auravet.com.br)     |
+| Assistente Administrativo | Eduardo Lima Sanches        | [eduardo.sanches@auravet.com.br](mailto:eduardo.sanches@auravet.com.br)       |
+| Enfermeiro                | Enf. Vanessa Borges Freire  | [vanessa.freire@auravet.com.br](mailto:vanessa.freire@auravet.com.br)         |
+| Enfermeiro                | Enf. Thiago Ramos Silveira  | [thiago.silveira@auravet.com.br](mailto:thiago.silveira@auravet.com.br)       |
+| Enfermeiro                | Enf. Larissa Melo Coutinho  | [larissa.coutinho@auravet.com.br](mailto:larissa.coutinho@auravet.com.br)     |
+| Enfermeiro                | Enf. Gustavo Vieira Campos  | [gustavo.campos@auravet.com.br](mailto:gustavo.campos@auravet.com.br)         |
+| Enfermeiro                | Enf. Paula Regina Saldanha  | [paula.saldanha@auravet.com.br](mailto:paula.saldanha@auravet.com.br)         |
+| Contador                  | Rodrigo Faria Montenegro    | [rodrigo.montenegro@auravet.com.br](mailto:rodrigo.montenegro@auravet.com.br) |
+
+Com esses logins é possível testar na prática:
+
+* Fluxo do **Auxiliar Administrativo** (agenda, confirmação, reagendamento, estoque)
+* Fluxo do **Assistente Administrativo** (cadastro de tutores/pets, caixa, faturas)
+* Fluxo do **Médico/Enfermeiro** (agenda inteligente, atendimentos, prontuário)
+* Fluxo do **Contador** (financeiro, condições de pagamento, produtos/serviços)
 
 ---
 
-## 🐳 Instalação com Docker
-1. **Preparar variáveis**
-   - Garanta que o arquivo `.env` na raiz contenha os valores desejados.
-   - Defina `VITE_API_URL` apontando para o endpoint público da API (no `.env` ou exportando no shell) para que o build do frontend injete o valor correto. O script de build do frontend falha cedo caso a variável não esteja configurada, evitando imagens quebradas.
-   - (Opcional) Exponha `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`, `API_PORT`, `WEB_PORT` diretamente no shell antes de subir o Compose para sobrescrever os padrões.
+## 🔐 Segurança
 
-2. **Subir a stack**
-   ```bash
-   cd infra/docker
-   docker compose up --build -d         # use "--build-arg VITE_API_URL=..." se preferir não tocar no .env
-   ```
-   Serviços publicados:
-   - PostgreSQL (`db`): porta padrão 5432
-   - API (`api`): `http://localhost:4000`
-   - Frontend (`web`): `http://localhost:5173`
-
-3. **Aplicar migrações e seed dentro do container**
-   ```bash
-   docker compose exec api npx prisma migrate deploy
-   docker compose exec api npx prisma db seed
-   ```
-   Esses comandos usam o Prisma instalado na imagem para sincronizar o schema e criar o administrador inicial.
-
-4. **Logs e desligamento**
-   ```bash
-   docker compose logs -f api web
-   docker compose down            # encerra todos os serviços
-   docker compose down -v         # encerra e remove volume do banco
-   ```
+* Autenticação baseada em **JWT** (Bearer Token)
+* Hash de senha com **scrypt** e salt configurável
+* Validação forte de entrada com **Zod**
+* Middlewares de autorização baseados em módulos/funções
+* Uso de **helmet** e configuração cuidadosa de CORS
 
 ---
 
-## 🧪 Scripts e checagens úteis
-- `npm run lint` — aplica ESLint nos workspaces.
-- `npm run typecheck` — roda o TypeScript em modo estrito.
-- `npm run format` — verifica formatação com Prettier.
-- `npm run build` — build completo da API e do frontend.
-- `npm run test --workspace apps/api` — suite de autenticação/autorização com Node Test Runner.
+## 🧪 Testes
 
-## 🚀 Fluxo funcional mínimo
-1. Acesse `/login` com o administrador seed (`SEED_ADMIN_EMAIL`).
-2. Cadastre um tutor em **Tutores** e inclua os respectivos pets em **Animais**.
-3. Registre atendimentos em **Registrar atendimento** (rotas protegidas por `services:write`).
-4. Gerencie colaboradores em **Usuários** (apenas administradores).
+O backend utiliza o runner nativo do Node (`node:test`) para testar:
 
-## 🔍 Qualidade & design system
-- Tema Tailwind customizado com paleta: savia `#A7C7A0`, azul `#B3D4E0`, verde escuro `#3D6655`, gelo `#F8FAF9`, grafite `#0F172A`.
-- Tipografia Montserrat (títulos) e Nunito Sans (texto).
-- Copy empática e sustentável, alinhada ao posicionamento “Na Auravet, seu pet é cuidado com ciência e carinho”.
+* Fluxos de autenticação
+* Regras de negócio (ex.: agendamentos)
+* Controle de permissões
 
-Pronto! Escolha o cenário de instalação que melhor se adapta ao seu ambiente e comece a evoluir a plataforma Auravet.
+Exemplo (ajuste para o script real):
+
+```bash
+cd apps/api
+npm test
+```
+
+---
+
+## 🧹 Padrões de código
+
+* **ESLint** + **Prettier**
+* **Husky** + **lint-staged** (checagens antes do commit)
+
+```bash
+npm run lint
+npm run format
+```
+
+---
+
+## 🗺 Fluxos principais da aplicação
+
+### Gerenciar Agendamentos
+
+* Criação, confirmação e reagendamento com base na Agenda Inteligente.
+
+### Gerenciar Atendimentos
+
+* Abertura a partir do agendamento, registro clínico, serviços/produtos e prontuário, concluindo com geração automática da fatura.
+
+### Gerenciar Faturas (Caixa + Financeiro)
+
+* Ajuste de itens, definição de forma/condição de pagamento, geração de PDF e registro de pagamento.
+* No financeiro, acompanhamento de faturas em aberto/vencidas e registro de ações de cobrança/renegociação.
+
+---
+
+## 🖼 Screenshots
+
+* Login
+* Dashboard
+* Agenda Inteligente
+* Agendamento
+* Atendimento
+* Caixa
+* Financeiro
+
+---
+
+## 🧭 Roadmap
+
+* Portal do tutor (visualização de histórico, faturas, agendamentos)
+* App mobile para tutores e equipe interna
+* Integração com gateways de pagamento
+* Relatórios avançados e BI
+
+---
+
+## 👤 Autor
+
+**Caio Murillo de Oliveira**
+Projeto desenvolvido como parte do **Projeto Integrador** do curso de Análise e Desenvolvimento de Sistemas (UNIMAR).
