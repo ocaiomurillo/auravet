@@ -90,6 +90,15 @@ export const createXlsxBlob = ({ sheetName, headers, rows }: XlsxWorkbookOptions
   );
 };
 
+interface ExportXlsxOptions extends XlsxWorkbookOptions {
+  filename: string;
+}
+
+export const exportXlsxFile = ({ sheetName, headers, rows, filename }: ExportXlsxOptions) => {
+  const blob = createXlsxBlob({ sheetName, headers, rows });
+  downloadBlob(blob, filename);
+};
+
 export const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

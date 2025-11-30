@@ -12,7 +12,7 @@ import { apiClient, servicesApi } from '../lib/apiClient';
 import type { Animal, Attendance, AttendanceStatus, AttendanceType, OwnerSummary } from '../types/api';
 import { getAttendanceTotal } from '../utils/attendance';
 import { buildAttendancePdf } from '../utils/attendancePdf';
-import { createXlsxBlob, downloadBlob } from '../utils/xlsxExport';
+import { exportXlsxFile } from '../utils/xlsxExport';
 
 const statusLabels: Record<AttendanceStatus, string> = {
   EM_ANDAMENTO: 'Em andamento',
@@ -150,9 +150,13 @@ const AttendancesPage = () => {
       getAttendanceTotal(attendance),
     ]);
 
-    const blob = createXlsxBlob({ sheetName: 'Atendimentos', headers, rows });
-    downloadBlob(blob, 'atendimentos.xlsx');
-    toast.success('Exportação iniciada. Verifique seus downloads.');
+    exportXlsxFile({
+      sheetName: 'Atendimentos',
+      headers,
+      rows,
+      filename: 'auravet-atendimentos.xlsx',
+    });
+    toast.success('Planilha de atendimentos pronta para download.');
   };
 
   const handleClearFilters = () => {
@@ -201,7 +205,7 @@ const AttendancesPage = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={handleExport}>
-            Exportar Excel
+            Exportar para Excel
           </Button>
           {canEdit ? (
             <Button asChild>

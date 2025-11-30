@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/apiClient';
 import type { Owner } from '../types/api';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
+import { exportXlsxFile } from '../utils/xlsxExport';
 
 interface OwnerFormValues {
   nome: string;
@@ -35,6 +36,9 @@ const OwnersPage = () => {
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
   const canEdit = hasModule('owners:write');
+
+  const buildXlsxFilename = (base: string) =>
+    `auravet-${base.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}-${Date.now()}.xlsx`;
 
   const { data: owners, isLoading, error } = useQuery({
     queryKey: ['owners'],
@@ -160,7 +164,10 @@ const OwnersPage = () => {
   }, [filterCpf, filterEmail, filterName, owners]);
 
   const handleExport = () => {
-    if (!filteredOwners.length) return;
+    if (!filteredOwners.length) {
+      toast.error('Nenhum tutor encontrado para exportação.');
+      return;
+    }
 
     const headers = ['Nome', 'E-mail', 'Telefone', 'CPF', 'Endereço', 'Total de animais'];
     const rows = filteredOwners.map((owner) => [
@@ -172,26 +179,14 @@ const OwnersPage = () => {
       String(owner.animals?.length ?? 0),
     ]);
 
-    const csvContent = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => {
-            const safeCell = cell.replace(/"/g, '""');
-            return `"${safeCell}"`;
-          })
-          .join(','),
-      )
-      .join('\n');
+    exportXlsxFile({
+      sheetName: 'Tutores',
+      headers,
+      rows,
+      filename: buildXlsxFilename('tutores'),
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'tutores.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    toast.success('Planilha de tutores pronta para download.');
   };
 
   return (

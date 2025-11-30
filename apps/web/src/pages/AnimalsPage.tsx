@@ -14,6 +14,7 @@ import { apiClient } from '../lib/apiClient';
 import type { Animal, AttendanceStatus, Owner } from '../types/api';
 import { getAttendanceTotal } from '../utils/attendance';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
+import { exportXlsxFile } from '../utils/xlsxExport';
 
 interface AnimalFormValues {
   nome: string;
@@ -28,6 +29,9 @@ const specieLabels: Record<Animal['especie'], string> = {
   GATO: 'Gato',
   OUTROS: 'Outros',
 };
+
+const buildXlsxFilename = (base: string) =>
+  `auravet-${base.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}-${Date.now()}.xlsx`;
 
 const AnimalsPage = () => {
   const location = useLocation();
@@ -182,7 +186,10 @@ const AnimalsPage = () => {
   });
 
   const handleExportAnimals = () => {
-    if (!filteredAnimals.length) return;
+    if (!filteredAnimals.length) {
+      toast.error('Nenhum pet encontrado para exportação.');
+      return;
+    }
 
     const headers = ['Nome', 'Espécie', 'Raça', 'Tutor', 'Nascimento'];
     const rows = filteredAnimals.map((animal) => [
@@ -193,30 +200,26 @@ const AnimalsPage = () => {
       animal.nascimento ? new Date(animal.nascimento).toLocaleDateString('pt-BR') : '',
     ]);
 
-    const csvContent = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => {
-            const safeCell = cell.replace(/"/g, '""');
-            return `"${safeCell}"`;
-          })
-          .join(','),
-      )
-      .join('\n');
+    exportXlsxFile({
+      sheetName: 'Pets',
+      headers,
+      rows,
+      filename: buildXlsxFilename('pets'),
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'animais.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    toast.success('Planilha de pets pronta para download.');
   };
 
   const handleExportAttendances = () => {
-    if (!filteredAttendances.length) return;
+    if (!selectedAnimal) {
+      toast.error('Selecione um pet para exportar os atendimentos.');
+      return;
+    }
+
+    if (!filteredAttendances.length) {
+      toast.error('Nenhum atendimento encontrado para exportação.');
+      return;
+    }
 
     const headers = ['Data', 'Responsável', 'Assistente', 'Valor', 'Notas'];
     const rows = filteredAttendances.map((attendance) => {
@@ -232,26 +235,14 @@ const AnimalsPage = () => {
       ];
     });
 
-    const csvContent = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => {
-            const safeCell = cell.replace(/"/g, '""');
-            return `"${safeCell}"`;
-          })
-          .join(','),
-      )
-      .join('\n');
+    exportXlsxFile({
+      sheetName: selectedAnimal.nome ? `Atendimentos - ${selectedAnimal.nome}` : 'Atendimentos',
+      headers,
+      rows,
+      filename: buildXlsxFilename(`atendimentos-${selectedAnimal.nome ?? 'pet'}`),
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${selectedAnimal?.nome ?? 'pet'}-atendimentos.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    toast.success('Planilha de atendimentos pronta para download.');
   };
 
   return (
@@ -280,7 +271,7 @@ const AnimalsPage = () => {
           actions={
             <div className="flex gap-2">
               <Button variant="ghost" className="text-sm" onClick={handleExportAnimals}>
-                Exportar lista
+                Exportar para Excel
               </Button>
             </div>
           }
@@ -370,7 +361,7 @@ const AnimalsPage = () => {
           actions={
             selectedAnimal && canViewAttendances ? (
               <Button variant="ghost" className="text-sm" onClick={handleExportAttendances}>
-                Exportar atendimentos
+                Exportar para Excel
               </Button>
             ) : undefined
           }
