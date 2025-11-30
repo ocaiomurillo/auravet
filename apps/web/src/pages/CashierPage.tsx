@@ -746,7 +746,7 @@ const CashierPage = () => {
         title="Resumo financeiro"
         description="Visão rápida do que está em aberto, do que já foi recebido e do que está completamente quitado."
       >
-        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-3">
           <div className="rounded-2xl bg-brand-azul/10 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Total em aberto</p>
             <p className="text-xl font-semibold text-brand-escuro">
@@ -772,29 +772,6 @@ const CashierPage = () => {
               {currencyFormatter.format(summary?.paidTotal ?? 0)}
             </p>
             <p className="text-xs text-brand-grafite/70">{summary?.paidCount ?? 0} faturas totalmente liquidadas</p>
-          </div>
-          <div className="rounded-2xl bg-brand-azul/5 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Próximos vencimentos</p>
-            <p className="text-sm text-brand-grafite/80">
-              {invoices
-                .map((invoice) => summarizeInvoicePayments(invoice).nextDueDate)
-                .filter((dueDate): dueDate is string => Boolean(dueDate))
-                .slice(0, 3)
-                .map((dueDate) => new Date(dueDate).toLocaleDateString('pt-BR'))
-                .join(' • ') || 'Sem contas próximas.'}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-brand-azul/5 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Responsáveis recentes</p>
-            <p className="text-sm text-brand-grafite/80">
-              {Array.from(
-                new Set(
-                  invoices
-                    .map((invoice) => invoice.responsible?.nome)
-                    .filter((nome): nome is string => Boolean(nome)),
-                ),
-              ).join(' • ') || 'Responsáveis serão exibidos após registrar pagamentos.'}
-            </p>
           </div>
         </div>
       </Card>
