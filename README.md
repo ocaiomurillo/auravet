@@ -294,6 +294,8 @@ npm run format
 
 ## 🖼 Screenshots
 
+Em /docs/*.png:
+
 * Login
 * Dashboard
 * Agenda Inteligente
