@@ -401,6 +401,7 @@ const sortServices = (records: ServiceRecord[], orderBy: any) => {
 
 const baseInvoiceStatuses: InvoiceStatusRecord[] = [
   { id: 'status-aberta', slug: 'ABERTA', name: 'Aberta' },
+  { id: 'status-parcial', slug: 'PARCIALMENTE_QUITADA', name: 'Parcialmente quitada' },
   { id: 'status-quitada', slug: 'QUITADA', name: 'Quitada' },
 ];
 

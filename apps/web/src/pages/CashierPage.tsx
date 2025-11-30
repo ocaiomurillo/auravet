@@ -805,6 +805,10 @@ const CashierPage = () => {
               {currencyFormatter.format(summary?.openTotal ?? 0)}
             </p>
             <p className="text-xs text-brand-grafite/70">{summary?.openCount ?? 0} contas aguardando pagamento</p>
+            <p className="text-[11px] text-brand-grafite/60">
+              Parcialmente quitadas: {currencyFormatter.format(summary?.partiallyPaidTotal ?? 0)} •
+              {` ${summary?.partiallyPaidCount ?? 0} faturas`}
+            </p>
           </div>
           <div className="rounded-2xl bg-emerald-100/60 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Total recebido</p>

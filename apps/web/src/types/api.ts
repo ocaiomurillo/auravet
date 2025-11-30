@@ -233,6 +233,8 @@ export interface InvoiceSummary {
   receivedTotal: number;
   openCount: number;
   paidCount: number;
+  partiallyPaidTotal: number;
+  partiallyPaidCount: number;
 }
 
 export interface InvoiceListResponse {

@@ -21,6 +21,7 @@ import {
   fetchInvoiceCandidates,
   getOpenStatus,
   getPaidStatus,
+  getPartiallyPaidStatus,
   invoiceInclude,
   reconcileInstallmentsForInvoice,
   syncInvoiceForService,
@@ -138,9 +139,11 @@ const BLOCKED_STATUS_SLUG = 'BLOQUEADA';
 
 const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof invoiceInclude }>>) => {
   let openTotal = new Prisma.Decimal(0);
+  let partiallyPaidTotal = new Prisma.Decimal(0);
   let paidTotal = new Prisma.Decimal(0);
   let receivedTotal = new Prisma.Decimal(0);
   let openCount = 0;
+  let partiallyPaidCount = 0;
   let paidCount = 0;
 
   for (const invoice of invoices) {
@@ -149,13 +152,19 @@ const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof
       return acc.add(installment.amount);
     }, new Prisma.Decimal(0));
 
+    const remainingForInvoice = invoice.total.sub(receivedForInvoice);
+
     receivedTotal = receivedTotal.add(receivedForInvoice);
 
     if (invoice.status.slug === 'QUITADA') {
       paidTotal = paidTotal.add(invoice.total);
       paidCount += 1;
+    } else if (invoice.status.slug === 'PARCIALMENTE_QUITADA') {
+      partiallyPaidTotal = partiallyPaidTotal.add(remainingForInvoice);
+      partiallyPaidCount += 1;
+      openTotal = openTotal.add(remainingForInvoice);
     } else {
-      openTotal = openTotal.add(invoice.total);
+      openTotal = openTotal.add(remainingForInvoice);
       openCount += 1;
     }
   }
@@ -164,8 +173,10 @@ const buildSummary = (invoices: Array<Prisma.InvoiceGetPayload<{ include: typeof
     openTotal: Number(openTotal.toFixed(2)),
     paidTotal: Number(paidTotal.toFixed(2)),
     receivedTotal: Number(receivedTotal.toFixed(2)),
-    openCount,
+    openCount: openCount + partiallyPaidCount,
     paidCount,
+    partiallyPaidTotal: Number(partiallyPaidTotal.toFixed(2)),
+    partiallyPaidCount,
   };
 };
 
@@ -508,8 +519,10 @@ invoicesRouter.post(
 
       const paidStatus = await getPaidStatus(tx);
       const openStatus = await getOpenStatus(tx);
+      const partiallyPaidStatus = await getPartiallyPaidStatus(tx);
 
       const isFullyPaid = installments.every((installment) => Boolean(installment.paidAt));
+      const isPartiallyPaid = !isFullyPaid && installments.some((installment) => installment.paidAt);
       const latestPayment = installments.reduce<Date | null>((latest, installment) => {
         if (!installment.paidAt) return latest;
         return !latest || installment.paidAt > latest ? installment.paidAt : latest;
@@ -524,7 +537,11 @@ invoicesRouter.post(
       return tx.invoice.update({
         where: { id },
         data: {
-          statusId: isFullyPaid ? paidStatus.id : openStatus.id,
+          statusId: isFullyPaid
+            ? paidStatus.id
+            : isPartiallyPaid
+              ? partiallyPaidStatus.id
+              : openStatus.id,
           paymentDetailsDefined: true,
           paidAt: latestPayment,
           paymentNotes: payload.paymentNotes ?? null,

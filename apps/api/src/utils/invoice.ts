@@ -6,6 +6,7 @@ import { serializeService } from './serializers';
 const BLOCKED_STATUS_SLUG = 'BLOQUEADA';
 const OPEN_STATUS_SLUG = 'ABERTA';
 const PAID_STATUS_SLUG = 'QUITADA';
+const PARTIALLY_PAID_STATUS_SLUG = 'PARCIALMENTE_QUITADA';
 
 const hasPaymentDetails = (params: {
   paymentConditionId?: string | null;
@@ -353,3 +354,5 @@ export const fetchInvoiceCandidates = async (
 
 export const getOpenStatus = async (tx: Prisma.TransactionClient) => ensureInvoiceStatus(tx, OPEN_STATUS_SLUG);
 export const getPaidStatus = async (tx: Prisma.TransactionClient) => ensureInvoiceStatus(tx, PAID_STATUS_SLUG);
+export const getPartiallyPaidStatus = async (tx: Prisma.TransactionClient) =>
+  ensureInvoiceStatus(tx, PARTIALLY_PAID_STATUS_SLUG);
