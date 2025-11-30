@@ -28,12 +28,11 @@ import {
 } from '../utils/invoice';
 import { serializeInvoice } from '../utils/serializers';
 import { buildInvoicePrintHtml } from '../utils/invoice-print';
+import { financePermissions } from '../utils/permissions';
 
 export const invoicesRouter = Router();
 
 invoicesRouter.use(authenticate);
-
-const financePermissions = ['accounting:manage', 'cashier:manage'] as const;
 
 const parseDate = (value: string, label: string) => {
   const date = new Date(value);

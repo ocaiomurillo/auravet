@@ -23,6 +23,7 @@ import {
   serializeAppointment,
   serializeAppointmentUser,
 } from '../utils/serializers';
+import { financePermissions } from '../utils/permissions';
 
 export const appointmentsRouter = Router();
 
@@ -378,7 +379,7 @@ appointmentsRouter.get(
 
 appointmentsRouter.get(
   '/billable',
-  requireAnyPermission('accounting:manage', 'cashier:manage'),
+  requireAnyPermission(...financePermissions),
   asyncHandler(async (req, res) => {
     const filters = appointmentBillableQuerySchema.parse(req.query);
 
