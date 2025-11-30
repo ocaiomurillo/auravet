@@ -18,6 +18,7 @@ import type {
 } from '../types/api';
 import { buildOwnerAddress, formatCpf } from '../utils/owner';
 import { buildAttendancePdf } from '../utils/attendancePdf';
+import { exportXlsxFile } from '../utils/xlsxExport';
 
 const statusLabels: Record<Appointment['status'], string> = {
   AGENDADO: 'Agendado',
@@ -92,6 +93,9 @@ const toDateTimeLocal = (iso: string) => {
     date.getHours(),
   )}:${pad(date.getMinutes())}`;
 };
+
+const buildXlsxFilename = (base: string) =>
+  `auravet-${base.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}-${Date.now()}.xlsx`;
 
 const AppointmentsPage = () => {
   const queryClient = useQueryClient();
@@ -242,6 +246,68 @@ const AppointmentsPage = () => {
       );
     },
     onSettled: () => setPdfServiceId(null),
+  });
+
+  const exportAppointments = useMutation({
+    mutationFn: async () => {
+      if (isLoading) {
+        throw new Error('Aguarde o carregamento dos agendamentos para exportar.');
+      }
+
+      if (!appointments.length) {
+        throw new Error('Nenhum agendamento encontrado com os filtros atuais.');
+      }
+
+      const headers = [
+        'Início',
+        'Fim',
+        'Status',
+        'Tipo',
+        'Pet',
+        'Tutor',
+        'Veterinário',
+        'Assistente',
+        'Conflitos',
+        'Duração (min)',
+        'Observações',
+      ] as const;
+
+      const rows = appointments.map((appointment) => {
+        const conflicts = [
+          appointment.availability.veterinarianConflict ? 'Veterinário' : '',
+          appointment.availability.assistantConflict ? 'Assistência' : '',
+        ]
+          .filter(Boolean)
+          .join(' e ');
+
+        return [
+          formatDateTime(appointment.scheduledStart),
+          formatDateTime(appointment.scheduledEnd),
+          statusLabels[appointment.status],
+          getAttendanceTypeLabel(appointment.tipo),
+          appointment.animal.nome ?? '—',
+          appointment.owner.nome ?? '—',
+          appointment.veterinarian?.nome ?? '—',
+          appointment.assistant?.nome ?? '—',
+          conflicts || 'Sem conflito',
+          appointment.durationMinutes,
+          appointment.notes ?? '—',
+        ];
+      });
+
+      exportXlsxFile({
+        sheetName: 'Agendamentos',
+        headers,
+        rows,
+        filename: buildXlsxFilename('agendamentos'),
+      });
+    },
+    onSuccess: () => {
+      toast.success('Planilha de agendamentos pronta para download.');
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível exportar os agendamentos.');
+    },
   });
 
   const createMutation = useMutation({
@@ -560,10 +626,24 @@ const AppointmentsPage = () => {
             </div>
           </div>
 
-          <div className="flex gap-3 md:col-span-6">
-            <Button type="submit">Aplicar filtros</Button>
-            <Button type="button" variant="ghost" onClick={handleResetFilters}>
-              Limpar
+          <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-6">
+            <div className="flex gap-3">
+              <Button type="submit">Aplicar filtros</Button>
+              <Button type="button" variant="ghost" onClick={handleResetFilters}>
+                Limpar
+              </Button>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={exportAppointments.isPending || isLoading}
+              onClick={() => exportAppointments.mutate()}
+            >
+              {exportAppointments.isPending
+                ? 'Exportando...'
+                : exportAppointments.isError
+                  ? 'Tentar exportar novamente'
+                  : 'Exportar para Excel'}
             </Button>
           </div>
         </form>
