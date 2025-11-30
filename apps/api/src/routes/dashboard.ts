@@ -159,7 +159,7 @@ dashboardRouter.get(
       );
     }
 
-    if (hasModule(modules, 'cashier:access')) {
+    if (hasModule(modules, 'cashier:manage')) {
       jobs.push(
         (async () => {
           const now = new Date();

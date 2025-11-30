@@ -86,7 +86,7 @@ const resolveServiceIdForInvoice = async (
 
 invoicesRouter.get(
   '/statuses',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (_req, res) => {
     const statuses = await prisma.invoiceStatus.findMany({ orderBy: { name: 'asc' } });
     res.json(
@@ -103,7 +103,7 @@ const invoiceCandidateSchema = z.object({ ownerId: z.string().cuid().optional() 
 
 invoicesRouter.get(
   '/candidates',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const { ownerId } = invoiceCandidateSchema.parse(req.query);
     const services = await fetchInvoiceCandidates(prisma, ownerId);
@@ -216,7 +216,7 @@ const buildInstallmentsForAdjustment = (
 
 invoicesRouter.get(
   '/',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const filters = invoiceFilterSchema.parse(req.query);
 
@@ -392,7 +392,7 @@ const buildXlsxBuffer = (rows: WorksheetCell[][]) => {
 
 invoicesRouter.get(
   '/export',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const filters = invoiceExportSchema.parse(req.query);
 
@@ -430,7 +430,7 @@ invoicesRouter.get(
 
 invoicesRouter.post(
   '/',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const payload = invoiceGenerateSchema.parse(req.body);
 
@@ -454,7 +454,7 @@ invoicesRouter.post(
 
 invoicesRouter.post(
   '/:id/pay',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const { id } = invoiceIdSchema.parse(req.params);
     const payload = invoicePaymentSchema.parse(req.body);
@@ -549,7 +549,7 @@ invoicesRouter.post(
 
 invoicesRouter.patch(
   '/:id/adjust',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const { id } = invoiceIdSchema.parse(req.params);
     const payload = invoiceAdjustmentSchema.parse(req.body);
@@ -634,7 +634,7 @@ invoicesRouter.patch(
 
 invoicesRouter.get(
   '/:id/print',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const { id } = invoiceIdSchema.parse(req.params);
 
@@ -657,7 +657,7 @@ invoicesRouter.get(
 
 invoicesRouter.get(
   '/:id',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const { id } = invoiceIdSchema.parse(req.params);
 
@@ -718,7 +718,7 @@ const recalculateInvoiceTotal = async (tx: Prisma.TransactionClient, invoiceId: 
 
 invoicesRouter.post(
   '/:id/items',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const { id } = invoiceIdSchema.parse(req.params);
     const payload = invoiceManualItemSchema.parse(req.body);
@@ -796,7 +796,7 @@ invoicesRouter.post(
 
 invoicesRouter.delete(
   '/:id/items/:itemId',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const { id, itemId } = invoiceItemPathSchema.parse(req.params);
 

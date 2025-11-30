@@ -372,7 +372,7 @@ appointmentsRouter.get(
 
 appointmentsRouter.get(
   '/billable',
-  requirePermission('cashier:access'),
+  requirePermission('cashier:manage'),
   asyncHandler(async (req, res) => {
     const filters = appointmentBillableQuerySchema.parse(req.query);
 
