@@ -60,10 +60,12 @@ const App = () => {
             <Route path="cashier" element={<CashierPage />} />
           </Route>
           <Route
-            element={<RequireModules modules={['services:write', 'animals:read', 'products:read']} />}
+            element={
+              <RequireModules modules={['attendances:manage', 'animals:read', 'owners:read', 'products:read']} />
+            }
           >
-            <Route path="new-service" element={<NewServicePage />} />
-            <Route path="services/:id/edit" element={<NewServicePage />} />
+            <Route path="attendances/new" element={<NewServicePage />} />
+            <Route path="attendances/:id/edit" element={<NewServicePage />} />
           </Route>
           <Route element={<RequireModules modules={['users:manage']} />}>
             <Route path="users" element={<UsersPage />} />

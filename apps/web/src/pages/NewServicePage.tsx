@@ -618,7 +618,7 @@ const NewServicePage = () => {
           : undefined;
 
       if (serviceId) {
-        navigate(`/services/${serviceId}/edit`);
+        navigate(`/attendances/${serviceId}/edit`);
       }
     },
   });
