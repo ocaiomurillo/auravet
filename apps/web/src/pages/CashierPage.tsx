@@ -111,7 +111,7 @@ const CashierPage = () => {
   const [extraItemDescription, setExtraItemDescription] = useState('');
   const [extraItemQuantity, setExtraItemQuantity] = useState('1');
   const [extraItemUnitPrice, setExtraItemUnitPrice] = useState('');
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [generatingInvoiceId, setGeneratingInvoiceId] = useState<string | null>(null);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const adjustedInvoiceItemIdsRef = useRef<Set<string>>(new Set());
@@ -703,14 +703,12 @@ const CashierPage = () => {
     removeManualItemMutation.mutate({ invoiceId: selectedInvoice.id, itemId });
   };
 
-  const handlePrintInvoice = async () => {
-    if (!selectedInvoice) return;
-
+  const handleDownloadInvoicePdf = async (invoice: Invoice) => {
     try {
-      setIsGeneratingPdf(true);
-      const doc = await buildInvoicePdf(selectedInvoice, paymentConditions);
-      const ownerSlug = slugify(selectedInvoice.owner.nome || 'tutor');
-      const fileDate = new Date(selectedInvoice.dueDate).toISOString().split('T')[0];
+      setGeneratingInvoiceId(invoice.id);
+      const doc = await buildInvoicePdf(invoice, paymentConditions);
+      const ownerSlug = slugify(invoice.owner.nome || 'tutor');
+      const fileDate = new Date(invoice.dueDate).toISOString().split('T')[0];
       const fileName = `auravet-fatura-${ownerSlug || 'tutor'}-${fileDate}.pdf`;
       const blobUrl = doc.output('bloburl');
 
@@ -727,8 +725,14 @@ const CashierPage = () => {
         err instanceof Error ? err.message : 'Não foi possível gerar o PDF desta conta.',
       );
     } finally {
-      setIsGeneratingPdf(false);
+      setGeneratingInvoiceId(null);
     }
+  };
+
+  const handlePrintInvoice = () => {
+    if (!selectedInvoice) return;
+
+    void handleDownloadInvoicePdf(selectedInvoice);
   };
 
   return (
@@ -846,12 +850,11 @@ const CashierPage = () => {
             <table className="min-w-full divide-y divide-brand-azul/20">
               <thead className="bg-brand-azul/10">
                 <tr className="text-left text-sm font-semibold uppercase tracking-wide text-brand-grafite/70">
-                  <th className="px-4 py-3">Tutor</th>
-                  <th className="px-4 py-3">Total</th>
-                  <th className="px-4 py-3">Pagamento</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Responsável</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <th className="w-[28%] px-4 py-3">Tutor</th>
+                  <th className="w-[15%] px-4 py-3">Total</th>
+                  <th className="w-[32%] px-4 py-3">Pagamento</th>
+                  <th className="w-[15%] px-4 py-3">Status</th>
+                  <th className="w-[10%] px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-azul/10 bg-white/90">
@@ -886,16 +889,20 @@ const CashierPage = () => {
                             paymentConditions,
                           )}
                         </p>
-                        <p className="text-xs text-brand-grafite/60">
-                          {paymentSummary.totalInstallments > 0
-                            ? `${paymentSummary.paidCount}/${paymentSummary.totalInstallments} parcelas pagas`
-                            : 'Pagamento à vista'}
-                          {paymentSummary.nextDueDate
-                            ? ` • Próx. ${new Date(paymentSummary.nextDueDate).toLocaleDateString('pt-BR')}`
-                            : paymentSummary.isPaid
-                              ? ' • Quitada'
-                              : ''}
-                        </p>
+                        <div className="mt-1 space-y-1 text-xs text-brand-grafite/60">
+                          <p>
+                            {paymentSummary.totalInstallments > 0
+                              ? `${paymentSummary.paidCount}/${paymentSummary.totalInstallments} parcelas pagas`
+                              : 'Pagamento à vista'}
+                          </p>
+                          <p>
+                            {paymentSummary.nextDueDate
+                              ? `Próx. ${new Date(paymentSummary.nextDueDate).toLocaleDateString('pt-BR')}`
+                              : paymentSummary.isPaid
+                                ? 'Fatura quitada'
+                                : 'Aguardando pagamento'}
+                          </p>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -908,24 +915,24 @@ const CashierPage = () => {
                           {paymentSummary.isPaid ? 'Quitada' : 'Em aberto'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        {invoice.responsible ? (
-                          <>
-                            <p className="font-semibold text-brand-escuro">{invoice.responsible.nome}</p>
-                          <p className="text-xs text-brand-grafite/60">{invoice.responsible.email}</p>
-                        </>
-                      ) : (
-                        <span className="text-xs text-brand-grafite/60">Aguardando registro</span>
-                      )}
-                    </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          className="px-3 py-1 text-xs"
-                          onClick={() => handleOpenInvoice(invoice)}
-                        >
-                          Ver detalhes
-                        </Button>
+                        <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end sm:gap-3">
+                          <Button
+                            variant="ghost"
+                            className="px-3 py-1 text-xs"
+                            onClick={() => handleOpenInvoice(invoice)}
+                          >
+                            Ver detalhes
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="px-3 py-1 text-xs"
+                            disabled={generatingInvoiceId === invoice.id}
+                            onClick={() => void handleDownloadInvoicePdf(invoice)}
+                          >
+                            {generatingInvoiceId === invoice.id ? 'Gerando PDF...' : 'Gerar PDF'}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1059,10 +1066,12 @@ const CashierPage = () => {
               <Button
                 variant="ghost"
                 onClick={handlePrintInvoice}
-                disabled={isGeneratingPdf}
+                disabled={generatingInvoiceId === selectedInvoice.id}
                 className="self-start"
               >
-                {isGeneratingPdf ? 'Gerando PDF...' : 'Baixar PDF da fatura'}
+                {generatingInvoiceId === selectedInvoice.id
+                  ? 'Gerando PDF...'
+                  : 'Baixar PDF da fatura'}
               </Button>
             </div>
 
