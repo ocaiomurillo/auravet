@@ -17,7 +17,9 @@ const HomePage = () => {
   const canViewOwners = hasModule('owners:read');
   const canViewAnimals = hasModule('animals:read');
   const canViewProducts = hasModule('products:read');
-  const canViewFinance = hasModule('accounting:manage') || hasModule('cashier:manage');
+  const canViewAccounting = hasModule('accounting:manage');
+  const canViewCashier = hasModule('cashier:manage');
+  const canViewFinance = canViewAccounting || canViewCashier;
   const canCreateAttendances = hasModule('services:write');
 
   const shouldFetchSummary =
@@ -314,7 +316,7 @@ const HomePage = () => {
           description="Visualize recebíveis, acompanhe status de cobrança e antecipe vencimentos."
           actions={
             <Button variant="secondary" asChild>
-              <Link to="/accounting" className="flex items-center gap-2">
+              <Link to={canViewAccounting ? '/accounting' : '/cashier'} className="flex items-center gap-2">
                 <ArrowRightCircleIcon className="h-5 w-5" /> Acessar
               </Link>
             </Button>
