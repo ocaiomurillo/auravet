@@ -12,15 +12,21 @@ import type { DashboardSummaryResponse } from '../types/api';
 const HomePage = () => {
   const { user, hasModule } = useAuth();
 
-  const canViewAttendances = hasModule('services:read');
+  const canViewAppointments = hasModule('appointments:manage');
+  const canViewAttendances = hasModule('attendances:manage');
   const canViewOwners = hasModule('owners:read');
   const canViewAnimals = hasModule('animals:read');
   const canViewProducts = hasModule('products:read');
-  const canViewAccounting = hasModule('cashier:access');
+  const canViewAccounting = hasModule('accounting:manage');
   const canCreateAttendances = hasModule('services:write');
 
   const shouldFetchSummary =
-    canViewAttendances || canViewOwners || canViewAnimals || canViewProducts || canViewAccounting;
+    canViewAppointments ||
+    canViewAttendances ||
+    canViewOwners ||
+    canViewAnimals ||
+    canViewProducts ||
+    canViewAccounting;
 
   const summaryQuery = useQuery<DashboardSummaryResponse, Error>({
     queryKey: ['dashboard', 'summary'],
@@ -132,7 +138,7 @@ const HomePage = () => {
         </Card>
       ) : null}
 
-      {canViewAttendances ? (
+      {canViewAppointments ? (
         <Card
           title="Agendamentos"
           description="Visualize compromissos e acompanhe confirmações e cancelamentos."

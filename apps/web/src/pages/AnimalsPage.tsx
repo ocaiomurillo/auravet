@@ -50,7 +50,7 @@ const AnimalsPage = () => {
   const { hasModule } = useAuth();
   const canManageAnimals = hasModule('animals:write');
   const canRegisterAttendances = hasModule('services:write');
-  const canViewAttendances = hasModule('services:read');
+  const canViewAttendances = hasModule('attendances:manage');
 
   const { data: animals, isLoading, error } = useQuery({
     queryKey: ['animals'],
