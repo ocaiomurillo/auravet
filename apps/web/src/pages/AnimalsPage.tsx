@@ -49,7 +49,7 @@ const AnimalsPage = () => {
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
   const canManageAnimals = hasModule('animals:write');
-  const canRegisterAttendances = hasModule('services:write');
+  const canRegisterAttendances = hasModule('attendances:manage');
   const canViewAttendances = hasModule('attendances:manage');
 
   const { data: animals, isLoading, error } = useQuery({
@@ -257,7 +257,7 @@ const AnimalsPage = () => {
         <div className="flex flex-wrap gap-2">
           {canRegisterAttendances ? (
             <Button variant="secondary" asChild>
-              <Link to="/new-service">Registrar Atendimento</Link>
+              <Link to="/attendances/new">Registrar Atendimento</Link>
             </Button>
           ) : null}
           {canManageAnimals ? <Button onClick={openCreateModal}>Novo Pet</Button> : null}
@@ -442,11 +442,11 @@ const AnimalsPage = () => {
                                 <p className="text-sm text-brand-grafite/70">Assistente: {attendance.assistant.nome}</p>
                               ) : null}
                             </div>
-                            {canRegisterAttendances ? (
-                              <Button variant="ghost" className="text-sm" asChild>
-                                <Link to={`/services/${attendance.id}/edit`}>Editar</Link>
-                              </Button>
-                            ) : null}
+                          {canRegisterAttendances ? (
+                            <Button variant="ghost" className="text-sm" asChild>
+                              <Link to={`/attendances/${attendance.id}/edit`}>Editar</Link>
+                            </Button>
+                          ) : null}
                           </div>
                         {(attendance.notes?.length ?? 0) > 0 ? (
                           <ul className="mt-3 space-y-2 text-sm text-brand-grafite/80">

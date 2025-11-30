@@ -53,7 +53,7 @@ dashboardRouter.get(
     const summary: DashboardSummary = {};
     const jobs: Array<Promise<void>> = [];
 
-    if (hasModule(modules, 'services:read')) {
+    if (hasModule(modules, 'attendances:manage')) {
       jobs.push(
         (async () => {
           const [total, ongoing, completed] = await Promise.all([
@@ -78,7 +78,7 @@ dashboardRouter.get(
       );
     }
 
-    if (hasModule(modules, 'services:read')) {
+    if (hasModule(modules, 'appointments:manage')) {
       jobs.push(
         (async () => {
           const now = new Date();

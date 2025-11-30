@@ -45,7 +45,7 @@ const AnimalAttendancesPage = () => {
   const params = useParams<{ id: string }>();
 
   const animalId = params.id;
-  const canEditAttendances = hasModule('services:write');
+  const canManageAttendances = hasModule('attendances:manage');
 
   const [statusFilter, setStatusFilter] = useState<AttendanceStatus | ''>('');
   const [from, setFrom] = useState('');
@@ -95,9 +95,11 @@ const AnimalAttendancesPage = () => {
             Histórico consolidado do pet com filtros rápidos para encontrar atendimentos específicos.
           </p>
         </div>
-        <Button variant="secondary" asChild>
-          <Link to="/new-service">Registrar novo atendimento</Link>
-        </Button>
+        {canManageAttendances ? (
+          <Button variant="secondary" asChild>
+            <Link to="/attendances/new">Registrar novo atendimento</Link>
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr,2fr]">
@@ -212,11 +214,11 @@ const AnimalAttendancesPage = () => {
                     </div>
                     <div className="flex flex-col gap-2">
                       <Button variant="ghost" asChild>
-                        <Link to={`/services/${attendance.id}/edit?mode=view`}>Visualizar</Link>
+                        <Link to={`/attendances/${attendance.id}/edit?mode=view`}>Visualizar</Link>
                       </Button>
-                      {canEditAttendances ? (
+                      {canManageAttendances ? (
                         <Button asChild>
-                          <Link to={`/services/${attendance.id}/edit`}>Editar</Link>
+                          <Link to={`/attendances/${attendance.id}/edit`}>Editar</Link>
                         </Button>
                       ) : null}
                     </div>

@@ -20,7 +20,7 @@ const HomePage = () => {
   const canViewAccounting = hasModule('accounting:manage');
   const canViewCashier = hasModule('cashier:manage');
   const canViewFinance = canViewAccounting || canViewCashier;
-  const canCreateAttendances = hasModule('services:write');
+  const canCreateAttendances = hasModule('attendances:manage');
 
   const shouldFetchSummary =
     canViewAppointments ||
@@ -79,7 +79,7 @@ const HomePage = () => {
         actions={
           canCreateAttendances ? (
             <Button asChild variant="primary">
-              <Link to="/new-service" className="flex items-center gap-2">
+              <Link to="/attendances/new" className="flex items-center gap-2">
                 <PlusCircleIcon className="h-5 w-5" /> Atendimento
               </Link>
             </Button>
