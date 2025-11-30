@@ -5,6 +5,8 @@ import { HttpError } from '../utils/http-error';
 const PERMISSION_ALIASES: Record<string, string[]> = {
   'attendances:manage': ['services:manage', 'services:write'],
   'attendances:read': ['services:read'],
+  'cashier:access': ['cashier:manage'],
+  'cashier:manage': ['cashier:access'],
   'services:manage': ['attendances:manage', 'services:write'],
   'services:read': ['attendances:read', 'attendances:manage'],
   'services:write': ['attendances:manage', 'services:manage'],

@@ -6,6 +6,7 @@ import { requireAnyPermission } from '../middlewares/require-permission';
 import { paymentConditionIdSchema, paymentConditionPayloadSchema } from '../schema/payment-condition';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
+import { financePermissions } from '../utils/permissions';
 
 const serializePaymentCondition = (condition: {
   id: string;
@@ -24,7 +25,7 @@ const serializePaymentCondition = (condition: {
 export const paymentConditionsRouter = Router();
 
 paymentConditionsRouter.use(authenticate);
-paymentConditionsRouter.use(requireAnyPermission('accounting:manage', 'cashier:manage'));
+paymentConditionsRouter.use(requireAnyPermission(...financePermissions));
 
 paymentConditionsRouter.get(
   '/',
