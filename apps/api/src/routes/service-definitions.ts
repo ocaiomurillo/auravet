@@ -48,7 +48,7 @@ serviceDefinitionsRouter.get(
 
 serviceDefinitionsRouter.post(
   '/',
-  requirePermission('services:write'),
+  requirePermission('services:manage'),
   asyncHandler(async (req, res) => {
     const payload = serviceDefinitionCreateSchema.parse(req.body);
 
