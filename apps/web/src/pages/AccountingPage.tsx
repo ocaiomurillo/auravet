@@ -404,6 +404,10 @@ const AccountingPage = () => {
               {currencyFormatter.format(summary?.openTotal ?? 0)}
             </p>
             <p className="text-xs text-brand-grafite/70">{summary?.openCount ?? 0} contas pendentes</p>
+            <p className="text-[11px] text-brand-grafite/60">
+              Parcialmente quitadas: {currencyFormatter.format(summary?.partiallyPaidTotal ?? 0)} •
+              {` ${summary?.partiallyPaidCount ?? 0} faturas`}
+            </p>
           </div>
           <div className="rounded-2xl bg-brand-azul/5 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/70">Próximo vencimento</p>
@@ -427,6 +431,7 @@ const AccountingPage = () => {
           {[
             { label: 'Bloqueadas', value: 'BLOQUEADA' },
             { label: 'Abertas', value: 'ABERTA' },
+            { label: 'Parcialmente quitadas', value: 'PARCIALMENTE_QUITADA' },
             { label: 'Quitadas', value: 'QUITADA' },
           ].map((option) => (
             <button
