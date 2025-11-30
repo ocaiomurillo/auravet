@@ -335,9 +335,10 @@ const AppointmentsPage = () => {
       }),
     onSuccess: (response) => {
       const { appointment } = response;
-      toast.success(
-        `Agendamento de ${getAttendanceTypeLabel(appointment.tipo)} criado com sucesso.`,
-      );
+      const successMessage = appointment.tipo
+        ? `Agendamento de ${getAttendanceTypeLabel(appointment.tipo)} criado com sucesso.`
+        : 'Agendamento criado com sucesso.';
+      toast.success(successMessage);
       if (appointment.availability.veterinarianConflict || appointment.availability.assistantConflict) {
         toast.warning(
           'Atenção: existem conflitos de agenda para este horário. Reveja a disponibilidade dos colaboradores.',
