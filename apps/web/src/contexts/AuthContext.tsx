@@ -33,6 +33,11 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const currentUserQueryKey = ['auth', 'me'];
 
+const MODULE_ALIASES: Record<string, string[]> = {
+  'cashier:manage': ['cashier:access'],
+  'cashier:access': ['cashier:manage'],
+};
+
 const fetchCurrentUser = async (): Promise<User> => {
   const response = await apiClient.get<{ user: User }>('/auth/me');
   return response.user;
@@ -99,9 +104,22 @@ export const AuthProvider = ({ children }: PropsWithChildren): JSX.Element => {
     [],
   );
 
+  const userModules = useMemo(() => new Set(user?.modules ?? []), [user]);
+
   const hasModule = useCallback(
-    (module: string) => user?.modules.includes(module) ?? false,
-    [user],
+    (module: string) => {
+      if (userModules.has(module)) {
+        return true;
+      }
+
+      const aliases = MODULE_ALIASES[module];
+      if (!aliases) {
+        return false;
+      }
+
+      return aliases.some((alias) => userModules.has(alias));
+    },
+    [userModules],
   );
 
   const refreshUser = useCallback(async () => {
