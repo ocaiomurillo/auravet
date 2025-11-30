@@ -50,13 +50,13 @@ const App = () => {
           <Route element={<RequireModules modules={['products:read']} />}>
             <Route path="products" element={<ProductsPage />} />
           </Route>
-          <Route element={<RequireModules modules={['accounting:manage']} />}>
+          <Route element={<RequireModules modules={['accounting:manage', 'cashier:manage']} mode="any" />}>
             <Route path="accounting" element={<AccountingPage />} />
           </Route>
-          <Route element={<RequireModules modules={['payment-conditions:manage']} />}>
+          <Route element={<RequireModules modules={['accounting:manage', 'cashier:manage']} mode="any" />}>
             <Route path="payment-conditions" element={<PaymentConditionsPage />} />
           </Route>
-          <Route element={<RequireModules modules={['cashier:manage']} />}>
+          <Route element={<RequireModules modules={['accounting:manage', 'cashier:manage']} mode="any" />}>
             <Route path="cashier" element={<CashierPage />} />
           </Route>
           <Route

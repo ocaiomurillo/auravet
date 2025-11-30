@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middlewares/authenticate';
-import { requirePermission } from '../middlewares/require-permission';
+import { requireAnyPermission } from '../middlewares/require-permission';
 import { paymentConditionIdSchema, paymentConditionPayloadSchema } from '../schema/payment-condition';
 import { asyncHandler } from '../utils/async-handler';
 import { HttpError } from '../utils/http-error';
@@ -24,7 +24,7 @@ const serializePaymentCondition = (condition: {
 export const paymentConditionsRouter = Router();
 
 paymentConditionsRouter.use(authenticate);
-paymentConditionsRouter.use(requirePermission('cashier:manage'));
+paymentConditionsRouter.use(requireAnyPermission('accounting:manage', 'cashier:manage'));
 
 paymentConditionsRouter.get(
   '/',

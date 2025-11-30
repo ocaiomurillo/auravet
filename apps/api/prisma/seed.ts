@@ -350,6 +350,7 @@ const LEGACY_MODULE_SLUG_MAP: Record<string, string> = {
 };
 
 const BASE_READ_MODULES = ['owners:read', 'animals:read', 'products:read', 'services:read'] as const;
+const FINANCE_MODULES = ['accounting:manage', 'cashier:manage'] as const;
 
 const DEFAULT_ROLES: Array<{
   slug: string;
@@ -371,7 +372,7 @@ const DEFAULT_ROLES: Array<{
   {
     slug: 'ASSISTENTE_ADMINISTRATIVO',
     name: 'Assistente Administrativo',
-    modules: [...BASE_READ_MODULES, 'accounting:manage', 'cashier:manage'],
+    modules: [...BASE_READ_MODULES, ...FINANCE_MODULES],
   },
   {
     slug: 'ENFERMEIRO',
@@ -391,8 +392,7 @@ const DEFAULT_ROLES: Array<{
       'products:manage',
       'services:manage',
       'payment-conditions:manage',
-      'accounting:manage',
-      'cashier:manage',
+      ...FINANCE_MODULES,
     ],
   },
 ];
