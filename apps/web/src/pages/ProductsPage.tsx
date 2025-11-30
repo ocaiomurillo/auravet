@@ -276,7 +276,7 @@ const ProductsPage = () => {
     });
 
     downloadBlob(blob, `auravet-produtos-${Date.now()}.xlsx`);
-    toast.success('Exportação para Excel preparada.');
+    toast.success('Planilha de produtos pronta para download.');
   };
 
   const currencyFormatter = new Intl.NumberFormat('pt-BR', {

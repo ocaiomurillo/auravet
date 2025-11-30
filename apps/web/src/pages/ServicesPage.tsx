@@ -217,7 +217,7 @@ const ServicesPage = () => {
     });
 
     downloadBlob(blob, `auravet-servicos-${Date.now()}.xlsx`);
-    toast.success('Exportação em XLSX preparada.');
+    toast.success('Planilha de serviços pronta para download.');
   };
 
   const isSavingDefinition = isSubmitting || createDefinition.isPending || updateDefinition.isPending;

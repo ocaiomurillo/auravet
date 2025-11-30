@@ -25,6 +25,7 @@ import {
   paymentConditionLabel,
   paymentMethodLabel,
 } from '../utils/invoicePdf';
+import { exportXlsxFile } from '../utils/xlsxExport';
 
 const slugify = (value: string) =>
   value
@@ -33,6 +34,8 @@ const slugify = (value: string) =>
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+const buildXlsxFilename = (base: string) => `${slugify(base)}-${Date.now()}.xlsx`;
 
 type InstallmentFormState = {
   id: string;
@@ -475,7 +478,7 @@ const CashierPage = () => {
     setFilters({ ownerId: '', status: '', from: '', to: '' });
   };
 
-  const handleExportXlsx = async () => {
+  const handleExportXlsx = () => {
     if (!invoices.length) {
       toast.error('Nenhuma conta encontrada para exportação.');
       return;
@@ -484,16 +487,61 @@ const CashierPage = () => {
     setIsExporting(true);
 
     try {
-      const blob = await invoicesApi.exportFile(filters);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `auravet-contas-${Date.now()}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success('Exportação em XLSX preparada.');
+      const headers = [
+        'Tutor',
+        'E-mail',
+        'Telefone',
+        'CPF',
+        'Endereço',
+        'Total',
+        'Forma de pagamento',
+        'Condição de pagamento',
+        'Parcelas pagas',
+        'Próximo vencimento',
+        'Status',
+      ] as const;
+
+      const rows = invoices.map((invoice) => {
+        const paymentSummary = summarizeInvoicePayments(invoice);
+        const statusLabel =
+          statuses?.find((status) => status.id === invoice.status.id)?.name ?? invoice.status.name;
+
+        const installmentsLabel = paymentSummary.totalInstallments
+          ? `${paymentSummary.paidCount}/${paymentSummary.totalInstallments}`
+          : '—';
+
+        const nextDueDateLabel = paymentSummary.nextDueDate
+          ? new Date(paymentSummary.nextDueDate).toLocaleDateString('pt-BR')
+          : paymentSummary.isPaid
+            ? 'Quitada'
+            : 'Sem vencimento definido';
+
+        return [
+          invoice.owner.nome ?? '',
+          invoice.owner.email ?? '',
+          invoice.owner.telefone ?? '',
+          formatCpf(invoice.owner.cpf) ?? '',
+          buildOwnerAddress(invoice.owner) ?? '',
+          Number(invoice.total.toFixed(2)),
+          paymentMethodLabel(invoice.paymentMethod),
+          paymentConditionLabel(
+            invoice.paymentConditionDetails?.id ?? invoice.paymentCondition,
+            paymentConditions,
+          ),
+          installmentsLabel,
+          nextDueDateLabel,
+          paymentSummary.isPaid ? 'Quitada' : statusLabel,
+        ];
+      });
+
+      exportXlsxFile({
+        sheetName: 'Contas a receber',
+        headers,
+        rows,
+        filename: buildXlsxFilename('auravet-contas'),
+      });
+
+      toast.success('Planilha de contas pronta para download.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível exportar as contas.');
     } finally {
@@ -828,9 +876,9 @@ const CashierPage = () => {
               type="button"
               variant="secondary"
               onClick={handleExportXlsx}
-              disabled={isExporting}
+              disabled={isExporting || isLoading || !invoices.length}
             >
-              {isExporting ? 'Gerando XLSX...' : 'Exportar XLSX'}
+              {isExporting ? 'Gerando planilha...' : 'Exportar para Excel'}
             </Button>
             <Button type="button" variant="ghost" onClick={handleFiltersReset}>
               Limpar
