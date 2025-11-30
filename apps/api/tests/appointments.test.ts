@@ -1454,6 +1454,66 @@ describe('PATCH /appointments/:id/complete', () => {
     assert.ok(invoice);
     assert.equal(Number(invoice.total), updatedPrice);
   });
+
+  it('accepts legacy appointment permissions when completing an appointment', async () => {
+    const legacyRole = await prisma.role.create({
+      data: {
+        name: 'Permissões legadas de agendamento',
+        slug: 'AGENDAMENTOS_LEGADO',
+        modules: {
+          create: [{ module: { connect: { id: 'appointments:write' } } }],
+        },
+      },
+    });
+
+    const password = 'Legacy123!';
+    const passwordHash = await hashPassword(password);
+    const legacyUser = await prisma.user.create({
+      data: {
+        nome: 'Usuário Legado',
+        email: 'legacy@auravet.com',
+        passwordHash,
+        roleId: legacyRole.id,
+        isActive: true,
+      },
+    });
+
+    const login = await post('/auth/login', { email: legacyUser.email, password });
+    assert.equal(login.response.status, 200);
+    const token = login.data?.token as string;
+    assert.ok(token);
+
+    const owner = await prisma.owner.create({
+      data: {
+        nome: 'Tutor Legado',
+        email: 'legacy.tutor@example.com',
+      },
+    });
+
+    const animal = await prismaMock.animal.create({
+      data: {
+        nome: 'Luna',
+        especie: 'CACHORRO',
+        ownerId: owner.id,
+      },
+    });
+
+    const appointment = await (prismaMock.appointment as any).create({
+      data: {
+        animalId: animal.id,
+        ownerId: owner.id,
+        veterinarianId,
+        status: 'AGENDADO',
+        scheduledStart: new Date('2024-03-01T10:00:00.000Z'),
+        scheduledEnd: new Date('2024-03-01T10:30:00.000Z'),
+      },
+    });
+
+    const completion = await patch(`/appointments/${appointment.id}/complete`, {}, token);
+
+    assert.equal(completion.response.status, 200);
+    assert.equal(completion.data?.appointment?.status, 'CONCLUIDO');
+  });
 });
 
 describe('POST /invoices', () => {
