@@ -56,7 +56,7 @@ const AttendancesPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasModule } = useAuth();
-  const canEdit = hasModule('services:write');
+  const canManageAttendances = hasModule('attendances:manage');
 
   const [filters, setFilters] = useState<AttendanceFiltersState>({
     status: '',
@@ -207,7 +207,7 @@ const AttendancesPage = () => {
           <Button variant="secondary" onClick={handleExport}>
             Exportar para Excel
           </Button>
-          {canEdit ? (
+          {canManageAttendances ? (
             <Button asChild>
               <Link to="/attendances/new">Registrar atendimento</Link>
             </Button>
@@ -307,7 +307,7 @@ const AttendancesPage = () => {
                   <Button variant="secondary" onClick={() => pdfMutation.mutate(attendance.id)}>
                     Gerar PDF
                   </Button>
-                  {canEdit ? (
+                  {canManageAttendances ? (
                     <>
                       <Button variant="ghost" onClick={() => handleEdit(attendance.id)}>
                         Editar
