@@ -1,4 +1,4 @@
-import { AppointmentStatus, Prisma } from '@prisma/client';
+import { AppointmentStatus, Prisma, ServiceStatus } from '@prisma/client';
 import { Router } from 'express';
 
 import { prisma } from '../lib/prisma';
@@ -54,20 +54,13 @@ dashboardRouter.get(
     const jobs: Array<Promise<void>> = [];
 
     if (hasModule(modules, 'attendances:manage')) {
-      jobs.push(
-        (async () => {
-          const [total, ongoing, completed] = await Promise.all([
-            prisma.servico.count(),
-            prisma.servico.count({
-              where: {
-                OR: [
-                  { appointment: null },
-                  { appointment: { status: { not: AppointmentStatus.CONCLUIDO } } },
-                ],
-              },
-            }),
-            prisma.servico.count({ where: { appointment: { status: AppointmentStatus.CONCLUIDO } } }),
-          ]);
+          jobs.push(
+            (async () => {
+              const [total, ongoing, completed] = await Promise.all([
+                prisma.servico.count(),
+                prisma.servico.count({ where: { status: ServiceStatus.EM_ANDAMENTO } }),
+                prisma.servico.count({ where: { status: ServiceStatus.CONCLUIDO } }),
+              ]);
 
           summary.services = {
             total,
