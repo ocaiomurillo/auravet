@@ -402,6 +402,8 @@ export interface DashboardInvoicesSummary {
   open?: number;
   partiallyPaid?: number;
   paid?: number;
+  receivableTotal?: number;
+  overdueTotal?: number;
   receivedTotal?: number;
   overdue?: number;
 }
