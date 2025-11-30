@@ -199,7 +199,7 @@ const AppointmentsPage = () => {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => appointmentsApi.update(id, { status: 'CANCELADO' }),
+    mutationFn: (id: string) => appointmentsApi.cancel(id),
     onSuccess: () => {
       toast.success('Agendamento cancelado com sucesso.');
       setRescheduleForm({ id: null, start: '', end: '', notes: '' });

@@ -45,6 +45,7 @@ enum AppointmentStatus {
   AGENDADO
   CONFIRMADO
   CONCLUIDO
+  CANCELADO
 }
 
 enum PaymentMethod {

@@ -154,11 +154,17 @@ export type CompleteAppointmentPayload = {
   };
 };
 
+export type CancelAppointmentPayload = {
+  notes?: string;
+};
+
 export const appointmentsApi = {
   create: (payload: CreateAppointmentPayload) =>
     apiClient.post<{ appointment: Appointment }>('/appointments', payload),
   update: (id: string, payload: UpdateAppointmentPayload) =>
     apiClient.put<{ appointment: Appointment }>(`/appointments/${id}`, payload),
+  cancel: (id: string, payload: CancelAppointmentPayload = {}) =>
+    apiClient.patch<{ appointment: Appointment }>(`/appointments/${id}/cancel`, payload),
   complete: (id: string, payload: CompleteAppointmentPayload = {}) =>
     apiClient.patch<{ appointment: Appointment }>(`/appointments/${id}/complete`, payload),
   list: (filters: { status?: string } = {}) => {
