@@ -12,6 +12,7 @@ import { HttpError } from '../utils/http-error';
 import { isPrismaKnownError } from '../utils/prisma-error';
 import { serializeService } from '../utils/serializers';
 import { syncInvoiceForService } from '../utils/invoice';
+import { expandWithAliases } from '../utils/permissions';
 
 export const servicesRouter = Router();
 
@@ -175,6 +176,8 @@ const loadServiceDefinitionsMap = async (
 };
 
 const ensureResponsibleExists = async (tx: Prisma.TransactionClient, userId: string) => {
+  const allowedModuleSlugs = expandWithAliases(['attendances:manage', 'attendances:read']);
+
   const responsible = await tx.user.findFirst({
     where: {
       id: userId,
@@ -183,7 +186,7 @@ const ensureResponsibleExists = async (tx: Prisma.TransactionClient, userId: str
         modules: {
           some: {
             isEnabled: true,
-            module: { slug: { in: ['attendances:manage', 'services:manage', 'services:write'] }, isActive: true },
+            module: { slug: { in: allowedModuleSlugs }, isActive: true },
           },
         },
       },
