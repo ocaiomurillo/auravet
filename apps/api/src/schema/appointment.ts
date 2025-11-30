@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { tipoServicoValues } from './service';
 
-export const appointmentStatusValues = ['AGENDADO', 'CONFIRMADO', 'CONCLUIDO'] as const;
+export const appointmentStatusValues = ['AGENDADO', 'CONFIRMADO', 'CONCLUIDO', 'CANCELADO'] as const;
 
 const dateTimeSchema = z
   .string({ required_error: 'Informe a data e hora do agendamento' })
