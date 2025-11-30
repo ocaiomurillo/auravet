@@ -1,4 +1,4 @@
-import { AppointmentStatus } from '@prisma/client';
+import { AppointmentStatus, Prisma } from '@prisma/client';
 import { Router } from 'express';
 
 import { prisma } from '../lib/prisma';
@@ -29,6 +29,9 @@ interface DashboardSummary {
     open: number;
     partiallyPaid: number;
     paid: number;
+    receivableTotal: number;
+    overdueTotal: number;
+    receivedTotal: number;
   };
   owners?: {
     total: number;
@@ -159,18 +162,37 @@ dashboardRouter.get(
     if (hasModule(modules, 'cashier:access')) {
       jobs.push(
         (async () => {
-          const [blocked, open, partiallyPaid, paid] = await Promise.all([
+          const now = new Date();
+
+          const [blocked, open, partiallyPaid, paid, receivable, overdue, received] = await Promise.all([
             prisma.invoice.count({ where: { status: { slug: 'BLOQUEADA' } } }),
             prisma.invoice.count({ where: { status: { slug: 'ABERTA' } } }),
             prisma.invoice.count({ where: { status: { slug: 'PARCIALMENTE_QUITADA' } } }),
             prisma.invoice.count({ where: { status: { slug: 'QUITADA' } } }),
+            prisma.invoiceInstallment.aggregate({
+              where: { paidAt: null },
+              _sum: { amount: true },
+            }),
+            prisma.invoiceInstallment.aggregate({
+              where: { paidAt: null, dueDate: { lt: now } },
+              _sum: { amount: true },
+            }),
+            prisma.invoiceInstallment.aggregate({
+              where: { paidAt: { not: null } },
+              _sum: { amount: true },
+            }),
           ]);
+
+          const toNumber = (value: Prisma.Decimal | null | undefined) => value?.toNumber() ?? 0;
 
           summary.invoices = {
             blocked,
             open,
             partiallyPaid,
             paid,
+            receivableTotal: toNumber(receivable._sum.amount),
+            overdueTotal: toNumber(overdue._sum.amount),
+            receivedTotal: toNumber(received._sum.amount),
           };
         })(),
       );

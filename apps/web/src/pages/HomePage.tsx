@@ -29,7 +29,11 @@ const HomePage = () => {
     staleTime: 60_000,
   });
 
-  const formatter = useMemo(() => new Intl.NumberFormat('pt-BR'), []);
+  const numberFormatter = useMemo(() => new Intl.NumberFormat('pt-BR'), []);
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }),
+    [],
+  );
   const summary = summaryQuery.data?.summary;
 
   const renderMetrics = <T,>(data: T | undefined, render: (value: T) => ReactNode) => {
@@ -96,7 +100,7 @@ const HomePage = () => {
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Total cadastrados</dt>
-                <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(owners.total)}</dd>
+                <dd className="text-2xl font-semibold text-brand-escuro">{numberFormatter.format(owners.total)}</dd>
               </div>
             </dl>
           ))}
@@ -120,7 +124,7 @@ const HomePage = () => {
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Pets cadastrados</dt>
-                <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(animals.total)}</dd>
+                <dd className="text-2xl font-semibold text-brand-escuro">{numberFormatter.format(animals.total)}</dd>
               </div>
             </dl>
           ))}
@@ -157,37 +161,37 @@ const HomePage = () => {
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Agendados</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.scheduled ?? 0)}
+                    {numberFormatter.format(status.scheduled ?? 0)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Confirmados</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.confirmed ?? 0)}
+                    {numberFormatter.format(status.confirmed ?? 0)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Cancelados</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.cancelled ?? 0)}
+                    {numberFormatter.format(status.cancelled ?? 0)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Concluídos</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.completed ?? 0)}
+                    {numberFormatter.format(status.completed ?? 0)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Hoje</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(timeframe.today ?? 0)}
+                    {numberFormatter.format(timeframe.today ?? 0)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Próximos 7 dias</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(timeframe.upcomingWeek ?? 0)}
+                    {numberFormatter.format(timeframe.upcomingWeek ?? 0)}
                   </dd>
                 </div>
               </dl>
@@ -223,31 +227,31 @@ const HomePage = () => {
               <dl className="grid grid-cols-2 gap-4">
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Total registrados</dt>
-                  <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(total)}</dd>
+                  <dd className="text-2xl font-semibold text-brand-escuro">{numberFormatter.format(total)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Em andamento</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.ongoing ?? 0)}
+                    {numberFormatter.format(status.ongoing ?? 0)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Concluídos</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.completed ?? 0)}
+                    {numberFormatter.format(status.completed ?? 0)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Cancelados</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.cancelled ?? 0)}
+                    {numberFormatter.format(status.cancelled ?? 0)}
                   </dd>
                 </div>
                 {todaysServices !== undefined ? (
                   <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Realizados hoje</dt>
                     <dd className="text-2xl font-semibold text-brand-escuro">
-                      {formatter.format(todaysServices ?? 0)}
+                      {numberFormatter.format(todaysServices ?? 0)}
                     </dd>
                   </div>
                 ) : null}
@@ -277,19 +281,19 @@ const HomePage = () => {
               <dl className="grid grid-cols-2 gap-4">
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Críticos</dt>
-                  <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(products.critical)}</dd>
+                  <dd className="text-2xl font-semibold text-brand-escuro">{numberFormatter.format(products.critical)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Em atenção</dt>
-                  <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(products.lowStock)}</dd>
+                  <dd className="text-2xl font-semibold text-brand-escuro">{numberFormatter.format(products.lowStock)}</dd>
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Ativos no catálogo</dt>
-                  <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(products.totalActive)}</dd>
+                  <dd className="text-2xl font-semibold text-brand-escuro">{numberFormatter.format(products.totalActive)}</dd>
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Com estoque saudável</dt>
-                  <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(healthy)}</dd>
+                  <dd className="text-2xl font-semibold text-brand-escuro">{numberFormatter.format(healthy)}</dd>
                 </div>
               </dl>
             );
@@ -318,66 +322,75 @@ const HomePage = () => {
               paid: invoices.paid,
               overdue: invoices.overdue,
             };
-            const receivables = invoices.receivables ?? {
-              receivedTotal: invoices.receivedTotal,
-            };
-            const hasOverdue = invoices.status?.overdue !== undefined || invoices.overdue !== undefined;
-            const hasDueToday = invoices.receivables?.dueToday !== undefined;
-            const hasDueSoon = invoices.receivables?.dueSoon !== undefined;
-            const hasReceivedTotal = receivables.receivedTotal !== undefined;
+            const receivables = invoices.receivables ?? {};
+            const receivableTotal = invoices.receivableTotal ?? 0;
+            const overdueTotal = invoices.overdueTotal ?? 0;
+            const receivedTotal = invoices.receivedTotal ?? receivables.receivedTotal ?? 0;
+
+            const openCount = status.open ?? invoices.open ?? 0;
+            const partiallyPaidCount = status.partiallyPaid ?? invoices.partiallyPaid ?? 0;
+            const paidCount = status.paid ?? invoices.paid ?? 0;
+            const blockedCount = status.blocked ?? invoices.blocked ?? 0;
+            const overdueCount = status.overdue ?? invoices.overdue;
+            const hasOverdue = overdueCount !== undefined || overdueTotal > 0;
+            const hasDueToday = receivables.dueToday !== undefined;
+            const hasDueSoon = receivables.dueSoon !== undefined;
 
             return (
-              <dl className="grid grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Em aberto</dt>
-                  <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(status.open ?? 0)}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Pagas parcialmente</dt>
+              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Recebido</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.partiallyPaid ?? 0)}
+                    {currencyFormatter.format(receivedTotal)}
                   </dd>
+                  <p className="text-xs text-brand-grafite/70">
+                    Faturas pagas: {numberFormatter.format(paidCount)}
+                  </p>
                 </div>
-                <div>
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Pagas</dt>
-                  <dd className="text-2xl font-semibold text-brand-escuro">{formatter.format(status.paid ?? 0)}</dd>
+                <div className="space-y-1">
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">A receber</dt>
+                  <dd className="text-2xl font-semibold text-brand-escuro">
+                    {currencyFormatter.format(receivableTotal)}
+                  </dd>
+                  <p className="text-xs text-brand-grafite/70">
+                    Em aberto e parciais: {numberFormatter.format(openCount + partiallyPaidCount)}
+                  </p>
                 </div>
-                <div>
+                <div className="space-y-1">
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Vencidas</dt>
+                  <dd className="text-2xl font-semibold text-brand-escuro">
+                    {currencyFormatter.format(overdueTotal)}
+                  </dd>
+                  {hasOverdue ? (
+                    <p className="text-xs text-brand-grafite/70">
+                      Faturas vencidas: {numberFormatter.format(overdueCount ?? 0)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
                   <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Bloqueadas</dt>
                   <dd className="text-2xl font-semibold text-brand-escuro">
-                    {formatter.format(status.blocked ?? 0)}
+                    {numberFormatter.format(blockedCount)}
                   </dd>
                 </div>
-                {hasOverdue ? (
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Vencidas</dt>
-                    <dd className="text-2xl font-semibold text-brand-escuro">
-                      {formatter.format(status.overdue ?? 0)}
-                    </dd>
-                  </div>
-                ) : null}
-                {hasDueToday ? (
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Vencem hoje</dt>
-                    <dd className="text-2xl font-semibold text-brand-escuro">
-                      {formatter.format(receivables.dueToday ?? 0)}
-                    </dd>
-                  </div>
-                ) : null}
-                {hasDueSoon ? (
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Próximos vencimentos</dt>
-                    <dd className="text-2xl font-semibold text-brand-escuro">
-                      {formatter.format(receivables.dueSoon ?? 0)}
-                    </dd>
-                  </div>
-                ) : null}
-                {hasReceivedTotal ? (
-                  <div className="sm:col-span-2">
-                    <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Recebido</dt>
-                    <dd className="text-2xl font-semibold text-brand-escuro">
-                      {formatter.format(receivables.receivedTotal ?? 0)}
-                    </dd>
+                {hasDueToday || hasDueSoon ? (
+                  <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
+                    {hasDueToday ? (
+                      <div className="space-y-1">
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Vencem hoje</dt>
+                        <dd className="text-lg font-semibold text-brand-escuro">
+                          {numberFormatter.format(receivables.dueToday ?? 0)}
+                        </dd>
+                      </div>
+                    ) : null}
+                    {hasDueSoon ? (
+                      <div className="space-y-1">
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-brand-grafite/60">Próximos vencimentos</dt>
+                        <dd className="text-lg font-semibold text-brand-escuro">
+                          {numberFormatter.format(receivables.dueSoon ?? 0)}
+                        </dd>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </dl>
