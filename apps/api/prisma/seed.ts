@@ -344,7 +344,8 @@ const DEFAULT_MODULES = [
 const LEGACY_MODULE_SLUG_MAP: Record<string, string> = {
   'owners:write': 'owners:manage',
   'animals:write': 'animals:manage',
-  'services:write': 'services:manage',
+  'services:write': 'attendances:manage',
+  'services:manage': 'attendances:manage',
   'products:write': 'products:manage',
   'cashier:access': 'cashier:manage',
 };
