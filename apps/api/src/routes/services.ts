@@ -183,7 +183,7 @@ const ensureResponsibleExists = async (tx: Prisma.TransactionClient, userId: str
         modules: {
           some: {
             isEnabled: true,
-            module: { slug: 'services:write', isActive: true },
+            module: { slug: { in: ['attendances:manage', 'services:manage', 'services:write'] }, isActive: true },
           },
         },
       },
@@ -256,7 +256,7 @@ const toDecimal = (value: number) => new Prisma.Decimal(value.toFixed(2));
 
 servicesRouter.get(
   '/',
-  requirePermission('services:read'),
+  requirePermission('attendances:manage', 'attendances:read'),
   asyncHandler(async (req, res) => {
     const filters = serviceFilterSchema.parse(req.query);
 
@@ -283,7 +283,7 @@ servicesRouter.get(
 
 servicesRouter.get(
   '/catalog',
-  requirePermission('services:write'),
+  requirePermission('attendances:manage'),
   asyncHandler(async (_req, res) => {
     const definitions = await prisma.serviceDefinition.findMany({
       where: { isActive: true },
@@ -307,7 +307,7 @@ servicesRouter.get(
 
 servicesRouter.get(
   '/responsibles',
-  requirePermission('services:write'),
+  requirePermission('attendances:manage'),
   asyncHandler(async (_req, res) => {
     const responsibles = await prisma.user.findMany({
       where: {
@@ -316,7 +316,10 @@ servicesRouter.get(
           modules: {
             some: {
               isEnabled: true,
-              module: { slug: 'services:write', isActive: true },
+              module: {
+                slug: { in: ['attendances:manage', 'services:manage', 'services:write'] },
+                isActive: true,
+              },
             },
           },
         },
@@ -335,7 +338,7 @@ servicesRouter.get(
 
 servicesRouter.post(
   '/',
-  requirePermission('services:write'),
+  requirePermission('attendances:manage'),
   asyncHandler(async (req, res) => {
     const payload = serviceCreateSchema.parse(req.body);
 
@@ -446,7 +449,7 @@ servicesRouter.post(
 
 servicesRouter.get(
   '/:id',
-  requirePermission('services:read'),
+  requirePermission('attendances:manage', 'attendances:read'),
   asyncHandler(async (req, res) => {
     const { id } = serviceIdSchema.parse(req.params);
 
@@ -465,7 +468,7 @@ servicesRouter.get(
 
 servicesRouter.put(
   '/:id',
-  requirePermission('services:write'),
+  requirePermission('attendances:manage'),
   asyncHandler(async (req, res) => {
     const { id } = serviceIdSchema.parse(req.params);
     const payload = serviceUpdateSchema.parse(req.body);
@@ -751,7 +754,7 @@ servicesRouter.put(
 
 servicesRouter.post(
   '/:id/conclude',
-  requirePermission('services:write'),
+  requirePermission('attendances:manage'),
   asyncHandler(async (req, res) => {
     const { id } = serviceIdSchema.parse(req.params);
     const payload = concludeServiceSchema.parse(req.body);
@@ -797,7 +800,7 @@ servicesRouter.post(
 
 servicesRouter.delete(
   '/:id',
-  requirePermission('services:write'),
+  requirePermission('attendances:manage'),
   asyncHandler(async (req, res) => {
     const { id } = serviceIdSchema.parse(req.params);
 
