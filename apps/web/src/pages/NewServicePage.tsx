@@ -508,30 +508,6 @@ const NewServicePage = () => {
   const overallTotal = servicesTotal + productsTotal;
 
   useEffect(() => {
-    (items ?? []).forEach((item, index) => {
-      if (!item?.productId) return;
-
-      const product = availableProducts.find((candidate) => candidate.id === item.productId);
-      if (!product) return;
-
-      const basePrice = resolveProductBasePrice(product);
-      const formattedBasePrice = basePrice.toFixed(2);
-      const rawUnitPrice = typeof item.precoUnitario === 'string' ? item.precoUnitario : String(item.precoUnitario ?? '');
-      const normalizedUnitPrice = rawUnitPrice.replace(',', '.');
-      const parsedUnitPrice = Number(normalizedUnitPrice);
-      const hasCustomPrice = Number.isFinite(parsedUnitPrice)
-        ? Number(parsedUnitPrice.toFixed(2)) !== Number(basePrice.toFixed(2))
-        : false;
-
-      if (!canOverrideProductPrice || rawUnitPrice.trim() === '' || !Number.isFinite(parsedUnitPrice)) {
-        if (!rawUnitPrice || rawUnitPrice !== formattedBasePrice || hasCustomPrice) {
-          setValue(`items.${index}.precoUnitario`, formattedBasePrice);
-        }
-      }
-    });
-  }, [availableProducts, canOverrideProductPrice, items, resolveProductBasePrice, setValue]);
-
-  useEffect(() => {
     (catalogItems ?? []).forEach((item, index) => {
       if (!item?.serviceDefinitionId) return;
       if (item.precoUnitario) return;
@@ -554,6 +530,30 @@ const NewServicePage = () => {
     setValue('data', toDateTimeLocal(selectedAppointment.scheduledStart));
     setValue('fim', toDateTimeLocal(selectedAppointment.scheduledEnd));
   }, [selectedAppointment, setValue]);
+
+  useEffect(() => {
+    (items ?? []).forEach((item, index) => {
+      if (!item?.productId) return;
+
+      const product = availableProducts.find((candidate) => candidate.id === item.productId);
+      if (!product) return;
+
+      const basePrice = resolveProductBasePrice(product);
+      const formattedBasePrice = basePrice.toFixed(2);
+      const rawUnitPrice = typeof item.precoUnitario === 'string' ? item.precoUnitario : String(item.precoUnitario ?? '');
+      const normalizedUnitPrice = rawUnitPrice.replace(',', '.');
+      const parsedUnitPrice = Number(normalizedUnitPrice);
+      const hasCustomPrice = Number.isFinite(parsedUnitPrice)
+        ? Number(parsedUnitPrice.toFixed(2)) !== Number(basePrice.toFixed(2))
+        : false;
+
+      if (!canOverrideProductPrice || rawUnitPrice.trim() === '' || !Number.isFinite(parsedUnitPrice)) {
+        if (!rawUnitPrice || rawUnitPrice !== formattedBasePrice || hasCustomPrice) {
+          setValue(`items.${index}.precoUnitario`, formattedBasePrice);
+        }
+      }
+    });
+  }, [availableProducts, canOverrideProductPrice, items, resolveProductBasePrice, setValue]);
 
   const createAttendance = useMutation({
     mutationFn: (payload: CreateAttendancePayload) => servicesApi.create(payload),
@@ -1076,17 +1076,17 @@ const NewServicePage = () => {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="font-montserrat text-2xl font-semibold text-brand-escuro">{pageTitle}</h1>
-          <p className="text-sm text-brand-grafite/70">{pageDescription}</p>
+            <p className="text-sm text-brand-grafite/70">{pageDescription}</p>
+          </div>
+          <Button variant="secondary" asChild>
+            <Link to="/services">Abrir catálogo de serviços</Link>
+          </Button>
         </div>
-        <Button variant="secondary" asChild>
-          <Link to="/services">Abrir catálogo de serviços</Link>
-        </Button>
-      </div>
 
-      <Card
-        title="Dados do atendimento"
-        description="Preencha com atenção para manter o histórico impecável e inclua quantos serviços forem necessários no mesmo atendimento."
-      >
+        <Card
+          title="Dados do atendimento"
+          description="Preencha com atenção para manter o histórico impecável e inclua quantos serviços forem necessários no mesmo atendimento."
+        >
         <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
           <div className="md:col-span-2">
             <SelectField
@@ -1672,8 +1672,9 @@ const NewServicePage = () => {
             </Button>
           </div>
         </form>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </>
   );
 };
 
