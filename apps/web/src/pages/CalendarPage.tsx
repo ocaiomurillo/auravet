@@ -134,7 +134,7 @@ const CalendarPage = () => {
 
   const handleRegisterAttendance = (appointmentId: string) => {
     const searchParams = new URLSearchParams({ appointmentId });
-    navigate(`/new-service?${searchParams.toString()}`);
+    navigate(`/attendances/new?${searchParams.toString()}`);
   };
 
   return (

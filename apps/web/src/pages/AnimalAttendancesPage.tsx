@@ -96,7 +96,7 @@ const AnimalAttendancesPage = () => {
           </p>
         </div>
         <Button variant="secondary" asChild>
-          <Link to="/new-service">Registrar novo atendimento</Link>
+          <Link to="/attendances/new">Registrar novo atendimento</Link>
         </Button>
       </div>
 
@@ -212,11 +212,11 @@ const AnimalAttendancesPage = () => {
                     </div>
                     <div className="flex flex-col gap-2">
                       <Button variant="ghost" asChild>
-                        <Link to={`/services/${attendance.id}/edit?mode=view`}>Visualizar</Link>
+                        <Link to={`/attendances/${attendance.id}/edit?mode=view`}>Visualizar</Link>
                       </Button>
                       {canEditAttendances ? (
                         <Button asChild>
-                          <Link to={`/services/${attendance.id}/edit`}>Editar</Link>
+                          <Link to={`/attendances/${attendance.id}/edit`}>Editar</Link>
                         </Button>
                       ) : null}
                     </div>

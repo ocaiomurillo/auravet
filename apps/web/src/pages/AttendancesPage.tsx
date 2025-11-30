@@ -180,7 +180,7 @@ const AttendancesPage = () => {
   };
 
   const handleEdit = (id: string) => {
-    navigate(`/services/${id}/edit`);
+    navigate(`/attendances/${id}/edit`);
   };
 
   const buildStatusBadge = (status: AttendanceStatus) => {
@@ -209,7 +209,7 @@ const AttendancesPage = () => {
           </Button>
           {canEdit ? (
             <Button asChild>
-              <Link to="/new-service">Registrar atendimento</Link>
+              <Link to="/attendances/new">Registrar atendimento</Link>
             </Button>
           ) : null}
         </div>
