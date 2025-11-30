@@ -29,7 +29,7 @@ ownersRouter.use(authenticate);
 
 ownersRouter.get(
   '/basic',
-  requireAnyPermission('owners:read', 'cashier:access'),
+  requireAnyPermission('owners:read', 'cashier:manage'),
   asyncHandler(async (_req, res) => {
     const owners = await prisma.owner.findMany({
       select: {

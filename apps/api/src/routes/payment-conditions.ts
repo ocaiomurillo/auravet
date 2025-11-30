@@ -24,7 +24,7 @@ const serializePaymentCondition = (condition: {
 export const paymentConditionsRouter = Router();
 
 paymentConditionsRouter.use(authenticate);
-paymentConditionsRouter.use(requirePermission('cashier:access'));
+paymentConditionsRouter.use(requirePermission('cashier:manage'));
 
 paymentConditionsRouter.get(
   '/',
