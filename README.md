@@ -105,7 +105,7 @@ A Auravet foi construída em **arquitetura em camadas** e organizada em **monore
 
 ## 🚀 Como rodar o projeto
 
-### 1. Pré-requisitos
+#### 1. Pré-requisitos
 
 * Node.js 20+
 * npm (ou pnpm/yarn, se quiser adaptar)
@@ -121,7 +121,6 @@ Caso não exista, o script local já cuida de criar um `.env` a partir de `.env.
 
 Na raiz do projeto existe a pasta `scripts/` com dois scripts de automação:
 
-* `scripts/setup-local.sh` → prepara **ambiente local** (Node + Prisma + banco local)
 * `scripts/setup-docker.sh` → prepara e sobe o ambiente completo com **Docker**
 
 > No Linux/macOS, antes de rodar pela primeira vez:
@@ -131,32 +130,7 @@ chmod +x scripts/setup-local.sh
 chmod +x scripts/setup-docker.sh
 ```
 
-#### 2.1 Ambiente local (sem Docker)
-
-Esse script cuida de:
-
-* Garantir que exista um `.env` (copiando de `.env.example` se necessário)
-* Instalar as dependências do monorepo (`npm install`)
-* Gerar o Prisma Client
-* Aplicar as migrações (`prisma migrate`)
-* Executar o seed (cria usuários, tutores, pets, produtos, serviços, agendamentos, atendimentos e faturas de exemplo)
-
-Passo a passo:
-
-```bash
-# Na raiz do repositório
-./scripts/setup-local.sh
-
-# Depois que o setup terminar:
-npm run dev
-```
-
-Por padrão (ajuste se seu `package.json` estiver diferente):
-
-* API: `http://localhost:4000`
-* Web: `http://localhost:5173`
-
-#### 2.2 Ambiente completo com Docker
+#### 2 Ambiente completo com Docker
 
 O script `setup-docker.sh` faz o seguinte:
 
